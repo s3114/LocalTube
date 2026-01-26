@@ -24,6 +24,15 @@ const downloadsDir = path.join(__dirname, 'downloads');
 if (!fs.existsSync(downloadsDir)) {
     fs.mkdirSync(downloadsDir);
 }
+// ムービーとサムネイルの保存先ディレクトリを作成します。
+const movieDir = path.join(downloadsDir, 'movie');
+if (!fs.existsSync(movieDir)) {
+    fs.mkdirSync(movieDir);
+}
+const thumbnailDir = path.join(downloadsDir, 'thumbnail');
+if (!fs.existsSync(thumbnailDir)) {
+    fs.mkdirSync(thumbnailDir);
+}
 
 // ■ APIエンドポイントの設定
 // --------------------------------------------------
@@ -63,7 +72,7 @@ app.post('/download', (req, res) => {
         '--embed-thumbnail', // サムネイルを動画に埋め込む
         '--add-metadata',    // 動画にメタデータを追加する
         '--ignore-errors',   // エラーが発生してもダウンロードを続行する
-        '--retries', 'infinity',    // 一時的なエラー時に無限回再試行する
+        '--retries', 'infinite',    // 一時的なエラー時に無限回再試行する
     ];
 
     // フロントエンドのオプションに応じて引数を追加します。
@@ -105,6 +114,46 @@ app.post('/download', (req, res) => {
         if (code === 0) {
             // 成功した場合 (終了コード 0)
             console.log(`ダウンロードが成功しました: ${url}`);
+
+            const useDefaultMove = !savePath || savePath.trim() === '';
+
+            if (useDefaultMove) {
+                try {
+                    const files = fs.readdirSync(outputDir);
+                    const thumbnailExtensions = ['.webp', '.jpg', '.jpeg', '.png'];
+
+                    for (const file of files) {
+                        const oldPath = path.join(outputDir, file);
+                        
+                        try {
+                            // 対象がファイルであり、ディレクトリではないことを確認
+                            const stat = fs.statSync(oldPath);
+                            if (!stat.isFile()) {
+                                continue;
+                            }
+
+                            const fileExt = path.extname(file).toLowerCase();
+
+                            if (fileExt === '.mp4') {
+                                const newPath = path.join(movieDir, file);
+                                fs.renameSync(oldPath, newPath);
+                                console.log(`Moved video file: ${newPath}`);
+                            } else if (thumbnailExtensions.includes(fileExt)) {
+                                const newPath = path.join(thumbnailDir, file);
+                                fs.renameSync(oldPath, newPath);
+                                console.log(`Moved thumbnail file: ${newPath}`);
+                            }
+                        } catch (err) {
+                            // statSync or renameSyncのエラーを個別にキャッチ
+                            console.error(`Failed to process or move file ${file}: ${err}`);
+                        }
+                    }
+                } catch (err) {
+                    // readdirSyncのエラーをキャッチ
+                    console.error(`Failed to read downloads directory for moving files: ${err}`);
+                }
+            }
+            
             res.json({
                 message: 'ダウンロードが正常に完了しました！',
                 status: 'success',
