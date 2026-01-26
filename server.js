@@ -60,6 +60,10 @@ app.post('/download', (req, res) => {
     let args = [
         url, // ダウンロードする動画のURL
         '-o', path.join(outputDir, '%(upload_date)s-%(title)s.%(ext)s'), // 出力ファイル名のテンプレート
+        '--embed-thumbnail', // サムネイルを動画に埋め込む
+        '--add-metadata',    // 動画にメタデータを追加する
+        '--ignore-errors',   // エラーが発生してもダウンロードを続行する
+        '--retries', 'infinity',    // 一時的なエラー時に無限回再試行する
     ];
 
     // フロントエンドのオプションに応じて引数を追加します。
