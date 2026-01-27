@@ -25,11 +25,11 @@ if (!fs.existsSync(downloadsDir)) {
     fs.mkdirSync(downloadsDir);
 }
 // ムービーとサムネイルの保存先ディレクトリを作成します。
-const movieDir = path.join(downloadsDir, 'movie');
+const movieDir = path.join(downloadsDir, '動画');
 if (!fs.existsSync(movieDir)) {
     fs.mkdirSync(movieDir);
 }
-const thumbnailDir = path.join(downloadsDir, 'thumbnail');
+const thumbnailDir = path.join(downloadsDir, 'サムネイル');
 if (!fs.existsSync(thumbnailDir)) {
     fs.mkdirSync(thumbnailDir);
 }
@@ -82,7 +82,10 @@ app.post('/download', (req, res) => {
     if (downloadThumb) {
         args.push('--write-thumbnail'); // サムネイルをダウンロード
     }
-    // 'saveHistory' や 'bypassDrm' などの他のオプションもここに追加できます。
+    if (saveHistory) {
+        args.push('--download-archive', path.join(__dirname, 'finished.txt')); // ダウンロード履歴を保存
+    }
+    // 'bypassDrm' などの他のオプションもここに追加できます。
 
     // yt-dlp.exeを別プロセスとして実行します。
     const commandString = `${ytDlpPath} ${args.map(arg => `"${arg}"`).join(' ')}`;
@@ -139,13 +142,19 @@ app.post('/download', (req, res) => {
                                 fs.renameSync(oldPath, newPath);
                                 console.log(`Moved video file: ${newPath}`);
                             } else if (thumbnailExtensions.includes(fileExt)) {
-                                const newPath = path.join(thumbnailDir, file);
-                                fs.renameSync(oldPath, newPath);
-                                console.log(`Moved thumbnail file: ${newPath}`);
+                                // サムネイル保存オプションの状態によって移動または削除を分岐
+                                if (downloadThumb) {
+                                    const newPath = path.join(thumbnailDir, file);
+                                    fs.renameSync(oldPath, newPath);
+                                    console.log(`Moved thumbnail file: ${newPath}`);
+                                } else {
+                                    fs.unlinkSync(oldPath);
+                                    console.log(`Deleted thumbnail file: ${oldPath}`);
+                                }
                             }
                         } catch (err) {
-                            // statSync or renameSyncのエラーを個別にキャッチ
-                            console.error(`Failed to process or move file ${file}: ${err}`);
+                            // statSync, renameSync, or unlinkSyncのエラーを個別にキャッチ
+                            console.error(`Failed to process file ${file}: ${err}`);
                         }
                     }
                 } catch (err) {
