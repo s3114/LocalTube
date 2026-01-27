@@ -40,7 +40,7 @@ if (!fs.existsSync(thumbnailDir)) {
 // '/download' というパスにPOSTリクエストが来たときの処理を定義します。
 app.post('/download', (req, res) => {
     // フロントエンドから送信されたオプションを取得します。
-    const { url, format, saveHistory, downloadThumb, bypassDrm, savePath } = req.body;
+    const { url, format, saveHistory, downloadThumb, bypassDrm, savePath, cookieFilePath } = req.body;
 
     // URLが指定されていない場合は、エラーステータス400を返します。
     if (!url) {
@@ -84,6 +84,9 @@ app.post('/download', (req, res) => {
     }
     if (saveHistory) {
         args.push('--download-archive', path.join(__dirname, 'finished.txt')); // ダウンロード履歴を保存
+    }
+    if (cookieFilePath && cookieFilePath.trim() !== '') {
+        args.push('--cookies', cookieFilePath); // クッキーファイルを指定
     }
     // 'bypassDrm' などの他のオプションもここに追加できます。
 
