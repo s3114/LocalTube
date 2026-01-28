@@ -39,6 +39,5 @@ if not exist node_modules (
 )
 
 node server.js
-REM start "Node Server" /min cmd /k "node server.js"
 
 pause
