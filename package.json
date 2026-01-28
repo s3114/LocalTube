@@ -12,6 +12,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "iconv-lite": "^0.7.2",
+    "multer": "^2.0.2",
+    "sse-express": "^1.0.2",
+    "ws": "^8.19.0"
   }
 }
