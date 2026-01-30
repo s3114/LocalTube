@@ -172,7 +172,7 @@
     <main>
         <div class="card">
             <div class="url-box">
-                <textarea id="urls" placeholder="YouTube の URL を1行に1つずつ入力"></textarea>
+                <textarea id="urls" placeholder="YouTube や Abema の URL を入力"></textarea>
                 <button onclick="start()">DL</button>
             </div>
             <div class="options">
@@ -203,16 +203,22 @@
                     <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">144p （256 x 144 ）</option>
                 </select>
 
-
                 <div class="url-box">
-                    <input type="text" id="savePath" placeholder="保存先フォルダパス (空白の場合、起動.batの親フォルダのdownloadsに保存されます)">
+                    <input type="text" id="savePath" placeholder="保存先フォルダパス (空白の場合はデフォルト)">
                 </div>
                 <div class="toggle">
                     <div>
-                        並列ダウンロード数: <span id="parallelDownloadsValue">1</span>
-                        <small>フラグメントの並列ダウンロード数</small>
+                        同時ダウンロード数: <span id="parallelDownloadsValue">10</span>
+                        <small>動画を同時にダウンロードする最大数</small>
                     </div>
-                    <input type="range" id="optParallelDownloads" min="1" max="16" value="1">
+                    <input type="range" id="optParallelDownloads" min="1" max="999" value="3">
+                </div>
+                <div class="toggle">
+                    <div>
+                        フラグメントの並列ダウンロード数: <span id="concurrentFragmentsValue">4</span>
+                        <small>1つの動画をダウンロードする際の分割数</small>
+                    </div>
+                    <input type="range" id="optConcurrentFragments" min="1" max="16" value="4">
                 </div>
             </div>
             <div class="toggle">
@@ -268,11 +274,11 @@
         // --- Helper Functions ---
         function getStatusIcon(status) {
             switch (status) {
-                case 'queued': return '🕒'; // Clock
-                case 'downloading': return '⬇️'; // Down arrow
-                case 'completed': return '✅'; // Check mark
-                case 'error': return '❌'; // Cross mark
-                default: return '❔'; // Question mark
+                case 'queued': return '🕒';
+                case 'downloading': return '⬇️';
+                case 'completed': return '✅';
+                case 'error': return '❌';
+                default: return '❔';
             }
         }
         
@@ -328,12 +334,11 @@
 
         // --- Main Logic ---
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Settings Persistence ---
             function saveSetting(key, value) { localStorage.setItem(key, value); }
             function loadSetting(key, defaultValue) {
                 const storedValue = localStorage.getItem(key);
                 if (storedValue === null) return defaultValue;
-                if (defaultValue === true || defaultValue === false) return storedValue === 'true';
+                if (typeof defaultValue === 'boolean') return storedValue === 'true';
                 return storedValue;
             }
 
@@ -345,6 +350,8 @@
                 optDrm: document.getElementById('optDrm'),
                 optParallelDownloads: document.getElementById('optParallelDownloads'),
                 parallelDownloadsValue: document.getElementById('parallelDownloadsValue'),
+                optConcurrentFragments: document.getElementById('optConcurrentFragments'),
+                concurrentFragmentsValue: document.getElementById('concurrentFragmentsValue'),
                 cookiePathSet: document.getElementById('cookiePathSet'),
                 cookieFileNameDisplay: document.getElementById('cookieFileNameDisplay'),
                 urls: document.getElementById('urls'),
@@ -352,23 +359,34 @@
             };
 
             elements.fmt.value = loadSetting('fmt', elements.fmt.value);
-            elements.savePath.value = loadSetting('savePath', elements.savePath.value);
-            elements.optHistory.checked = loadSetting('optHistory', elements.optHistory.checked);
-            elements.optThumb.checked = loadSetting('optThumb', elements.optThumb.checked);
-            elements.optDrm.checked = loadSetting('optDrm', false); // デフォルトはfalse
-            const loadedParallel = loadSetting('optParallelDownloads', elements.optParallelDownloads.value);
+            elements.savePath.value = loadSetting('savePath', '');
+            elements.optHistory.checked = loadSetting('optHistory', true);
+            elements.optThumb.checked = loadSetting('optThumb', true);
+            elements.optDrm.checked = loadSetting('optDrm', false);
+            
+            const loadedParallel = loadSetting('optParallelDownloads', '3');
             elements.optParallelDownloads.value = loadedParallel;
             elements.parallelDownloadsValue.textContent = loadedParallel;
+            
+            const loadedFragments = loadSetting('optConcurrentFragments', '4');
+            elements.optConcurrentFragments.value = loadedFragments;
+            elements.concurrentFragmentsValue.textContent = loadedFragments;
 
             elements.fmt.addEventListener('change', (e) => saveSetting('fmt', e.target.value));
             elements.savePath.addEventListener('input', (e) => saveSetting('savePath', e.target.value));
             elements.optHistory.addEventListener('change', (e) => saveSetting('optHistory', e.target.checked));
             elements.optThumb.addEventListener('change', (e) => saveSetting('optThumb', e.target.checked));
             elements.optDrm.addEventListener('change', (e) => saveSetting('optDrm', e.target.checked));
+            
             elements.optParallelDownloads.addEventListener('input', (e) => {
                 elements.parallelDownloadsValue.textContent = e.target.value;
                 saveSetting('optParallelDownloads', e.target.value);
             });
+            elements.optConcurrentFragments.addEventListener('input', (e) => {
+                elements.concurrentFragmentsValue.textContent = e.target.value;
+                saveSetting('optConcurrentFragments', e.target.value);
+            });
+
             elements.cookiePathSet.addEventListener('change', e => {
                 const file = e.target.files[0];
                 elements.cookieFileNameDisplay.textContent = file ? file.name : 'ファイルが選択されていません';
@@ -445,6 +463,7 @@
             formData.append('drmProtect', document.getElementById('optDrm').checked);
             formData.append('savePath', document.getElementById('savePath').value);
             formData.append('parallelDownloads', document.getElementById('optParallelDownloads').value);
+            formData.append('concurrentFragments', document.getElementById('optConcurrentFragments').value);
 
             if (window.selectedCookieFile) {
                 formData.append('cookieFile', window.selectedCookieFile);

@@ -34,7 +34,8 @@ if (!fs.existsSync(thumbnailDir)) fs.mkdirSync(thumbnailDir);
 // --------------------------------------------------
 const jobHistory = new Map(); // 全てのジョブをIDで管理
 const downloadQueue = [];
-let isDownloading = false;
+let activeDownloads = 0;
+let maxConcurrentDownloads = 1; // デフォルトは1
 
 // ■ SSE (Server-Sent Events) の設定
 // --------------------------------------------------
@@ -66,153 +67,226 @@ app.get('/jobs', (req, res) => {
     res.json(Array.from(jobHistory.values()));
 });
 
-app.post('/download', upload.single('cookieFile'), (req, res) => {
-    const { urls, format, saveHistory, downloadThumb, drmProtect, savePath, parallelDownloads } = req.body;
+app.post('/download', upload.single('cookieFile'), async (req, res) => {
+    const { urls, format, saveHistory, downloadThumb, drmProtect, savePath, parallelDownloads, concurrentFragments } = req.body;
     const cookieFile = req.file;
 
     if (!urls) {
         return res.status(400).json({ error: '動画のURLは必須です。' });
     }
 
-    const urlList = urls.split(/[\n\s,]+/).filter(url => url.trim() !== '');
+    maxConcurrentDownloads = parseInt(parallelDownloads, 10) || 1;
+
+    const inputUrls = urls.split(/[\n\s,]+/).filter(url => url.trim() !== '');
     const newJobs = [];
 
-    for (const url of urlList) {
-        const jobId = crypto.randomUUID();
-        const job = {
-            id: jobId,
-            url: url.trim(),
-            options: { format, saveHistory: saveHistory === 'true', downloadThumb: downloadThumb === 'true', drmProtect: drmProtect === 'true', savePath, parallelDownloads },
-            cookieFile, // 注意: 全てのURLで同じCookieファイルが使われます
-            status: 'queued',
-            title: url.trim(),
-            progress: { percentage: 0, size: '', totalSize: '', speed: '', eta: '' }
-        };
-        downloadQueue.push(job);
-        jobHistory.set(job.id, job);
-        newJobs.push(job);
+    for (const url of inputUrls) {
+        try {
+            const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
+            for (const videoUrl of videoUrls) {
+                const jobId = crypto.randomUUID();
+                const job = {
+                    id: jobId,
+                    url: videoUrl.trim(),
+                    options: { format, saveHistory: saveHistory === 'true', downloadThumb: downloadThumb === 'true', drmProtect: drmProtect === 'true', savePath, concurrentFragments },
+                    cookieFile,
+                    status: 'queued',
+                    title: videoUrl.trim(),
+                    progress: { percentage: 0, size: '', totalSize: '', speed: '', eta: '' }
+                };
+                downloadQueue.push(job);
+                jobHistory.set(job.id, job);
+                newJobs.push(job);
+            }
+        } catch (error) {
+            console.error(`URLの解析に失敗しました: ${url}`, error);
+            // エラーをクライアントに通知することも検討
+        }
     }
+
 
     broadcast('jobs_added', newJobs);
 
     res.status(202).json({ message: `${newJobs.length}件のダウンロードがキューに追加されました。` });
 
-    if (!isDownloading) {
-        processQueue();
-    }
+    startNextDownload();
 });
 
-// キューを処理するメイン関数
-async function processQueue() {
-    if (isDownloading || downloadQueue.length === 0) {
-        return;
-    }
+// URLを解析して動画URLのリストを取得する関数
+function getUrlsFromInput(url, cookiePath) {
+    return new Promise((resolve, reject) => {
+        const ytDlpPath = path.join(__dirname, 'yt-dlp.exe');
+        let args = [];
+        const commonArgs = ['--skip-download', '--quiet', '--no-warnings'];
+        if (cookiePath) {
+            commonArgs.push('--cookies', cookiePath);
+        }
 
-    isDownloading = true;
-    const job = downloadQueue[0];
-    job.status = 'downloading';
-    job.progress.eta = '開始中...';
-    broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
-
-    const ytDlpPath = path.join(__dirname, 'yt-dlp.exe');
-
-    // 1. まずタイトルを取得
-    try {
-        const title = await getTitle(ytDlpPath, job.url);
-        job.title = title;
-        broadcast('title_update', { id: job.id, title: job.title });
-    } catch (error) {
-        console.error(`タイトルの取得に失敗: ${job.url}`, error);
-        job.status = 'error';
-        job.progress.eta = 'タイトル取得失敗';
-        broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
-        
-        cleanupAndContinue(job);
-        return;
-    }
-
-    // 2. ダウンロードを開始
-    const outputDir = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : downloadsDir;
-    if (!fs.existsSync(outputDir)) {
-        try {
-            fs.mkdirSync(outputDir, { recursive: true });
-        } catch (error) {
-            console.error(`保存先ディレクトリの作成に失敗しました ${outputDir}: ${error.message}`);
-            job.status = 'error';
-            job.progress.eta = '保存先エラー';
-            broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
-            cleanupAndContinue(job);
+        // YouTube
+        if (url.includes('youtube.com/playlist?list=')) {
+            args = [url, '--flat-playlist', '--get-url', ...commonArgs];
+        } else if (url.includes('youtube.com/watch?v=') || url.includes('youtu.be/')) {
+            // プレイリストの一部である可能性を考慮してindexを取り除く
+            const cleanUrl = url.split('&')[0];
+            resolve([cleanUrl]);
+            return;
+        } else if (url.includes('youtube.com/@') || url.includes('youtube.com/channel')) {
+            args = [url, '--flat-playlist', '--get-id', ...commonArgs];
+        }
+        // ABEMA
+        else if (url.includes('abema.tv/video/title/')) { //シリーズ
+             args = [url, '--flat-playlist', '--get-url', ...commonArgs];
+        } else if (url.includes('abema.tv/video/episode/')) { //動画
+            resolve([url]);
             return;
         }
-    }
+        else {
+            // 不明なURLはそのまま渡す
+            resolve([url]);
+            return;
+        }
 
-    let args = buildArgs(job, outputDir);
-    const ytDlp = spawn(ytDlpPath, args);
+        const ytDlp = spawn(ytDlpPath, args);
+        let videoUrls = '';
+        ytDlp.stdout.on('data', (data) => {
+            videoUrls += data.toString();
+        });
 
-    // プロセスのイベントハンドリング
-    let stdoutBuffer = '';
-    ytDlp.stdout.on('data', (data) => {
-        stdoutBuffer += data.toString();
-        // 改行コード（\rまたは\n）で分割し、不完全な最後の行はバッファに残す
-        const lines = stdoutBuffer.split(/[\r\n]/);
-        stdoutBuffer = lines.pop() || ''; 
+        ytDlp.stderr.on('data', (data) => {
+            console.error(`[${url}] yt-dlp stderr: ${data}`);
+        });
 
-        for (const line of lines) {
-            if (line.trim() === '') continue;
-
-            // yt-dlpのデフォルトプログレス出力に合わせた正規表現
-            // 例: [download]  10.2% of 11.00MiB at 806.79KiB/s ETA 00:12
-            const progressMatch = line.match(/\[download\]\s+([\d.]+)% of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/);
-            if (progressMatch) {
-                job.progress = {
-                    percentage: parseFloat(progressMatch[1]),
-                    totalSize: progressMatch[2],
-                    speed: progressMatch[3],
-                    eta: progressMatch[4]
-                };
-                broadcast('progress_update', { id: job.id, progress: job.progress });
+        ytDlp.on('close', (code) => {
+            if (code === 0) {
+                const urls = videoUrls.split('\n').filter(u => u.trim() !== '');
+                // チャンネルの場合、IDのリストが返るのでURLに変換する
+                if (url.includes('youtube.com/@') || url.includes('youtube.com/channel')) {
+                    resolve(urls.map(id => `https://www.youtube.com/watch?v=${id}`));
+                } else {
+                    resolve(urls);
+                }
+            } else {
+                reject(new Error(`yt-dlp exited with code ${code} for URL: ${url}`));
             }
-        }
-    });
-
-    ytDlp.stderr.on('data', (data) => {
-        console.error(`yt-dlp stderr: ${data.toString().trim()}`);
-    });
-
-    ytDlp.on('close', (code) => {
-        if (code === 0) {
-            job.status = 'completed';
-            job.progress.eta = '完了';
-            moveFiles(outputDir, job.options.downloadThumb);
-        } else {
-            job.status = 'error';
-            job.progress.eta = 'エラー';
-        }
-        broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
-        cleanupAndContinue(job);
-    });
-
-    ytDlp.on('error', (err) => {
-        console.error(`yt-dlpプロセスの起動に失敗しました: ${err.message}`);
-        job.status = 'error';
-        job.progress.eta = '起動失敗';
-        broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
-        cleanupAndContinue(job);
+        });
+        
+        ytDlp.on('error', (err) => {
+            reject(err);
+        });
     });
 }
+
+
+// キューを処理するメイン関数
+async function startNextDownload() {
+    while (activeDownloads < maxConcurrentDownloads && downloadQueue.length > 0) {
+        activeDownloads++;
+        const job = downloadQueue.shift();
+        
+        if (!job) {
+            activeDownloads--;
+            continue;
+        }
+
+        job.status = 'downloading';
+        job.progress.eta = '開始中...';
+        broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
+
+        const ytDlpPath = path.join(__dirname, 'yt-dlp.exe');
+
+        // 1. まずタイトルを取得
+        try {
+            const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path);
+            job.title = title;
+            broadcast('title_update', { id: job.id, title: job.title });
+        } catch (error) {
+            console.error(`タイトルの取得に失敗: ${job.url}`, error);
+            job.status = 'error';
+            job.progress.eta = 'タイトル取得失敗';
+            broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
+            cleanupAndContinue(job);
+            continue; // 次のループへ
+        }
+
+        // 2. ダウンロードを開始
+        const outputDir = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : downloadsDir;
+        if (!fs.existsSync(outputDir)) {
+            try {
+                fs.mkdirSync(outputDir, { recursive: true });
+            } catch (error) {
+                console.error(`保存先ディレクトリの作成に失敗しました ${outputDir}: ${error.message}`);
+                job.status = 'error';
+                job.progress.eta = '保存先エラー';
+                broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
+                cleanupAndContinue(job);
+                continue; // 次のループへ
+            }
+        }
+
+        let args = buildArgs(job, outputDir);
+        const ytDlp = spawn(ytDlpPath, args);
+
+        // プロセスのイベントハンドリング
+        let stdoutBuffer = '';
+        ytDlp.stdout.on('data', (data) => {
+            stdoutBuffer += data.toString();
+            // 改行コード（\rまたは\n）で分割し、不完全な最後の行はバッファに残す
+            const lines = stdoutBuffer.split(/[\r\n]/);
+            stdoutBuffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.trim() === '') continue;
+
+                const progressMatch = line.match(/\[download\]\s+([\d.]+)% of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/);
+                if (progressMatch) {
+                    job.progress = {
+                        percentage: parseFloat(progressMatch[1]),
+                        totalSize: progressMatch[2],
+                        speed: progressMatch[3],
+                        eta: progressMatch[4]
+                    };
+                    broadcast('progress_update', { id: job.id, progress: job.progress });
+                }
+            }
+        });
+
+        ytDlp.stderr.on('data', (data) => {
+            console.error(`yt-dlp stderr: ${data.toString().trim()}`);
+        });
+
+        ytDlp.on('close', (code) => {
+            if (code === 0) {
+                job.status = 'completed';
+                job.progress.eta = '完了';
+                moveFiles(outputDir, job.options.downloadThumb);
+            } else {
+                job.status = 'error';
+                job.progress.eta = 'エラー';
+            }
+            broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
+            cleanupAndContinue(job);
+        });
+
+        ytDlp.on('error', (err) => {
+            console.error(`yt-dlpプロセスの起動に失敗しました: ${err.message}`);
+            job.status = 'error';
+            job.progress.eta = '起動失敗';
+            broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
+            cleanupAndContinue(job);
+        });
+    }
+}
+
 
 function cleanupAndContinue(job) {
     if (job.cookieFile) {
-        fs.unlink(job.cookieFile.path, (err) => {
-            if (err) console.error(`一時クッキーファイルの削除に失敗しました: ${job.cookieFile.path}`, err);
-            else console.log(`一時クッキーファイルを削除しました: ${job.cookieFile.path}`);
-        });
+        // 同じCookieファイルが他のジョブで使われている可能性があるため、すぐに削除しない
     }
-
-    downloadQueue.shift();
-    isDownloading = false;
-    processQueue();
+    
+    activeDownloads--;
+    startNextDownload(); // 次のダウンロードを開始
 }
+
 
 // yt-dlpの引数を組み立てるヘルパー関数
 function buildArgs(job, outputDir) {
@@ -230,8 +304,8 @@ function buildArgs(job, outputDir) {
     if (options.downloadThumb) args.push('--write-thumbnail');
     if (options.saveHistory) args.push('--download-archive', path.join(__dirname, 'finished.txt'));
     if (job.cookieFile) args.push('--cookies', job.cookieFile.path);
-    if (options.parallelDownloads && parseInt(options.parallelDownloads) > 0) {
-        args.push('--concurrent-fragments', options.parallelDownloads);
+    if (options.concurrentFragments && parseInt(options.concurrentFragments) > 0) {
+        args.push('--concurrent-fragments', options.concurrentFragments);
     }
     if (options.drmProtect) {
         args.push('--add-header', 'youtube:player-client=default,-tv,web_safari,web_embedded');
@@ -240,9 +314,13 @@ function buildArgs(job, outputDir) {
 }
 
 // タイトルを取得するヘルパー関数
-function getTitle(ytDlpPath, url) {
+function getTitle(ytDlpPath, url, cookiePath) {
     return new Promise((resolve, reject) => {
-        const ytDlpProcess = spawn(ytDlpPath, [url, '--get-title', '--no-warnings']);
+        const args = [url, '--get-title', '--no-warnings'];
+        if (cookiePath) {
+            args.push('--cookies', cookiePath);
+        }
+        const ytDlpProcess = spawn(ytDlpPath, args);
 
         const stdoutChunks = [];
         const stderrChunks = [];
@@ -274,6 +352,7 @@ function getTitle(ytDlpPath, url) {
         });
     });
 }
+
 
 // ファイル移動のヘルパー関数
 function moveFiles(outputDir, downloadThumb) {
