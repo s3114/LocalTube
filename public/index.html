@@ -217,6 +217,14 @@
             </div>
             <div class="toggle">
                 <div>
+                    cookieファイル
+                    <small id="cookieFileNameDisplay">ファイルが選択されていません</small>
+                </div>
+                <input type="file" id="cookiePathSet" accept=".txt" style="display: none;">
+                <button onclick="document.getElementById('cookiePathSet').click()" style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">選択</button>
+            </div>
+            <div class="toggle">
+                <div>
                     ダウンロード履歴を保存
                     <small>再度同じ動画がダウンロードされないようになります。</small>
                 </div>
@@ -237,11 +245,16 @@
             </div>
             <div class="toggle">
                 <div>
-                    cookieファイル
-                    <small id="cookieFileNameDisplay">ファイルが選択されていません</small>
+                    DRM 保護を回避
+                    <div class="warn">
+                        <small>非推奨（必要なときのみ使用してください。）詳しくは<a
+                                href="https://github.com/yt-dlp/yt-dlp/issues/12563">こちら</a>(英語)</small>
+                    </div>
                 </div>
-                <input type="file" id="cookiePathSet" accept=".txt" style="display: none;">
-                <button onclick="document.getElementById('cookiePathSet').click()" style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">選択</button>
+                <label class="switch">
+                    <input type="checkbox" id="optDrm">
+                    <span class="slider"></span>
+                </label>
             </div>
         </div>
 
@@ -329,6 +342,7 @@
                 savePath: document.getElementById('savePath'),
                 optHistory: document.getElementById('optHistory'),
                 optThumb: document.getElementById('optThumb'),
+                optDrm: document.getElementById('optDrm'),
                 optParallelDownloads: document.getElementById('optParallelDownloads'),
                 parallelDownloadsValue: document.getElementById('parallelDownloadsValue'),
                 cookiePathSet: document.getElementById('cookiePathSet'),
@@ -341,6 +355,7 @@
             elements.savePath.value = loadSetting('savePath', elements.savePath.value);
             elements.optHistory.checked = loadSetting('optHistory', elements.optHistory.checked);
             elements.optThumb.checked = loadSetting('optThumb', elements.optThumb.checked);
+            elements.optDrm.checked = loadSetting('optDrm', false); // デフォルトはfalse
             const loadedParallel = loadSetting('optParallelDownloads', elements.optParallelDownloads.value);
             elements.optParallelDownloads.value = loadedParallel;
             elements.parallelDownloadsValue.textContent = loadedParallel;
@@ -349,6 +364,7 @@
             elements.savePath.addEventListener('input', (e) => saveSetting('savePath', e.target.value));
             elements.optHistory.addEventListener('change', (e) => saveSetting('optHistory', e.target.checked));
             elements.optThumb.addEventListener('change', (e) => saveSetting('optThumb', e.target.checked));
+            elements.optDrm.addEventListener('change', (e) => saveSetting('optDrm', e.target.checked));
             elements.optParallelDownloads.addEventListener('input', (e) => {
                 elements.parallelDownloadsValue.textContent = e.target.value;
                 saveSetting('optParallelDownloads', e.target.value);
@@ -426,6 +442,7 @@
             formData.append('format', document.getElementById('fmt').value);
             formData.append('saveHistory', document.getElementById('optHistory').checked);
             formData.append('downloadThumb', document.getElementById('optThumb').checked);
+            formData.append('drmProtect', document.getElementById('optDrm').checked);
             formData.append('savePath', document.getElementById('savePath').value);
             formData.append('parallelDownloads', document.getElementById('optParallelDownloads').value);
 

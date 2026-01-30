@@ -67,7 +67,7 @@ app.get('/jobs', (req, res) => {
 });
 
 app.post('/download', upload.single('cookieFile'), (req, res) => {
-    const { urls, format, saveHistory, downloadThumb, bypassDrm, savePath, parallelDownloads } = req.body;
+    const { urls, format, saveHistory, downloadThumb, drmProtect, savePath, parallelDownloads } = req.body;
     const cookieFile = req.file;
 
     if (!urls) {
@@ -82,7 +82,7 @@ app.post('/download', upload.single('cookieFile'), (req, res) => {
         const job = {
             id: jobId,
             url: url.trim(),
-            options: { format, saveHistory: saveHistory === 'true', downloadThumb: downloadThumb === 'true', bypassDrm: bypassDrm === 'true', savePath, parallelDownloads },
+            options: { format, saveHistory: saveHistory === 'true', downloadThumb: downloadThumb === 'true', drmProtect: drmProtect === 'true', savePath, parallelDownloads },
             cookieFile, // 注意: 全てのURLで同じCookieファイルが使われます
             status: 'queued',
             title: url.trim(),
@@ -232,6 +232,9 @@ function buildArgs(job, outputDir) {
     if (job.cookieFile) args.push('--cookies', job.cookieFile.path);
     if (options.parallelDownloads && parseInt(options.parallelDownloads) > 0) {
         args.push('--concurrent-fragments', options.parallelDownloads);
+    }
+    if (options.drmProtect) {
+        args.push('--add-header', 'youtube:player-client=default,-tv,web_safari,web_embedded');
     }
     return args;
 }
