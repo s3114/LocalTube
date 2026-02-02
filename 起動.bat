@@ -8,6 +8,12 @@ echo ==================================================
 echo      Starting development environment setup...
 echo ==================================================
 
+ping -n 1 8.8.8.8 >nul 2>&1
+if errorlevel 1 (
+    echo [WARN] Network unavailable. Skipping to server start.
+    goto START_SERVER
+)
+
 echo.
 echo [1/6] Checking for LocalTube updates...
 
@@ -152,5 +158,6 @@ echo      Setup complete. Starting server...
 echo ==================================================
 echo.
 
+:START_SERVER
 node "%~dp0server.js"
 pause
