@@ -20,28 +20,31 @@ set "TEMP_REMOTE_VERSION=%~dp0remote_version.txt"
 
 echo [0/6] Checking version information...
 
-powershell -Command "Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -OutFile '%TEMP_REMOTE_VERSION%'"
+powershell -NoProfile -Command ^
+  "$r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; " ^
+  "$r.Content.Trim() | Out-File -Encoding utf8 '%TEMP_REMOTE_VERSION%'"
 
 if not exist "%LOCAL_VERSION_FILE%" (
   echo Local version.txt not found. Update required.
   set NEED_UPDATE=1
-  ) else (
-  for /f "usebackq delims=" %%R in ("%TEMP_REMOTE_VERSION%") do set REMOTE_VER=%%R
-  for /f "usebackq delims=" %%L in ("%LOCAL_VERSION_FILE%") do set LOCAL_VER=%%L
-  
-  echo Local version : %LOCAL_VER%
-  echo Remote version: %REMOTE_VER%
-  
+) else (
+  for /f "usebackq tokens=* delims=" %%R in ("%TEMP_REMOTE_VERSION%") do set REMOTE_VER=%%R
+  for /f "usebackq tokens=* delims=" %%L in ("%LOCAL_VERSION_FILE%") do set LOCAL_VER=%%L
+
+  echo Local version : [%LOCAL_VER%]
+  echo Remote version: [%REMOTE_VER%]
+
   if "%LOCAL_VER%"=="%REMOTE_VER%" (
     echo Version is up to date.
     set NEED_UPDATE=0
-    ) else (
+  ) else (
     echo Newer version found. Update required.
     set NEED_UPDATE=1
   )
 )
 
 del "%TEMP_REMOTE_VERSION%" >nul 2>&1
+
 
 if "%NEED_UPDATE%"=="1" (
   echo.
