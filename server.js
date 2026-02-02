@@ -191,46 +191,73 @@ async function startNextDownload() {
         job.status = 'downloading';
         job.progress.eta = '開始中...';
         broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
+        
+        // 非同期の即時実行関数でダウンロード処理をラップ
+        (async () => {
+            const maxRetries = 3;
+            const retryDelay = 5000; // 5秒
 
-        const ytDlpPath = path.join(__dirname, 'yt-dlp.exe');
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    await processDownloadJob(job); // タイトル取得、ダウンロード、移動を含む
+                    
+                    job.status = 'completed';
+                    job.progress.eta = '完了';
+                    broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
+                    cleanupAndContinue(job);
+                    return; // 成功したのでリトライせず終了
 
-        // 1. まずタイトルを取得
-        try {
-            const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path);
-            job.title = title;
-            broadcast('title_update', { id: job.id, title: job.title });
-        } catch (error) {
-            console.error(`タイトルの取得に失敗: ${job.url}`, error);
-            job.status = 'error';
-            job.progress.eta = 'タイトル取得失敗';
-            broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
-            cleanupAndContinue(job);
-            continue; // 次のループへ
-        }
-
-        // 2. ダウンロードを開始
-        const outputDir = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : downloadsDir;
-        if (!fs.existsSync(outputDir)) {
-            try {
-                fs.mkdirSync(outputDir, { recursive: true });
-            } catch (error) {
-                console.error(`保存先ディレクトリの作成に失敗しました ${outputDir}: ${error.message}`);
-                job.status = 'error';
-                job.progress.eta = '保存先エラー';
-                broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
-                cleanupAndContinue(job);
-                continue; // 次のループへ
+                } catch (error) {
+                    console.error(`[Attempt ${attempt}/${maxRetries}] Job ${job.id} failed: ${error.message}`);
+                    
+                    if (attempt === maxRetries) {
+                        job.status = 'error';
+                        job.progress.eta = 'エラー';
+                        broadcast('status_update', { id: job.id, status: 'error', progress: job.progress, error: error.message });
+                        cleanupAndContinue(job);
+                    } else {
+                        job.progress.eta = `${retryDelay / 1000}秒後に再試行... (${attempt})`;
+                        broadcast('status_update', { id: job.id, status: 'downloading', progress: job.progress });
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    }
+                }
             }
+        })();
+    }
+}
+
+async function processDownloadJob(job) {
+    const ytDlpPath = path.join(__dirname, 'yt-dlp.exe');
+
+    // 1. まずタイトルを取得
+    try {
+        const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path);
+        job.title = title;
+        broadcast('title_update', { id: job.id, title: job.title });
+    } catch (error) {
+        // タイトル取得はリトライ不能なエラーとして扱い、すぐに失敗させる
+        throw new Error(`タイトル取得失敗: ${error.message}`);
+    }
+
+    // 2. ダウンロードと移動の準備
+    const outputDir = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : downloadsDir;
+    if (!fs.existsSync(outputDir)) {
+        try {
+            fs.mkdirSync(outputDir, { recursive: true });
+        } catch (error) {
+            throw new Error(`保存先ディレクトリの作成に失敗しました ${outputDir}: ${error.message}`);
         }
-
-        let args = buildArgs(job, outputDir);
+    }
+    
+    // このPromiseがダウンロードとファイル移動のプロセス全体をカプセル化する
+    return new Promise((resolve, reject) => {
+        const args = buildArgs(job, outputDir);
         const ytDlp = spawn(ytDlpPath, args);
-
-        // プロセスのイベントハンドリング
+        let stderrOutput = '';
         let stdoutBuffer = '';
+
         ytDlp.stdout.on('data', (data) => {
             stdoutBuffer += data.toString();
-            // 改行コード（\rまたは\n）で分割し、不完全な最後の行はバッファに残す
             const lines = stdoutBuffer.split(/[\r\n]/);
             stdoutBuffer = lines.pop() || '';
 
@@ -251,30 +278,28 @@ async function startNextDownload() {
         });
 
         ytDlp.stderr.on('data', (data) => {
-            console.error(`yt-dlp stderr: ${data.toString().trim()}`);
+            const errorMsg = data.toString().trim();
+            stderrOutput += errorMsg + '\n';
+            console.error(`yt-dlp stderr: ${errorMsg}`);
         });
 
-        ytDlp.on('close', (code) => {
+        ytDlp.on('close', async (code) => {
             if (code === 0) {
-                job.status = 'completed';
-                job.progress.eta = '完了';
-                moveFiles(outputDir, job.options.downloadThumb);
+                try {
+                    await moveFiles(outputDir, job.options.downloadThumb);
+                    resolve(); // すべて成功
+                } catch (moveError) {
+                    reject(new Error(`ファイル移動に失敗: ${moveError.message}`));
+                }
             } else {
-                job.status = 'error';
-                job.progress.eta = 'エラー';
+                reject(new Error(`yt-dlpがエラーコード${code}で終了しました。Stderr: ${stderrOutput}`));
             }
-            broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
-            cleanupAndContinue(job);
         });
 
         ytDlp.on('error', (err) => {
-            console.error(`yt-dlpプロセスの起動に失敗しました: ${err.message}`);
-            job.status = 'error';
-            job.progress.eta = '起動失敗';
-            broadcast('status_update', { id: job.id, status: 'error', progress: job.progress });
-            cleanupAndContinue(job);
+            reject(new Error(`yt-dlpプロセスの起動に失敗: ${err.message}`));
         });
-    }
+    });
 }
 
 
@@ -354,31 +379,71 @@ function getTitle(ytDlpPath, url, cookiePath) {
 }
 
 
-// ファイル移動のヘルパー関数
-function moveFiles(outputDir, downloadThumb) {
+// ファイル移動のヘルパー関数 (非同期化・リトライ機能付き)
+async function moveFiles(outputDir, downloadThumb) {
+    const maxRetries = 5;
+    const delay = 1000; // 1秒
+
     try {
-        const files = fs.readdirSync(outputDir);
+        const files = await fs.promises.readdir(outputDir);
         for (const file of files) {
             const oldPath = path.join(outputDir, file);
-            if (!fs.statSync(oldPath).isFile()) continue;
+            
+            try {
+                const stat = await fs.promises.stat(oldPath);
+                if (!stat.isFile()) continue;
+            } catch (e) {
+                if (e.code === 'ENOENT') continue; // ファイルがなければスキップ
+                throw e;
+                
+            }
 
             const fileExt = path.extname(file).toLowerCase();
             const thumbnailExtensions = ['.webp', '.jpg', '.jpeg', '.png'];
+            let newPath;
+            let action;
 
-            if (fileExt === '.mp4') { // Assume downloaded video is mp4, could be improved
-                const newPath = path.join(movieDir, file);
-                try { fs.renameSync(oldPath, newPath); } catch (e) { console.error(`Failed to move ${file}: ${e}`); }
+            // .fyyy.mp4 (yyyは3桁の数字) または .temp.mp4 のパターンに一致するかどうかをチェックする正規表現
+            const skipPattern = /\.(f\d{3}|temp)\.mp4$/i;
+
+            if (fileExt === '.mp4') {
+                if (!skipPattern.test(file)) { // パターンに一致しない場合のみ移動する
+                    newPath = path.join(movieDir, file);
+                    action = 'move';
+                }
             } else if (thumbnailExtensions.includes(fileExt)) {
                 if (downloadThumb) {
-                    const newPath = path.join(thumbnailDir, file);
-                    try { fs.renameSync(oldPath, newPath); } catch (e) { console.error(`Failed to move thumb ${file}: ${e}`); }
+                    newPath = path.join(thumbnailDir, file);
+                    action = 'move';
                 } else {
-                    try { fs.unlinkSync(oldPath); } catch (e) { console.error(`Failed to delete thumb ${file}: ${e}`); }
+                    action = 'delete';
+                }
+            }
+
+            if (action) {
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        if (action === 'move') {
+                            await fs.promises.rename(oldPath, newPath);
+                        } else {
+                            await fs.promises.unlink(oldPath);
+                        }
+                        break; 
+                    } catch (err) {
+                        if ((err.code === 'EBUSY' || err.code === 'ENOENT') && i < maxRetries - 1) {
+                            console.warn(`[${action}] Retrying on ${file} due to ${err.code}... (${i + 1}/${maxRetries})`);
+                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+                        } else {
+                            console.error(`Failed to ${action} ${file} after retries: ${err}`);
+                            throw err; 
+                        }
+                    }
                 }
             }
         }
     } catch (err) {
-        console.error(`ファイルの移動/削除中にエラー: ${err}`);
+        console.error(`ファイルの移動/削除処理中にエラーが発生しました: ${err}`);
+        throw err;
     }
 }
 
