@@ -29,10 +29,10 @@ if not exist "%LOCAL_VERSION_FILE%" (
   for /f "usebackq tokens=* delims=" %%R in ("%TEMP_REMOTE_VERSION%") do set REMOTE_VER=%%R
   for /f "usebackq tokens=* delims=" %%L in ("%LOCAL_VERSION_FILE%") do set LOCAL_VER=%%L
 
-  echo Local version : [%LOCAL_VER%]
-  echo Remote version: [%REMOTE_VER%]
+  echo Local version : [!LOCAL_VER!]
+  echo Remote version: [!REMOTE_VER!]
 
-  if "%LOCAL_VER%"=="%REMOTE_VER%" (
+  if "!LOCAL_VER!"=="!REMOTE_VER!" (
     echo Version is up to date.
     set NEED_UPDATE=0
   ) else (
