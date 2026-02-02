@@ -20,9 +20,7 @@ set "TEMP_REMOTE_VERSION=%~dp0remote_version.txt"
 
 echo [0/6] Checking version information...
 
-powershell -NoProfile -Command ^
-  "$r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; " ^
-  "$r.Content.Trim() | Out-File -Encoding utf8 '%TEMP_REMOTE_VERSION%'"
+powershell -NoProfile -Command "$r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; $r.Content.Trim() | Out-File -Encoding utf8 '%TEMP_REMOTE_VERSION%'"
 
 if not exist "%LOCAL_VERSION_FILE%" (
   echo Local version.txt not found. Update required.
@@ -91,7 +89,7 @@ if "%NEED_UPDATE%"=="1" (
     pause
     exit /b 1
   )
-  copy /y "%~dp0temp_update\version.txt" "%LOCAL_VERSION_FILE%"
+  copy /y "%~dp0version.txt" "%LOCAL_VERSION_FILE%"
 )
 
 echo.
