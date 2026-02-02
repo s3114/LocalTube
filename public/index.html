@@ -1,463 +1,609 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>LocalTube</title>
     <style>
-        :root {
-            --bg: #0f0f0f;
-            --panel: #181818;
-            --border: #303030;
-            --text: #f1f1f1;
-            --subtext: #aaa;
-            --accent: #ff0000;
-            --warn: #ff9800;
-            --green: #4caf50;
-            --blue: #2196f3;
-        }
+      :root {
+        --bg: #0f0f0f;
+        --panel: #181818;
+        --border: #303030;
+        --text: #f1f1f1;
+        --subtext: #aaa;
+        --accent: #ff0000;
+        --warn: #ff9800;
+        --green: #4caf50;
+        --blue: #2196f3;
+      }
 
-        * {
-            box-sizing: border-box;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        body {
-            margin: 0;
-            font-family: "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-        }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
 
-        header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background: var(--panel);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            border-bottom: 1px solid var(--border);
-            z-index: 10;
-        }
+      header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        background: var(--panel);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border);
+        z-index: 10;
+      }
 
-        .logo {
-            font-size: 18px;
-            font-weight: bold;
-        }
+      .logo {
+        font-size: 18px;
+        font-weight: bold;
+      }
 
-        .logo span {
-            color: var(--accent);
-        }
+      .logo span {
+        color: var(--accent);
+      }
 
-        main {
-            max-width: 900px;
-            margin: 80px auto 40px;
-            padding: 0 16px;
-        }
+      main {
+        max-width: 1800px;
+        margin: 80px auto 40px;
+        padding: 0 16px;
+      }
 
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-        }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
 
+      .url-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        width: 100%;
+      }
 
-        .url-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            width: 100%;
-        }
+      .field-label {
+        font-weight: 600;
+        white-space: nowrap;
+      }
 
-        .field-label {
-            font-weight: 600;
-            white-space: nowrap;
-        }
+      .url-box {
+        display: flex;
+        gap: 10px;
+        flex: 1;
+      }
 
-        .url-box {
-            display: flex;
-            gap: 10px;
-            flex: 1;
-        }
+      .url-box textarea,
+      .url-box input {
+        flex: 1;
+        background: #000;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 12px;
+        border-radius: 8px;
+        font-family: "Segoe UI", Roboto, sans-serif;
+        resize: vertical;
+        min-height: 50px;
+      }
 
-        .url-box textarea,
-        .url-box input {
-            flex: 1;
-            background: #000;
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 12px;
-            border-radius: 8px;
-            font-family: "Segoe UI", Roboto, sans-serif;
-            resize: vertical;
-            min-height: 50px;
-        }
+      .url-box button {
+        background: var(--accent);
+        border: none;
+        color: #fff;
+        padding: 0 20px;
+        border-radius: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        align-self: flex-start;
+        height: 50px;
+      }
 
-        .url-box button {
-            background: var(--accent);
-            border: none;
-            color: #fff;
-            padding: 0 20px;
-            border-radius: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            align-self: flex-start;
-            height: 50px;
-        }
+      .field-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+      }
 
-        .field-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-        }
+      .field-row select,
+      .field-row input {
+        flex: 1;
+      }
 
-        .field-row select,
-        .field-row input {
-            flex: 1;
-        }
+      .options {
+        margin-top: 20px;
+        display: grid;
+        gap: 14px;
+      }
 
-        .options {
-            margin-top: 20px;
-            display: grid;
-            gap: 14px;
-        }
+      select {
+        width: 100%;
+        background: #000;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 10px;
+        border-radius: 8px;
+      }
 
-        select {
-            width: 100%;
-            background: #000;
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 10px;
-            border-radius: 8px;
-        }
+      input[type="range"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 48%;
+        height: 8px;
+        background: #555;
+        border-radius: 5px;
+        outline: none;
+        margin-top: 10px;
+      }
 
-        input[type="range"] {
-            appearance: none;
-            -webkit-appearance: none;
-            width: 48%;
-            height: 8px;
-            background: #555;
-            border-radius: 5px;
-            outline: none;
-            margin-top: 10px;
-        }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 1px solid var(--border);
+      }
 
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--accent);
-            cursor: pointer;
-            border: 1px solid var(--border);
-        }
+      input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 1px solid var(--border);
+      }
 
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--accent);
-            cursor: pointer;
-            border: 1px solid var(--border);
-        }
+      .toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #000;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+      }
 
-        .toggle {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-        }
+      .toggle small {
+        color: var(--subtext);
+        display: block;
+        font-size: 12px;
+      }
 
-        .toggle small {
-            color: var(--subtext);
-            display: block;
-            font-size: 12px;
-        }
+      .switch {
+        position: relative;
+        width: 42px;
+        height: 22px;
+      }
 
-        .switch {
-            position: relative;
-            width: 42px;
-            height: 22px;
-        }
+      .switch input {
+        display: none;
+      }
 
-        .switch input {
-            display: none;
-        }
+      .slider {
+        position: absolute;
+        inset: 0;
+        background: #555;
+        border-radius: 22px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
 
-        .slider {
-            position: absolute;
-            inset: 0;
-            background: #555;
-            border-radius: 22px;
-            cursor: pointer;
-            transition: .2s;
-        }
+      .slider:before {
+        content: "";
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        left: 2px;
+        top: 2px;
+        background: #fff;
+        border-radius: 50%;
+        transition: 0.2s;
+      }
 
-        .slider:before {
-            content: "";
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            left: 2px;
-            top: 2px;
-            background: #fff;
-            border-radius: 50%;
-            transition: .2s;
-        }
+      input:checked + .slider {
+        background: var(--accent);
+      }
 
-        input:checked+.slider {
-            background: var(--accent);
-        }
+      input:checked + .slider:before {
+        transform: translateX(20px);
+      }
 
-        input:checked+.slider:before {
-            transform: translateX(20px);
-        }
+      .warn small {
+        color: var(--warn);
+      }
 
-        .warn small {
-            color: var(--warn);
-        }
+      #savePath {
+        opacity: 0.9;
+      }
 
-        #savePath {
-            opacity: 0.9;
-        }
+      /* ===== Job Queue ===== */
+      #job-queue {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
 
-        /* ===== Job Queue ===== */
-        #job-queue {
-            margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
+      .job-item {
+        background: #000;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        transition: background-color 0.3s;
+      }
 
-        .job-item {
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            transition: background-color 0.3s;
-        }
+      .job-status-icon {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
-        .job-status-icon {
-            flex-shrink: 0;
-            width: 24px;
-            height: 24px;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+      .job-details {
+        flex-grow: 1;
+        overflow: hidden;
+      }
 
-        .job-details {
-            flex-grow: 1;
-            overflow: hidden;
-        }
+      .job-title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 14px;
+        color: var(--text);
+      }
 
-        .job-title {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-size: 14px;
-            color: var(--text);
-        }
+      .job-progress-bar-container {
+        width: 100%;
+        height: 6px;
+        background: #333;
+        border-radius: 3px;
+        margin-top: 8px;
+        overflow: hidden;
+      }
 
-        .job-progress-bar-container {
-            width: 100%;
-            height: 6px;
-            background: #333;
-            border-radius: 3px;
-            margin-top: 8px;
-            overflow: hidden;
-        }
+      .job-progress-bar {
+        height: 100%;
+        background: var(--blue);
+        width: 0%;
+        transition: width 0.2s linear;
+      }
 
-        .job-progress-bar {
-            height: 100%;
-            background: var(--blue);
-            width: 0%;
-            transition: width 0.2s linear;
-        }
+      .job-item[data-status="completed"] .job-progress-bar {
+        background: var(--green);
+      }
 
-        .job-item[data-status="completed"] .job-progress-bar {
-            background: var(--green);
-        }
+      .job-item[data-status="error"] .job-progress-bar {
+        background: var(--accent);
+      }
 
-        .job-item[data-status="error"] .job-progress-bar {
-            background: var(--accent);
-        }
+      .job-progress-text {
+        font-size: 12px;
+        color: var(--subtext);
+        margin-top: 4px;
+        height: 1.2em;
+      }
 
-        .job-progress-text {
-            font-size: 12px;
-            color: var(--subtext);
-            margin-top: 4px;
-            height: 1.2em;
-        }
+      /* === 2カラムレイアウト === */
+      .card-layout {
+        display: flex;
+        gap: 16px;
+      }
+
+      /* 左メインパネル */
+      .card-main {
+        flex: 2;
+        /* メインを広め */
+      }
+
+      /* 右サイドパネル */
+      .card-side {
+        flex: 1;
+        /* 右は少し狭め */
+        background: #000;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        color: var(--text);
+      }
+
+      /* 情報パネルの中身 */
+      .card-side h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: var(--accent);
+      }
+
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .info-label {
+        color: var(--subtext);
+        font-size: 12px;
+      }
+
+      .info-value {
+        font-weight: bold;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <header>
-        <div class="logo"><span>▶</span> LocalTube</div>
+      <div class="logo"><span>▶</span> LocalTube</div>
     </header>
 
     <main>
-        <div class="card">
-            <div class="url-row">
-                <div class="field-label">URL ：</div>
-                <div class="url-box">
-                    <textarea id="urls" placeholder="YouTube や Abema の URL を入力"></textarea>
-                    <button onclick="start()">ダウンロード</button>
-                </div>
+      <div class="card card-layout">
+        <div class="card-main">
+          <div class="url-row">
+            <div class="field-label">URL ：</div>
+            <div class="url-box">
+              <textarea
+                id="urls"
+                placeholder="YouTube や Abema の URL を入力"
+              ></textarea>
+              <button onclick="start()">ダウンロード</button>
             </div>
-            <div class="options">
-                <div class="field-row">
-                    <div class="field-label">画質：</div>
-                    <select id="fmt">
-                        <option
-                            value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            4320p（7680 x 4320）</option>
-                        <option
-                            value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            2160p（3840 x 2160）</option>
-                        <option
-                            value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            1440p（2560 x 1440）</option>
-                        <option
-                            value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            1080p（1920 x 1080）</option>
-                        <option
-                            value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            720p （1280 x 720 ）</option>
-                        <option
-                            value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            480p （720 x 480 ）</option>
-                        <option
-                            value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            360p （640 x 360 ）</option>
-                        <option value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                            240p （ 426 x 240 ）</option>
-                        <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">144p （256 x 144 ）</option>
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <div class="field-label">ｺﾒﾝﾄ：</div>
-                    <select id="comment-options">
-                        <option value="none">ダウンロードしない</option>
-                        <option value="comments">動画のコメント</option>
-                        <option value="sub">ライブ中のチャット</option>
-                        <option value="both">コメントとチャット</option>
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <div class="field-label">保存：</div>
-                    <div class="url-box">
-                        <input type="text" id="savePath" placeholder="保存先フォルダパス (空白の場合はデフォルト)">
-                    </div>
-                </div>
-
-                <div class="toggle">
-                    <div>
-                        Cookieファイル
-                        <small id="cookie-status-display">設定されていません</small>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <button id="set-firefox-btn"
-                            style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">FireFox</button>
-                        <input type="file" id="cookiePathSet" accept=".txt" style="display: none;">
-                        <button id="manual-select-btn"
-                            style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">手動選択</button>
-                    </div>
-                </div>
-
-                <div class="toggle">
-                    <div>
-                        同時ダウンロード数: <span id="parallelDownloadsValue">10</span>
-                        <small>動画を同時にダウンロードする最大数</small>
-                    </div>
-                    <input type="range" id="optParallelDownloads" min="1" max="999" value="3">
-                </div>
-                <div class="toggle">
-                    <div>
-                        フラグメントの並列ダウンロード数: <span id="concurrentFragmentsValue">4</span>
-                        <small>1つの動画をダウンロードする際の分割数</small>
-                    </div>
-                    <input type="range" id="optConcurrentFragments" min="1" max="16" value="4">
-                </div>
-
-                <div class="toggle">
-                    <div>
-                        ダウンロード履歴を保存
-                        <small>再度同じ動画がダウンロードされないようになります。</small>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="optHistory" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="toggle">
-                    <div>
-                        サムネイルをダウンロード
-                        <small>動画一覧・再生画面で使用</small>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="optThumb" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="toggle">
-                    <div>
-                        DRM 保護を回避
-                        <div class="warn">
-                            <small>非推奨（必要なときのみ使用してください。）詳しくは<a
-                                    href="https://github.com/yt-dlp/yt-dlp/issues/12563">こちら</a>(英語)</small>
-                        </div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="optDrm">
-                        <span class="slider"></span>
-                    </label>
-                </div>
+          </div>
+          <div class="options">
+            <div class="field-row">
+              <div class="field-label">画質：</div>
+              <select id="fmt">
+                <option
+                  value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  4320p（7680 x 4320）
+                </option>
+                <option
+                  value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  2160p（3840 x 2160）
+                </option>
+                <option
+                  value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  1440p（2560 x 1440）
+                </option>
+                <option
+                  value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  1080p（1920 x 1080）
+                </option>
+                <option
+                  value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  720p （1280 x 720 ）
+                </option>
+                <option
+                  value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  480p （720 x 480 ）
+                </option>
+                <option
+                  value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  360p （640 x 360 ）
+                </option>
+                <option
+                  value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                >
+                  240p （ 426 x 240 ）
+                </option>
+                <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">
+                  144p （256 x 144 ）
+                </option>
+              </select>
             </div>
+
+            <div class="field-row">
+              <div class="field-label">ｺﾒﾝﾄ：</div>
+              <select id="comment-options">
+                <option value="none">ダウンロードしない</option>
+                <option value="comments">動画のコメント</option>
+                <option value="sub">ライブ中のチャット</option>
+                <option value="both">コメントとチャット</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <div class="field-label">保存：</div>
+              <div class="url-box">
+                <input
+                  type="text"
+                  id="savePath"
+                  placeholder="保存先フォルダパス (空白の場合はデフォルト)"
+                />
+              </div>
+            </div>
+
+            <div class="toggle">
+              <div>
+                Cookieファイル
+                <small id="cookie-status-display">設定されていません</small>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px">
+                <button
+                  id="set-firefox-btn"
+                  style="
+                    background: #333;
+                    border: 1px solid var(--border);
+                    color: var(--text);
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                  "
+                >
+                  FireFox
+                </button>
+                <input
+                  type="file"
+                  id="cookiePathSet"
+                  accept=".txt"
+                  style="display: none"
+                />
+                <button
+                  id="manual-select-btn"
+                  style="
+                    background: #333;
+                    border: 1px solid var(--border);
+                    color: var(--text);
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                  "
+                >
+                  手動選択
+                </button>
+              </div>
+            </div>
+
+            <div class="toggle">
+              <div>
+                同時ダウンロード数: <span id="parallelDownloadsValue">10</span>
+                <small>動画を同時にダウンロードする最大数</small>
+              </div>
+              <input
+                type="range"
+                id="optParallelDownloads"
+                min="1"
+                max="999"
+                value="3"
+              />
+            </div>
+            <div class="toggle">
+              <div>
+                フラグメントの並列ダウンロード数:
+                <span id="concurrentFragmentsValue">4</span>
+                <small>1つの動画をダウンロードする際の分割数</small>
+              </div>
+              <input
+                type="range"
+                id="optConcurrentFragments"
+                min="1"
+                max="16"
+                value="4"
+              />
+            </div>
+
+            <div class="toggle">
+              <div>
+                ダウンロード履歴を保存
+                <small
+                  >再度同じ動画がダウンロードされないようになります。</small
+                >
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="optHistory" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle">
+              <div>
+                サムネイルをダウンロード
+                <small>動画一覧・再生画面で使用</small>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="optThumb" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle">
+              <div>
+                DRM 保護を回避
+                <div class="warn">
+                  <small
+                    >非推奨（必要なときのみ使用してください。）詳しくは<a
+                      href="https://github.com/yt-dlp/yt-dlp/issues/12563"
+                      >こちら</a
+                    >(英語)</small
+                  >
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="optDrm" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
+        <div class="card-side">
+          <h3>情報パネル</h3>
+          <div class="info-item">
+            <div class="info-label">現在時刻</div>
+            <div id="info-clock" class="info-value">—</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">稼働時間</div>
+            <div id="info-uptime" class="info-value">—</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">ネットワーク</div>
+            <div id="info-network" class="info-value">—</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">レイテンシ</div>
+            <div id="info-latency" class="info-value">—</div>
+          </div>
+          <div class="info-panel">
+            <canvas id="networkChart" height="100"></canvas>
+          </div>
+        </div>
+      </div>
 
-
-        <div id="job-queue"></div>
+      <div id="job-queue"></div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // --- Global State ---
-        const jobStates = new Map();
+      // --- Global State ---
+      const jobStates = new Map();
 
-        // --- Helper Functions ---
-        function getStatusIcon(status) {
-            switch (status) {
-                case 'queued': return '🕒';
-                case 'downloading': return '⬇️';
-                case 'completed': return '✅';
-                case 'error': return '❌';
-                default: return '❔';
-            }
+      // --- Helper Functions ---
+      function getStatusIcon(status) {
+        switch (status) {
+          case "queued":
+            return "🕒";
+          case "downloading":
+            return "⬇️";
+          case "completed":
+            return "✅";
+          case "error":
+            return "❌";
+          default:
+            return "❔";
         }
+      }
 
-        function renderJob(job) {
-            jobStates.set(job.id, job);
-            const statusIcon = getStatusIcon(job.status);
-            const progressText = job.status === 'downloading'
-                ? `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`
-                : (job.progress.eta || job.status);
+      function renderJob(job) {
+        jobStates.set(job.id, job);
+        const statusIcon = getStatusIcon(job.status);
+        const progressText =
+          job.status === "downloading"
+            ? `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`
+            : job.progress.eta || job.status;
 
-            return `
+        return `
                 <div class="job-item" id="job-${job.id}" data-status="${job.status}">
                     <div class="job-status-icon">${statusIcon}</div>
                     <div class="job-details">
@@ -469,275 +615,436 @@
                     </div>
                 </div>
             `;
+      }
+
+      function updateJobElement(job) {
+        const jobElement = document.getElementById(`job-${job.id}`);
+        if (!jobElement) return;
+
+        jobElement.dataset.status = job.status;
+        jobElement.querySelector(".job-status-icon").textContent =
+          getStatusIcon(job.status);
+        jobElement.querySelector(".job-title").textContent = job.title;
+        jobElement.querySelector(".job-title").title = job.title;
+
+        const progressBar = jobElement.querySelector(".job-progress-bar");
+        const progressTextElement =
+          jobElement.querySelector(".job-progress-text");
+
+        let progressText = "";
+        if (job.status === "downloading") {
+          progressBar.style.width = `${job.progress.percentage}%`;
+          progressText = `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`;
+        } else if (job.status === "completed") {
+          progressBar.style.width = "100%";
+          progressText = job.progress.eta || "完了";
+        } else if (job.status === "error") {
+          progressBar.style.width = "100%";
+          progressText = job.progress.eta || "エラー";
+        } else {
+          progressBar.style.width = "0%";
+          progressText = job.progress.eta || job.status;
+        }
+        progressTextElement.textContent = progressText;
+      }
+
+      // --- Main Logic ---
+      document.addEventListener("DOMContentLoaded", () => {
+        function saveSetting(key, value) {
+          localStorage.setItem(key, value);
+        }
+        function loadSetting(key, defaultValue) {
+          const storedValue = localStorage.getItem(key);
+          if (storedValue === null) return defaultValue;
+          if (typeof defaultValue === "boolean") return storedValue === "true";
+          return storedValue;
         }
 
-        function updateJobElement(job) {
-            const jobElement = document.getElementById(`job-${job.id}`);
-            if (!jobElement) return;
+        const elements = {
+          fmt: document.getElementById("fmt"),
+          savePath: document.getElementById("savePath"),
+          optHistory: document.getElementById("optHistory"),
+          optThumb: document.getElementById("optThumb"),
+          optDrm: document.getElementById("optDrm"),
+          optParallelDownloads: document.getElementById("optParallelDownloads"),
+          parallelDownloadsValue: document.getElementById(
+            "parallelDownloadsValue",
+          ),
+          optConcurrentFragments: document.getElementById(
+            "optConcurrentFragments",
+          ),
+          concurrentFragmentsValue: document.getElementById(
+            "concurrentFragmentsValue",
+          ),
+          urls: document.getElementById("urls"),
+          jobQueue: document.getElementById("job-queue"),
+          // New Cookie UI elements
+          cookieStatusDisplay: document.getElementById("cookie-status-display"),
+          setFirefoxBtn: document.getElementById("set-firefox-btn"),
+          manualSelectBtn: document.getElementById("manual-select-btn"),
+          cookiePathSet: document.getElementById("cookiePathSet"),
+          commentOptions: document.getElementById("comment-options"),
+        };
 
-            jobElement.dataset.status = job.status;
-            jobElement.querySelector('.job-status-icon').textContent = getStatusIcon(job.status);
-            jobElement.querySelector('.job-title').textContent = job.title;
-            jobElement.querySelector('.job-title').title = job.title;
+        // Load general settings from localStorage
+        elements.fmt.value = loadSetting("fmt", elements.fmt.value);
+        elements.savePath.value = loadSetting("savePath", "");
+        elements.optHistory.checked = loadSetting("optHistory", true);
+        elements.optThumb.checked = loadSetting("optThumb", true);
+        elements.optDrm.checked = loadSetting("optDrm", false);
+        const loadedParallel = loadSetting("optParallelDownloads", "3");
+        elements.optParallelDownloads.value = loadedParallel;
+        elements.parallelDownloadsValue.textContent = loadedParallel;
+        const loadedFragments = loadSetting("optConcurrentFragments", "4");
+        elements.optConcurrentFragments.value = loadedFragments;
+        elements.concurrentFragmentsValue.textContent = loadedFragments;
+        elements.commentOptions.value = loadSetting(
+          "commentOptions",
+          elements.commentOptions.value,
+        );
 
-            const progressBar = jobElement.querySelector('.job-progress-bar');
-            const progressTextElement = jobElement.querySelector('.job-progress-text');
+        // Event listeners for general settings
+        elements.fmt.addEventListener("change", (e) =>
+          saveSetting("fmt", e.target.value),
+        );
+        elements.savePath.addEventListener("input", (e) =>
+          saveSetting("savePath", e.target.value),
+        );
+        elements.optHistory.addEventListener("change", (e) =>
+          saveSetting("optHistory", e.target.checked),
+        );
+        elements.optThumb.addEventListener("change", (e) =>
+          saveSetting("optThumb", e.target.checked),
+        );
+        elements.optDrm.addEventListener("change", (e) =>
+          saveSetting("optDrm", e.target.checked),
+        );
+        elements.optParallelDownloads.addEventListener("input", (e) => {
+          elements.parallelDownloadsValue.textContent = e.target.value;
+          saveSetting("optParallelDownloads", e.target.value);
+        });
+        elements.optConcurrentFragments.addEventListener("input", (e) => {
+          elements.concurrentFragmentsValue.textContent = e.target.value;
+          saveSetting("optConcurrentFragments", e.target.value);
+        });
+        elements.commentOptions.addEventListener("change", (e) =>
+          saveSetting("commentOptions", e.target.value),
+        );
 
-            let progressText = '';
-            if (job.status === 'downloading') {
-                progressBar.style.width = `${job.progress.percentage}%`;
-                progressText = `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`;
-            } else if (job.status === 'completed') {
-                progressBar.style.width = '100%';
-                progressText = job.progress.eta || '完了';
-            } else if (job.status === 'error') {
-                progressBar.style.width = '100%';
-                progressText = job.progress.eta || 'エラー';
+        // --- Cookie Settings Management ---
+        function updateCookieButtonStyles(activeButton) {
+          elements.setFirefoxBtn.style.background = "#333";
+          elements.manualSelectBtn.style.background = "#333";
+          if (activeButton) {
+            activeButton.style.background = "var(--blue)"; // Active color
+          }
+        }
+
+        // Load initial cookie settings
+        (async () => {
+          try {
+            const response = await fetch("/api/settings");
+            if (response.ok) {
+              const settings = await response.json();
+              if (settings.selectedBrowser === "firefox") {
+                elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
+                updateCookieButtonStyles(elements.setFirefoxBtn);
+              } else {
+                elements.cookieStatusDisplay.textContent = "設定されていません";
+                updateCookieButtonStyles(null);
+              }
+            }
+          } catch (error) {
+            console.error("Failed to load settings:", error);
+          }
+        })();
+
+        // Event listener for Firefox button
+        elements.setFirefoxBtn.addEventListener("click", async () => {
+          window.selectedCookieFile = null; // Clear manual selection
+          try {
+            const response = await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ browser: "firefox" }),
+            });
+            if (response.ok) {
+              console.log("設定を Firefox にセットしました。");
+              elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
+              updateCookieButtonStyles(elements.setFirefoxBtn);
             } else {
-                progressBar.style.width = '0%';
-                progressText = job.progress.eta || job.status;
+              console.error("Firefox設定の保存に失敗しました。");
             }
-            progressTextElement.textContent = progressText;
-        }
-
-        // --- Main Logic ---
-        document.addEventListener('DOMContentLoaded', () => {
-            function saveSetting(key, value) { localStorage.setItem(key, value); }
-            function loadSetting(key, defaultValue) {
-                const storedValue = localStorage.getItem(key);
-                if (storedValue === null) return defaultValue;
-                if (typeof defaultValue === 'boolean') return storedValue === 'true';
-                return storedValue;
-            }
-
-            const elements = {
-                fmt: document.getElementById('fmt'),
-                savePath: document.getElementById('savePath'),
-                optHistory: document.getElementById('optHistory'),
-                optThumb: document.getElementById('optThumb'),
-                optDrm: document.getElementById('optDrm'),
-                optParallelDownloads: document.getElementById('optParallelDownloads'),
-                parallelDownloadsValue: document.getElementById('parallelDownloadsValue'),
-                optConcurrentFragments: document.getElementById('optConcurrentFragments'),
-                concurrentFragmentsValue: document.getElementById('concurrentFragmentsValue'),
-                urls: document.getElementById('urls'),
-                jobQueue: document.getElementById('job-queue'),
-                // New Cookie UI elements
-                cookieStatusDisplay: document.getElementById('cookie-status-display'),
-                setFirefoxBtn: document.getElementById('set-firefox-btn'),
-                manualSelectBtn: document.getElementById('manual-select-btn'),
-                cookiePathSet: document.getElementById('cookiePathSet'),
-                commentOptions: document.getElementById('comment-options')
-            };
-
-            // Load general settings from localStorage
-            elements.fmt.value = loadSetting('fmt', elements.fmt.value);
-            elements.savePath.value = loadSetting('savePath', '');
-            elements.optHistory.checked = loadSetting('optHistory', true);
-            elements.optThumb.checked = loadSetting('optThumb', true);
-            elements.optDrm.checked = loadSetting('optDrm', false);
-            const loadedParallel = loadSetting('optParallelDownloads', '3');
-            elements.optParallelDownloads.value = loadedParallel;
-            elements.parallelDownloadsValue.textContent = loadedParallel;
-            const loadedFragments = loadSetting('optConcurrentFragments', '4');
-            elements.optConcurrentFragments.value = loadedFragments;
-            elements.concurrentFragmentsValue.textContent = loadedFragments;
-            elements.commentOptions.value = loadSetting('commentOptions', elements.commentOptions.value);
-
-            // Event listeners for general settings
-            elements.fmt.addEventListener('change', (e) => saveSetting('fmt', e.target.value));
-            elements.savePath.addEventListener('input', (e) => saveSetting('savePath', e.target.value));
-            elements.optHistory.addEventListener('change', (e) => saveSetting('optHistory', e.target.checked));
-            elements.optThumb.addEventListener('change', (e) => saveSetting('optThumb', e.target.checked));
-            elements.optDrm.addEventListener('change', (e) => saveSetting('optDrm', e.target.checked));
-            elements.optParallelDownloads.addEventListener('input', (e) => {
-                elements.parallelDownloadsValue.textContent = e.target.value;
-                saveSetting('optParallelDownloads', e.target.value);
-            });
-            elements.optConcurrentFragments.addEventListener('input', (e) => {
-                elements.concurrentFragmentsValue.textContent = e.target.value;
-                saveSetting('optConcurrentFragments', e.target.value);
-            });
-            elements.commentOptions.addEventListener('change', (e) =>
-                saveSetting('commentOptions', e.target.value)
-            );
-
-
-            // --- Cookie Settings Management ---
-            function updateCookieButtonStyles(activeButton) {
-                elements.setFirefoxBtn.style.background = '#333';
-                elements.manualSelectBtn.style.background = '#333';
-                if (activeButton) {
-                    activeButton.style.background = 'var(--blue)'; // Active color
-                }
-            }
-
-            // Load initial cookie settings
-            (async () => {
-                try {
-                    const response = await fetch('/api/settings');
-                    if (response.ok) {
-                        const settings = await response.json();
-                        if (settings.selectedBrowser === 'firefox') {
-                            elements.cookieStatusDisplay.textContent = '自動連携: Firefox';
-                            updateCookieButtonStyles(elements.setFirefoxBtn);
-                        } else {
-                            elements.cookieStatusDisplay.textContent = '設定されていません';
-                            updateCookieButtonStyles(null);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to load settings:', error);
-                }
-            })();
-
-            // Event listener for Firefox button
-            elements.setFirefoxBtn.addEventListener('click', async () => {
-                window.selectedCookieFile = null; // Clear manual selection
-                try {
-                    const response = await fetch('/api/settings', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ browser: 'firefox' }),
-                    });
-                    if (response.ok) {
-                        console.log('設定を Firefox にセットしました。');
-                        elements.cookieStatusDisplay.textContent = '自動連携: Firefox';
-                        updateCookieButtonStyles(elements.setFirefoxBtn);
-                    } else {
-                        console.error('Firefox設定の保存に失敗しました。');
-                    }
-                } catch (error) {
-                    console.error('ネットワークエラー:', error);
-                }
-            });
-
-            // Event listener for Manual Select button
-            elements.manualSelectBtn.addEventListener('click', () => {
-                elements.cookiePathSet.click();
-            });
-
-            // Event listener for file input change
-            elements.cookiePathSet.addEventListener('change', async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                window.selectedCookieFile = file;
-                // Deactivate browser setting by saving an empty value
-                try {
-                    const response = await fetch('/api/settings', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ browser: '' }),
-                    });
-                    if (response.ok) {
-                        console.log('手動ファイル選択のため、ブラウザ自動連携を解除しました。');
-                        elements.cookieStatusDisplay.textContent = `手動指定: ${file.name}`;
-                        updateCookieButtonStyles(elements.manualSelectBtn);
-                    } else {
-                        console.error('ブラウザ設定のリセットに失敗しました。');
-                    }
-                } catch (error) {
-                    console.error('ネットワークエラー:', error);
-                }
-            });
-
-
-            // --- SSE Connection ---
-            const eventSource = new EventSource('/events');
-
-            eventSource.addEventListener('initial_state', (e) => {
-                const jobs = JSON.parse(e.data);
-                elements.jobQueue.innerHTML = '';
-                jobs.forEach(job => {
-                    elements.jobQueue.insertAdjacentHTML('beforeend', renderJob(job));
-                });
-            });
-
-            eventSource.addEventListener('jobs_added', (e) => {
-                const newJobs = JSON.parse(e.data);
-                newJobs.forEach(job => {
-                    elements.jobQueue.insertAdjacentHTML('beforeend', renderJob(job));
-                });
-            });
-
-            eventSource.addEventListener('title_update', (e) => {
-                const { id, title } = JSON.parse(e.data);
-                const job = jobStates.get(id);
-                if (job) {
-                    job.title = title;
-                    updateJobElement(job);
-                }
-            });
-
-            eventSource.addEventListener('progress_update', (e) => {
-                const { id, progress } = JSON.parse(e.data);
-                const job = jobStates.get(id);
-                if (job) {
-                    job.progress = progress;
-                    updateJobElement(job);
-                }
-            });
-
-            eventSource.addEventListener('status_update', (e) => {
-                const { id, status, progress } = JSON.parse(e.data);
-                const job = jobStates.get(id);
-                if (job) {
-                    job.status = status;
-                    if (progress) job.progress = progress;
-                    updateJobElement(job);
-                }
-            });
-
-            eventSource.onerror = (err) => {
-                console.error('EventSource failed:', err);
-                const jobQueueDiv = document.getElementById('job-queue');
-                jobQueueDiv.innerHTML = '<div style="color: var(--warn);">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' + jobQueueDiv.innerHTML;
-                eventSource.close();
-            };
+          } catch (error) {
+            console.error("ネットワークエラー:", error);
+          }
         });
 
-        // --- Actions ---
-        async function start() {
-            const urlsInput = document.getElementById('urls');
-            if (urlsInput.value.trim() === '') {
-                alert('URLを入力してください。');
-                return;
+        // Event listener for Manual Select button
+        elements.manualSelectBtn.addEventListener("click", () => {
+          elements.cookiePathSet.click();
+        });
+
+        // Event listener for file input change
+        elements.cookiePathSet.addEventListener("change", async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          window.selectedCookieFile = file;
+          // Deactivate browser setting by saving an empty value
+          try {
+            const response = await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ browser: "" }),
+            });
+            if (response.ok) {
+              console.log(
+                "手動ファイル選択のため、ブラウザ自動連携を解除しました。",
+              );
+              elements.cookieStatusDisplay.textContent = `手動指定: ${file.name}`;
+              updateCookieButtonStyles(elements.manualSelectBtn);
+            } else {
+              console.error("ブラウザ設定のリセットに失敗しました。");
+            }
+          } catch (error) {
+            console.error("ネットワークエラー:", error);
+          }
+        });
+
+        // ===== 5秒移動平均用バッファ =====
+        const netBuffer = []; // Mbps 用
+        const latencyBuffer = []; // ms 用
+        const AVG_WINDOW = 5; // 5秒平均
+
+        // --- SSE Connection ---
+        const eventSource = new EventSource("/events");
+
+        // ===== ネットワークグラフの初期化 =====
+        const ctx = document.getElementById("networkChart").getContext("2d");
+
+        const networkChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [], // 時間軸（秒）
+            datasets: [
+              {
+                label: "推定Mbps",
+                data: [],
+                tension: 0.3,
+              },
+              {
+                label: "レイテンシ(ms)",
+                data: [],
+                tension: 0.3,
+                yAxisID: "y2",
+              },
+            ],
+          },
+          options: {
+            animation: false,
+            scales: {
+              x: {
+                title: { display: true, text: "秒" },
+              },
+              y: {
+                title: { display: true, text: "Mbps" },
+                position: "left",
+              },
+              y2: {
+                title: { display: true, text: "ms" },
+                position: "right",
+                grid: { drawOnChartArea: false },
+              },
+            },
+          },
+        });
+
+        eventSource.addEventListener("initial_state", (e) => {
+          const jobs = JSON.parse(e.data);
+          elements.jobQueue.innerHTML = "";
+          jobs.forEach((job) => {
+            elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
+          });
+        });
+
+        eventSource.addEventListener("jobs_added", (e) => {
+          const newJobs = JSON.parse(e.data);
+          newJobs.forEach((job) => {
+            elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
+          });
+        });
+
+        eventSource.addEventListener("title_update", (e) => {
+          const { id, title } = JSON.parse(e.data);
+          const job = jobStates.get(id);
+          if (job) {
+            job.title = title;
+            updateJobElement(job);
+          }
+        });
+
+        eventSource.addEventListener("progress_update", (e) => {
+          const { id, progress } = JSON.parse(e.data);
+          const job = jobStates.get(id);
+          if (job) {
+            job.progress = progress;
+            updateJobElement(job);
+          }
+        });
+
+        eventSource.addEventListener("status_update", (e) => {
+          const { id, status, progress } = JSON.parse(e.data);
+          const job = jobStates.get(id);
+          if (job) {
+            job.status = status;
+            if (progress) job.progress = progress;
+            updateJobElement(job);
+          }
+        });
+
+        eventSource.onerror = (err) => {
+          console.error("EventSource failed:", err);
+          const jobQueueDiv = document.getElementById("job-queue");
+          jobQueueDiv.innerHTML =
+            '<div style="color: var(--warn);">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' +
+            jobQueueDiv.innerHTML;
+          eventSource.close();
+        };
+
+        eventSource.addEventListener("system_info", (e) => {
+          const data = JSON.parse(e.data);
+
+          // ===== サーバー時刻（★ここが追加・変更）=====
+          if (data.server_time) {
+            const t = data.server_time;
+            const clockEl = document.getElementById("info-clock");
+            if (clockEl) {
+              clockEl.textContent = `${t.yyyy}/${t.MM}/${t.dd} ${t.hh}:${t.mm}:${t.ss}`;
+            }
+          }
+
+          // --- ネットワーク表示（あれば） ---
+          const netEl = document.getElementById("info-network");
+          if (netEl && data.network_mbps != null) {
+            netEl.textContent = `${data.network_mbps} Mbps (推定)`;
+          }
+
+          // --- レイテンシ表示（あれば） ---
+          const latEl = document.getElementById("info-latency");
+          if (latEl && data.latency_ms != null) {
+            latEl.textContent = `${data.latency_ms} ms`;
+          }
+
+          // --- ★ 稼働時間（ここが問題箇所だった） ---
+          const upEl = document.getElementById("info-uptime");
+          if (upEl && typeof data.uptime_sec === "number") {
+            const sec = data.uptime_sec;
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+
+            upEl.textContent = `${h}時間 ${m}分 ${s}秒`;
+          }
+
+          // ===== グラフにデータ追加（5秒移動平均）=====
+          if (data.network_mbps != null && data.latency_ms != null) {
+            // ① バッファに追加
+            netBuffer.push(data.network_mbps);
+            latencyBuffer.push(data.latency_ms);
+
+            // ② 5個を超えたら古いものを捨てる
+            if (netBuffer.length > AVG_WINDOW) netBuffer.shift();
+            if (latencyBuffer.length > AVG_WINDOW) latencyBuffer.shift();
+
+            // ③ 平均を計算
+            const avgMbps = Math.round(
+              netBuffer.reduce((a, b) => a + b, 0) / netBuffer.length,
+            );
+
+            const avgLatency = Math.round(
+              latencyBuffer.reduce((a, b) => a + b, 0) / latencyBuffer.length,
+            );
+
+            // ④ 時間ラベル（5秒ごとに見える感じ）
+            const now = new Date();
+            const timeLabel = `${now.getMinutes()}:${now.getSeconds().toString().padStart(2, "0")}`;
+
+            // ⑤ グラフに追加
+            networkChart.data.labels.push(timeLabel);
+            networkChart.data.datasets[0].data.push(avgMbps);
+            networkChart.data.datasets[1].data.push(avgLatency);
+
+            // ⑥ 表示点数を最大60点に制限（＝約5分分）
+            if (networkChart.data.labels.length > 30) {
+              networkChart.data.labels.shift();
+              networkChart.data.datasets[0].data.shift();
+              networkChart.data.datasets[1].data.shift();
             }
 
-            const formData = new FormData();
-            formData.append('urls', urlsInput.value);
-            formData.append('format', document.getElementById('fmt').value);
-            formData.append('saveHistory', document.getElementById('optHistory').checked);
-            formData.append('downloadThumb', document.getElementById('optThumb').checked);
-            formData.append('drmProtect', document.getElementById('optDrm').checked);
-            formData.append('savePath', document.getElementById('savePath').value);
-            formData.append('parallelDownloads', document.getElementById('optParallelDownloads').value);
-            formData.append('concurrentFragments', document.getElementById('optConcurrentFragments').value);
-            formData.append('commentOptions', document.getElementById('comment-options').value);
+            networkChart.update();
+          }
+        });
+      });
 
-            if (window.selectedCookieFile) {
-                formData.append('cookieFile', window.selectedCookieFile);
-            }
-
-            try {
-                const response = await fetch('/download', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    alert(`エラー: ${errorData.error}`);
-                } else {
-                    urlsInput.value = ''; // Clear textarea on success
-                }
-            } catch (error) {
-                alert(`ネットワークエラー: ${error.message}`);
-                console.error('Fetch error:', error);
-            }
+      // --- Actions ---
+      async function start() {
+        const urlsInput = document.getElementById("urls");
+        if (urlsInput.value.trim() === "") {
+          alert("URLを入力してください。");
+          return;
         }
-    </script>
-</body>
 
+        const formData = new FormData();
+        formData.append("urls", urlsInput.value);
+        formData.append("format", document.getElementById("fmt").value);
+        formData.append(
+          "saveHistory",
+          document.getElementById("optHistory").checked,
+        );
+        formData.append(
+          "downloadThumb",
+          document.getElementById("optThumb").checked,
+        );
+        formData.append(
+          "drmProtect",
+          document.getElementById("optDrm").checked,
+        );
+        formData.append("savePath", document.getElementById("savePath").value);
+        formData.append(
+          "parallelDownloads",
+          document.getElementById("optParallelDownloads").value,
+        );
+        formData.append(
+          "concurrentFragments",
+          document.getElementById("optConcurrentFragments").value,
+        );
+        formData.append(
+          "commentOptions",
+          document.getElementById("comment-options").value,
+        );
+
+        if (window.selectedCookieFile) {
+          formData.append("cookieFile", window.selectedCookieFile);
+        }
+
+        try {
+          const response = await fetch("/download", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            alert(`エラー: ${errorData.error}`);
+          } else {
+            urlsInput.value = ""; // Clear textarea on success
+          }
+        } catch (error) {
+          alert(`ネットワークエラー: ${error.message}`);
+          console.error("Fetch error:", error);
+        }
+      }
+    </script>
+  </body>
 </html>
