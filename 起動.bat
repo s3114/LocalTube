@@ -11,18 +11,51 @@ echo ==================================================
 echo.
 echo [1/6] Checking for LocalTube updates...
 
-if exist "%~dp0update.bat" (
-  call "%~dp0update.bat"
-  if errorlevel 1 (
-    echo.
-    echo ERROR: Automatic update failed.
-    echo Aborting process.
-    pause
-    exit /b 1
-  )
-) else (
-  echo WARNING: update.bat was not found. Skipping update.
+:: ===== ここに update.bat の処理を統合 =====
+echo ===== LocalTube Auto Update =====
+
+set "ZIP_URL=https://github.com/s3114/LocalTube/archive/refs/heads/main.zip"
+set "TEMP_DIR=%~dp0temp_update"
+set "ZIP_FILE=%~dp0update.zip"
+
+echo [1/4 /6] Downloading the latest version...
+powershell -Command "Invoke-WebRequest -Uri '%ZIP_URL%' -OutFile '%ZIP_FILE%'"
+if errorlevel 1 (
+  echo ERROR: Failed to download update package.
+  pause
+  exit /b 1
 )
+
+echo [2/4 /6] Extracting files...
+powershell -Command "Expand-Archive -Force '%ZIP_FILE%' '%TEMP_DIR%'"
+if errorlevel 1 (
+  echo ERROR: Failed to extract update package.
+  pause
+  exit /b 1
+)
+
+echo [3/4 /6] Updating files...
+xcopy /E /Y "%TEMP_DIR%\LocalTube-main\*" "%~dp0"
+if errorlevel 1 (
+  echo ERROR: Failed to copy updated files.
+  pause
+  exit /b 1
+)
+
+echo [4/4 /6] Cleaning up temporary files...
+rd /s /q "%TEMP_DIR%"
+del "%ZIP_FILE%"
+
+echo Checking dependencies...
+call npm install
+if errorlevel 1 (
+  echo ERROR: npm install failed during update.
+  pause
+  exit /b 1
+)
+
+echo.
+echo ===== Update Complete =====
 
 echo.
 echo [2/6] Checking Node.js and server modules...
