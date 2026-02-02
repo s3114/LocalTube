@@ -16,6 +16,8 @@ const port = 3000; // サーバーがリッスンするポート番号
 // ■ ミドルウェアの設定
 // --------------------------------------------------
 app.use(express.static(path.join(__dirname, 'public'))); // 'public' ディレクトリ内の静的ファイルを提供
+app.use(express.json()); // JSONリクエストボディをパースするためのミドルウェアを追加
+
 
 // ■ ファイルアップロードの設定
 // --------------------------------------------------
@@ -63,6 +65,47 @@ app.get('/events', sseExpress, (req, res) => {
 
 // ■ APIエンドポイントの設定
 // --------------------------------------------------
+
+// ■ 設定管理
+// --------------------------------------------------
+const CONFIG_PATH = path.join(__dirname, 'config.json');
+
+// 設定を読み込むAPI
+app.get('/api/settings', async (req, res) => {
+    try {
+        if (fs.existsSync(CONFIG_PATH)) {
+            const configData = await fs.promises.readFile(CONFIG_PATH, 'utf-8');
+            res.json(JSON.parse(configData));
+        } else {
+            // ファイルが存在しない場合はデフォルト設定を返す
+            res.json({ selectedBrowser: '' });
+        }
+    } catch (error) {
+        console.error('設定の読み込みに失敗しました:', error);
+        res.status(500).json({ error: '設定の読み込みに失敗しました。' });
+    }
+});
+
+// 設定を保存するAPI
+app.post('/api/settings', async (req, res) => {
+    try {
+        const { browser } = req.body;
+        if (typeof browser === 'undefined') {
+            return res.status(400).json({ error: '無効なリクエストです。' });
+        }
+
+        const newConfig = { selectedBrowser: browser };
+
+        await fs.promises.writeFile(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
+
+        console.log('設定を保存しました:', newConfig);
+        res.json({ message: '設定を保存しました。' });
+    } catch (error) {
+        console.error('設定の保存に失敗しました:', error);
+        res.status(500).json({ error: '設定の保存に失敗しました。' });
+    }
+});
+
 app.get('/jobs', (req, res) => {
     res.json(Array.from(jobHistory.values()));
 });
@@ -135,7 +178,7 @@ function getUrlsFromInput(url, cookiePath) {
         }
         // ABEMA
         else if (url.includes('abema.tv/video/title/')) { //シリーズ
-             args = [url, '--flat-playlist', '--get-url', ...commonArgs];
+            args = [url, '--flat-playlist', '--get-url', ...commonArgs];
         } else if (url.includes('abema.tv/video/episode/')) { //動画
             resolve([url]);
             return;
@@ -169,7 +212,7 @@ function getUrlsFromInput(url, cookiePath) {
                 reject(new Error(`yt-dlp exited with code ${code} for URL: ${url}`));
             }
         });
-        
+
         ytDlp.on('error', (err) => {
             reject(err);
         });
@@ -182,7 +225,7 @@ async function startNextDownload() {
     while (activeDownloads < maxConcurrentDownloads && downloadQueue.length > 0) {
         activeDownloads++;
         const job = downloadQueue.shift();
-        
+
         if (!job) {
             activeDownloads--;
             continue;
@@ -191,7 +234,7 @@ async function startNextDownload() {
         job.status = 'downloading';
         job.progress.eta = '開始中...';
         broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
-        
+
         // 非同期の即時実行関数でダウンロード処理をラップ
         (async () => {
             const maxRetries = 3;
@@ -200,7 +243,7 @@ async function startNextDownload() {
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
                     await processDownloadJob(job); // タイトル取得、ダウンロード、移動を含む
-                    
+
                     job.status = 'completed';
                     job.progress.eta = '完了';
                     broadcast('status_update', { id: job.id, status: job.status, progress: job.progress });
@@ -209,7 +252,7 @@ async function startNextDownload() {
 
                 } catch (error) {
                     console.error(`[Attempt ${attempt}/${maxRetries}] Job ${job.id} failed: ${error.message}`);
-                    
+
                     if (attempt === maxRetries) {
                         job.status = 'error';
                         job.progress.eta = 'エラー';
@@ -227,23 +270,61 @@ async function startNextDownload() {
 }
 
 async function processDownloadJob(job) {
+
     const ytDlpPath = path.join(__dirname, 'yt-dlp.exe');
 
-    // 1. まずタイトルを取得
+
+
+    // 設定ファイルを先に読み込む
+
+    let settings = {};
+
     try {
-        const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path);
-        job.title = title;
-        broadcast('title_update', { id: job.id, title: job.title });
+
+        if (fs.existsSync(CONFIG_PATH)) {
+
+            const configData = await fs.promises.readFile(CONFIG_PATH, 'utf-8');
+
+            settings = JSON.parse(configData);
+
+        }
+
     } catch (error) {
-        // タイトル取得はリトライ不能なエラーとして扱い、すぐに失敗させる
-        throw new Error(`タイトル取得失敗: ${error.message}`);
+
+        console.error('ダウンロード処理中に設定の読み込みに失敗しました:', error);
+
+        // 設定が読めなくても処理は続行する
+
     }
+
+
+
+    // 1. まずタイトルを取得
+
+    try {
+
+        const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path, settings);
+
+        job.title = title;
+
+        broadcast('title_update', { id: job.id, title: job.title });
+
+    } catch (error) {
+
+        // タイトル取得はリトライ不能なエラーとして扱い、すぐに失敗させる
+
+        throw new Error(`タイトル取得失敗: ${error.message}`);
+
+    }
+
+
 
     // 2. 保存パスを決定する
     const customSavePath = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : null;
     const finalMovieDir = customSavePath || movieDir;
     const finalThumbnailDir = customSavePath ? path.join(customSavePath, 'サムネイル') : thumbnailDir;
     const finalTempDir = customSavePath || downloadsDir;
+
 
     // 必要に応じて保存先ディレクトリを作成
     if (customSavePath) {
@@ -254,19 +335,23 @@ async function processDownloadJob(job) {
                 throw new Error(`カスタム保存先ディレクトリの作成に失敗しました ${finalMovieDir}: ${error.message}`);
             }
         }
+
         if (job.options.downloadThumb && !fs.existsSync(finalThumbnailDir)) {
-             try {
+            try {
                 fs.mkdirSync(finalThumbnailDir, { recursive: true });
             } catch (error) {
                 throw new Error(`カスタムサムネイル保存先ディレクトリの作成に失敗しました ${finalThumbnailDir}: ${error.message}`);
             }
         }
     }
-    
+
+
+
     // このPromiseがダウンロードとファイル移動のプロセス全体をカプセル化する
     return new Promise((resolve, reject) => {
-        const args = buildArgs(job, { movieDir: finalMovieDir, thumbnailDir: finalThumbnailDir, tempDir: finalTempDir });
+        const args = buildArgs(job, { movieDir: finalMovieDir, thumbnailDir: finalThumbnailDir, tempDir: finalTempDir }, settings);
         const ytDlp = spawn(ytDlpPath, args);
+
         let stderrOutput = '';
         let stdoutBuffer = '';
 
@@ -277,7 +362,6 @@ async function processDownloadJob(job) {
 
             for (const line of lines) {
                 if (line.trim() === '') continue;
-
                 const progressMatch = line.match(/\[download\]\s+([\d.]+)% of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/);
                 if (progressMatch) {
                     job.progress = {
@@ -297,6 +381,8 @@ async function processDownloadJob(job) {
             console.error(`yt-dlp stderr: ${errorMsg}`);
         });
 
+
+
         ytDlp.on('close', async (code) => {
             if (code === 0) {
                 resolve(); // すべて成功
@@ -305,10 +391,14 @@ async function processDownloadJob(job) {
             }
         });
 
+
+
         ytDlp.on('error', (err) => {
             reject(new Error(`yt-dlpプロセスの起動に失敗: ${err.message}`));
         });
+
     });
+
 }
 
 
@@ -316,14 +406,14 @@ function cleanupAndContinue(job) {
     if (job.cookieFile) {
         // 同じCookieファイルが他のジョブで使われている可能性があるため、すぐに削除しない
     }
-    
+
     activeDownloads--;
     startNextDownload(); // 次のダウンロードを開始
 }
 
 
 // yt-dlpの引数を組み立てるヘルパー関数
-function buildArgs(job, paths) {
+function buildArgs(job, paths, settings) {
     const { url, options } = job;
     const { movieDir, thumbnailDir, tempDir } = paths;
 
@@ -349,7 +439,17 @@ function buildArgs(job, paths) {
         args.push('-P', `thumbnail:${thumbnailDir}`);
     }
     if (options.saveHistory) args.push('--download-archive', path.join(__dirname, 'finished.txt'));
-    if (job.cookieFile) args.push('--cookies', job.cookieFile.path);
+
+    // --- Cookie関連の引数を決定 ---
+    if (job.cookieFile) {
+        // 1. 手動でのファイル指定が最優先
+        args.push('--cookies', job.cookieFile.path);
+    } else if (settings && settings.selectedBrowser) {
+        // 2. 設定ファイルでのブラウザ指定
+        args.push('--cookies-from-browser', settings.selectedBrowser);
+    }
+    // 3. どちらもなければCookie関連の引数は追加しない
+
     if (options.concurrentFragments && parseInt(options.concurrentFragments) > 0) {
         args.push('--concurrent-fragments', options.concurrentFragments);
     }
@@ -360,14 +460,26 @@ function buildArgs(job, paths) {
 }
 
 // タイトルを取得するヘルパー関数
-function getTitle(ytDlpPath, url, cookiePath) {
+
+function getTitle(ytDlpPath, url, cookiePath, settings) {
     return new Promise((resolve, reject) => {
         const args = [url, '--get-title', '--no-warnings'];
-        if (cookiePath) {
-            args.push('--cookies', cookiePath);
-        }
-        const ytDlpProcess = spawn(ytDlpPath, args);
 
+        // --- Cookie関連の引数を決定 ---
+        if (cookiePath) {
+            // 1. 手動でのファイル指定が最優先
+            args.push('--cookies', cookiePath);
+
+        } else if (settings && settings.selectedBrowser) {
+            // 2. 設定ファイルでのブラウザ指定
+            args.push('--cookies-from-browser', settings.selectedBrowser);
+        }
+
+        // 3. どちらもなければCookie関連の引数は追加しない
+        // ★★★ yt-dlpに送信されるコマンドをログ出力 (タイトル取得時) ★★★
+
+        console.log(`[yt-dlp Title Command] Path: ${ytDlpPath}, Args: ${args.join(' ')}`);
+        const ytDlpProcess = spawn(ytDlpPath, args);
         const stdoutChunks = [];
         const stderrChunks = [];
 
@@ -375,9 +487,13 @@ function getTitle(ytDlpPath, url, cookiePath) {
             stdoutChunks.push(data);
         });
 
+
+
         ytDlpProcess.stderr.on('data', (data) => {
             stderrChunks.push(data);
         });
+
+
 
         ytDlpProcess.on('close', (code) => {
             const stdoutBuffer = Buffer.concat(stdoutChunks);
@@ -392,6 +508,8 @@ function getTitle(ytDlpPath, url, cookiePath) {
                 reject(new Error(`yt-dlp exited with code ${code}. Stderr: ${stderr}`));
             }
         });
+
+
 
         ytDlpProcess.on('error', (err) => {
             reject(err);
