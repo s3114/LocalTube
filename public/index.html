@@ -173,7 +173,7 @@
         <div class="card">
             <div class="url-box">
                 <textarea id="urls" placeholder="YouTube や Abema の URL を入力"></textarea>
-                <button onclick="start()">DL</button>
+                <button onclick="start()">ダウンロード</button>
             </div>
             <div class="options">
                 <select id="fmt">
@@ -201,6 +201,13 @@
                     <option value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                         240p （ 426 x 240 ）</option>
                     <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">144p （256 x 144 ）</option>
+                </select>
+
+                <select id="comment-options">
+                    <option value="none">コメントはダウンロードしない</option>
+                    <option value="comments">動画のコメント</option>
+                    <option value="sub">ライブ中のチャット</option>
+                    <option value="both">コメントとチャット</option>
                 </select>
 
                 <div class="url-box">
@@ -543,6 +550,7 @@
             formData.append('savePath', document.getElementById('savePath').value);
             formData.append('parallelDownloads', document.getElementById('optParallelDownloads').value);
             formData.append('concurrentFragments', document.getElementById('optConcurrentFragments').value);
+            formData.append('commentOptions', document.getElementById('comment-options').value);
 
             if (window.selectedCookieFile) {
                 formData.append('cookieFile', window.selectedCookieFile);
