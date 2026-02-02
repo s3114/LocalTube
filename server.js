@@ -239,19 +239,33 @@ async function processDownloadJob(job) {
         throw new Error(`タイトル取得失敗: ${error.message}`);
     }
 
-    // 2. ダウンロードと移動の準備
-    const outputDir = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : downloadsDir;
-    if (!fs.existsSync(outputDir)) {
-        try {
-            fs.mkdirSync(outputDir, { recursive: true });
-        } catch (error) {
-            throw new Error(`保存先ディレクトリの作成に失敗しました ${outputDir}: ${error.message}`);
+    // 2. 保存パスを決定する
+    const customSavePath = job.options.savePath && job.options.savePath.trim() !== '' ? job.options.savePath : null;
+    const finalMovieDir = customSavePath || movieDir;
+    const finalThumbnailDir = customSavePath ? path.join(customSavePath, 'サムネイル') : thumbnailDir;
+    const finalTempDir = customSavePath || downloadsDir;
+
+    // 必要に応じて保存先ディレクトリを作成
+    if (customSavePath) {
+        if (!fs.existsSync(finalMovieDir)) {
+            try {
+                fs.mkdirSync(finalMovieDir, { recursive: true });
+            } catch (error) {
+                throw new Error(`カスタム保存先ディレクトリの作成に失敗しました ${finalMovieDir}: ${error.message}`);
+            }
+        }
+        if (job.options.downloadThumb && !fs.existsSync(finalThumbnailDir)) {
+             try {
+                fs.mkdirSync(finalThumbnailDir, { recursive: true });
+            } catch (error) {
+                throw new Error(`カスタムサムネイル保存先ディレクトリの作成に失敗しました ${finalThumbnailDir}: ${error.message}`);
+            }
         }
     }
     
     // このPromiseがダウンロードとファイル移動のプロセス全体をカプセル化する
     return new Promise((resolve, reject) => {
-        const args = buildArgs(job, outputDir);
+        const args = buildArgs(job, { movieDir: finalMovieDir, thumbnailDir: finalThumbnailDir, tempDir: finalTempDir });
         const ytDlp = spawn(ytDlpPath, args);
         let stderrOutput = '';
         let stdoutBuffer = '';
@@ -285,12 +299,7 @@ async function processDownloadJob(job) {
 
         ytDlp.on('close', async (code) => {
             if (code === 0) {
-                try {
-                    await moveFiles(outputDir, job.options.downloadThumb);
-                    resolve(); // すべて成功
-                } catch (moveError) {
-                    reject(new Error(`ファイル移動に失敗: ${moveError.message}`));
-                }
+                resolve(); // すべて成功
             } else {
                 reject(new Error(`yt-dlpがエラーコード${code}で終了しました。Stderr: ${stderrOutput}`));
             }
@@ -314,11 +323,19 @@ function cleanupAndContinue(job) {
 
 
 // yt-dlpの引数を組み立てるヘルパー関数
-function buildArgs(job, outputDir) {
+function buildArgs(job, paths) {
     const { url, options } = job;
+    const { movieDir, thumbnailDir, tempDir } = paths;
+
     let args = [
         url,
-        '-o', path.join(outputDir, '%(upload_date)s-%(title)s.%(ext)s'),
+        // -o にはファイル名パターンのみを指定
+        '-o', '%(upload_date)s-%(title)s.%(ext)s',
+
+        // -P で各ファイルの保存先を指定
+        '-P', `home:${movieDir}`,
+        '-P', `temp:${tempDir}`,
+
         '--embed-thumbnail', '--add-metadata', '--ignore-errors', '--retries', 'infinite',
         '--progress', // 進捗情報を強制的に表示させる
         '--no-color', // 色コードを無効化
@@ -326,7 +343,11 @@ function buildArgs(job, outputDir) {
     ];
 
     if (options.format) args.push('-f', options.format);
-    if (options.downloadThumb) args.push('--write-thumbnail');
+    if (options.downloadThumb) {
+        args.push('--write-thumbnail');
+        // サムネイルの保存先を指定
+        args.push('-P', `thumbnail:${thumbnailDir}`);
+    }
     if (options.saveHistory) args.push('--download-archive', path.join(__dirname, 'finished.txt'));
     if (job.cookieFile) args.push('--cookies', job.cookieFile.path);
     if (options.concurrentFragments && parseInt(options.concurrentFragments) > 0) {
@@ -379,73 +400,7 @@ function getTitle(ytDlpPath, url, cookiePath) {
 }
 
 
-// ファイル移動のヘルパー関数 (非同期化・リトライ機能付き)
-async function moveFiles(outputDir, downloadThumb) {
-    const maxRetries = 5;
-    const delay = 1000; // 1秒
 
-    try {
-        const files = await fs.promises.readdir(outputDir);
-        for (const file of files) {
-            const oldPath = path.join(outputDir, file);
-            
-            try {
-                const stat = await fs.promises.stat(oldPath);
-                if (!stat.isFile()) continue;
-            } catch (e) {
-                if (e.code === 'ENOENT') continue; // ファイルがなければスキップ
-                throw e;
-                
-            }
-
-            const fileExt = path.extname(file).toLowerCase();
-            const thumbnailExtensions = ['.webp', '.jpg', '.jpeg', '.png'];
-            let newPath;
-            let action;
-
-            // .fyyy.mp4 (yyyは3桁の数字) または .temp.mp4 のパターンに一致するかどうかをチェックする正規表現
-            const skipPattern = /\.(f\d{3}|temp)\.mp4$/i;
-
-            if (fileExt === '.mp4') {
-                if (!skipPattern.test(file)) { // パターンに一致しない場合のみ移動する
-                    newPath = path.join(movieDir, file);
-                    action = 'move';
-                }
-            } else if (thumbnailExtensions.includes(fileExt)) {
-                if (downloadThumb) {
-                    newPath = path.join(thumbnailDir, file);
-                    action = 'move';
-                } else {
-                    action = 'delete';
-                }
-            }
-
-            if (action) {
-                for (let i = 0; i < maxRetries; i++) {
-                    try {
-                        if (action === 'move') {
-                            await fs.promises.rename(oldPath, newPath);
-                        } else {
-                            await fs.promises.unlink(oldPath);
-                        }
-                        break; 
-                    } catch (err) {
-                        if ((err.code === 'EBUSY' || err.code === 'ENOENT') && i < maxRetries - 1) {
-                            console.warn(`[${action}] Retrying on ${file} due to ${err.code}... (${i + 1}/${maxRetries})`);
-                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
-                        } else {
-                            console.error(`Failed to ${action} ${file} after retries: ${err}`);
-                            throw err; 
-                        }
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        console.error(`ファイルの移動/削除処理中にエラーが発生しました: ${err}`);
-        throw err;
-    }
-}
 
 
 // ■ サーバーの起動
