@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-setlocal
+setlocal EnableDelayedExpansion
 cd /d %~dp0
 set "SAVE_DIR=%~dp0"
 
