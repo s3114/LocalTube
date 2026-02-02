@@ -5,118 +5,118 @@ cd /d %~dp0
 set "SAVE_DIR=%~dp0"
 
 echo ==================================================
-echo      開発環境セットアップを開始します...
+echo      Starting development environment setup...
 echo ==================================================
 
 echo.
-echo [1/6] LocalTube の更新を確認しています...
+echo [1/6] Checking for LocalTube updates...
 
 if exist "%~dp0update.bat" (
   call "%~dp0update.bat"
   if errorlevel 1 (
     echo.
-    echo ERROR: 自動アップデートに失敗しました。
-    echo 処理を中断します。
+    echo ERROR: Automatic update failed.
+    echo Aborting process.
     pause
     exit /b 1
   )
 ) else (
-  echo WARNING: update.bat が見つかりません。更新をスキップします。
+  echo WARNING: update.bat was not found. Skipping update.
 )
 
 echo.
-echo [2/6] Node.js とサーバーモジュールを確認しています...
+echo [2/6] Checking Node.js and server modules...
 where node >nul 2>&1
 if errorlevel 1 (
-  echo Node.js が見つかりません。自動インストールを試みます...
+  echo Node.js was not found. Attempting automatic installation...
   net session >nul 2>&1
   if errorlevel 1 (
-    echo 管理者権限が必要です。管理者として再起動します...
+    echo Administrator privileges are required. Restarting as administrator...
     powershell -Command "Start-Process '%~f0' -Verb RunAs"
     exit /b
   )
   winget install OpenJS.NodeJS --accept-source-agreements --accept-package-agreements
   echo.
-  echo Node.js のインストールが完了しました。
-  echo このファイルをもう一度実行してください。
+  echo Node.js installation completed.
+  echo Please run this file again.
   pause
   exit /b
 )
 
 where npm >nul 2>&1
 if errorlevel 1 (
-  echo npm が見つかりません。Node.js のインストールに問題がある可能性があります。
+  echo npm was not found. There may be a problem with your Node.js installation.
   pause
   exit /b 1
 )
 
-echo Node.js モジュールをインストール/確認しています...
+echo Installing/checking Node.js modules...
 call npm install --silent
 if errorlevel 1 (
-  echo ERROR: npm install に失敗しました。
+  echo ERROR: npm install failed.
   pause
   exit /b
 )
-echo Node.js のセットアップが完了しました。
+echo Node.js setup completed.
 
 echo.
-echo [3/6] ffmpeg を確認・セットアップしています...
+echo [3/6] Checking and setting up ffmpeg...
 winget install ffmpeg --accept-source-agreements --accept-package-agreements
 if errorlevel 1 (
-  echo ERROR: ffmpeg のインストールに失敗しました。手動でインストールしてください。
+  echo ERROR: Failed to install ffmpeg. Please install it manually.
   pause
   exit /b
 )
-echo ffmpeg のセットアップが完了しました。
+echo ffmpeg setup completed.
 
 echo.
-echo [4/6] yt-dlp を確認・セットアップしています...
+echo [4/6] Checking and setting up yt-dlp...
 if exist "%SAVE_DIR%yt-dlp.exe" (
-  echo yt-dlp.exe を更新しています...
+  echo Updating yt-dlp.exe...
 ) else (
-  echo yt-dlp.exe をダウンロードしています...
-  curl -L -o "%SAVE_DIR%yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" || (echo ERROR: yt-dlp のダウンロードに失敗しました。 & pause & exit /b)
+  echo Downloading yt-dlp.exe...
+  curl -L -o "%SAVE_DIR%yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" || (echo ERROR: Failed to download yt-dlp. & pause & exit /b)
 )
 "%SAVE_DIR%yt-dlp.exe" -U
-echo yt-dlp のセットアップが完了しました。
+echo yt-dlp setup completed.
 
 echo.
-echo [5/6] AtomicParsley を確認・セットアップしています...
+echo [5/6] Checking and setting up AtomicParsley...
 if exist "%SAVE_DIR%AtomicParsley.exe" (
-  echo AtomicParsley.exe は既に存在します。
+  echo AtomicParsley.exe already exists.
 ) else (
-  echo AtomicParsley をダウンロードしています...
-  curl -L -o "%SAVE_DIR%AtomicParsley.zip" "https://github.com/wez/atomicparsley/releases/download/20240608.083822.1ed9031/AtomicParsleyWindows.zip" || (echo ERROR: AtomicParsley のダウンロードに失敗しました。 & pause & exit /b)
+  echo Downloading AtomicParsley...
+  curl -L -o "%SAVE_DIR%AtomicParsley.zip" "https://github.com/wez/atomicparsley/releases/download/20240608.083822.1ed9031/AtomicParsleyWindows.zip" || (echo ERROR: Failed to download AtomicParsley. & pause & exit /b)
   if exist "%SAVE_DIR%AtomicParsley.zip" (
-    echo AtomicParsley.zip を展開しています...
+    echo Extracting AtomicParsley.zip...
     powershell -Command "Expand-Archive -Path '%SAVE_DIR%AtomicParsley.zip' -DestinationPath '%SAVE_DIR%' -Force"
     del "%SAVE_DIR%AtomicParsley.zip"
   )
 )
-echo AtomicParsley のセットアップが完了しました。
+echo AtomicParsley setup completed.
 
 echo.
-echo [6/6] Deno を確認・セットアップしています...
+echo [6/6] Checking and setting up Deno...
 if exist "%SAVE_DIR%deno.exe" (
-  echo Deno をアップグレードしています...
+  echo Upgrading Deno...
   "%SAVE_DIR%deno.exe" upgrade
   if exist "%SAVE_DIR%deno.old.exe" (
     del "%SAVE_DIR%deno.old.exe"
   )
 ) else (
-  echo Deno をダウンロードしています...
-  curl -L -o "%SAVE_DIR%deno.zip" "https://github.com/denoland/deno/releases/download/v1.44.4/deno-x86_64-pc-windows-msvc.zip" || (echo ERROR: Deno のダウンロードに失敗しました。 & pause & exit /b)
+  echo Downloading Deno...
+  curl -L -o "%SAVE_DIR%deno.zip" "https://github.com/denoland/deno/releases/download/v1.44.4/deno-x86_64-pc-windows-msvc.zip" || (echo ERROR: Failed to download Deno. & pause & exit /b)
   if exist "%SAVE_DIR%deno.zip" (
-    echo deno.zip を展開しています...
+    echo Extracting deno.zip...
     powershell -Command "Expand-Archive -Path '%SAVE_DIR%deno.zip' -DestinationPath '%SAVE_DIR%' -Force"
     del "%SAVE_DIR%deno.zip"
   )
 )
-echo Deno のセットアップが完了しました。
+echo Deno setup completed.
 
 echo.
 echo ==================================================
-echo      セットアップ完了。サーバーを起動します...
+echo      Setup complete. Starting server...
 echo ==================================================
 echo.
 
