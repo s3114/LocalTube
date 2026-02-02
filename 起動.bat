@@ -11,7 +11,6 @@ echo ==================================================
 echo.
 echo [1/6] Checking for LocalTube updates...
 
-:: ===== ここに update.bat の処理を統合 =====
 echo ===== LocalTube Auto Update =====
 
 set "ZIP_URL=https://github.com/s3114/LocalTube/archive/refs/heads/main.zip"
