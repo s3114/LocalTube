@@ -16,16 +16,23 @@
             --green: #4caf50;
             --blue: #2196f3;
         }
-        * { box-sizing: border-box; }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: "Segoe UI", Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
         }
+
         header {
             position: fixed;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             height: 56px;
             background: var(--panel);
             display: flex;
@@ -34,21 +41,51 @@
             border-bottom: 1px solid var(--border);
             z-index: 10;
         }
-        .logo { font-size: 18px; font-weight: bold; }
-        .logo span { color: var(--accent); }
+
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
         main {
             max-width: 900px;
             margin: 80px auto 40px;
             padding: 0 16px;
         }
+
         .card {
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 20px;
         }
-        .url-box { display: flex; gap: 10px; }
-        .url-box textarea, .url-box input {
+
+
+        .url-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .field-label {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .url-box {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .url-box textarea,
+        .url-box input {
             flex: 1;
             background: #000;
             border: 1px solid var(--border);
@@ -59,6 +96,7 @@
             resize: vertical;
             min-height: 50px;
         }
+
         .url-box button {
             background: var(--accent);
             border: none;
@@ -70,7 +108,25 @@
             align-self: flex-start;
             height: 50px;
         }
-        .options { margin-top: 20px; display: grid; gap: 14px; }
+
+        .field-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .field-row select,
+        .field-row input {
+            flex: 1;
+        }
+
+        .options {
+            margin-top: 20px;
+            display: grid;
+            gap: 14px;
+        }
+
         select {
             width: 100%;
             background: #000;
@@ -79,6 +135,7 @@
             padding: 10px;
             border-radius: 8px;
         }
+
         input[type="range"] {
             appearance: none;
             -webkit-appearance: none;
@@ -89,18 +146,88 @@
             outline: none;
             margin-top: 10px;
         }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 1px solid var(--border); }
-        input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 1px solid var(--border); }
-        .toggle { display: flex; justify-content: space-between; align-items: center; background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
-        .toggle small { color: var(--subtext); display: block; font-size: 12px; }
-        .switch { position: relative; width: 42px; height: 22px; }
-        .switch input { display: none; }
-        .slider { position: absolute; inset: 0; background: #555; border-radius: 22px; cursor: pointer; transition: .2s; }
-        .slider:before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .2s; }
-        input:checked+.slider { background: var(--accent); }
-        input:checked+.slider:before { transform: translateX(20px); }
-        .warn small { color: var(--warn); }
-        #savePath { opacity: 0.9; }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 1px solid var(--border);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 1px solid var(--border);
+        }
+
+        .toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .toggle small {
+            color: var(--subtext);
+            display: block;
+            font-size: 12px;
+        }
+
+        .switch {
+            position: relative;
+            width: 42px;
+            height: 22px;
+        }
+
+        .switch input {
+            display: none;
+        }
+
+        .slider {
+            position: absolute;
+            inset: 0;
+            background: #555;
+            border-radius: 22px;
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        .slider:before {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 2px;
+            top: 2px;
+            background: #fff;
+            border-radius: 50%;
+            transition: .2s;
+        }
+
+        input:checked+.slider {
+            background: var(--accent);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .warn small {
+            color: var(--warn);
+        }
+
+        #savePath {
+            opacity: 0.9;
+        }
 
         /* ===== Job Queue ===== */
         #job-queue {
@@ -109,6 +236,7 @@
             flex-direction: column;
             gap: 10px;
         }
+
         .job-item {
             background: #000;
             border: 1px solid var(--border);
@@ -119,6 +247,7 @@
             align-items: center;
             transition: background-color 0.3s;
         }
+
         .job-status-icon {
             flex-shrink: 0;
             width: 24px;
@@ -128,10 +257,12 @@
             align-items: center;
             justify-content: center;
         }
+
         .job-details {
             flex-grow: 1;
             overflow: hidden;
         }
+
         .job-title {
             white-space: nowrap;
             overflow: hidden;
@@ -139,6 +270,7 @@
             font-size: 14px;
             color: var(--text);
         }
+
         .job-progress-bar-container {
             width: 100%;
             height: 6px;
@@ -147,14 +279,22 @@
             margin-top: 8px;
             overflow: hidden;
         }
+
         .job-progress-bar {
             height: 100%;
             background: var(--blue);
             width: 0%;
             transition: width 0.2s linear;
         }
-        .job-item[data-status="completed"] .job-progress-bar { background: var(--green); }
-        .job-item[data-status="error"] .job-progress-bar { background: var(--accent); }
+
+        .job-item[data-status="completed"] .job-progress-bar {
+            background: var(--green);
+        }
+
+        .job-item[data-status="error"] .job-progress-bar {
+            background: var(--accent);
+        }
+
         .job-progress-text {
             font-size: 12px;
             color: var(--subtext);
@@ -171,48 +311,75 @@
 
     <main>
         <div class="card">
-            <div class="url-box">
-                <textarea id="urls" placeholder="YouTube や Abema の URL を入力"></textarea>
-                <button onclick="start()">ダウンロード</button>
+            <div class="url-row">
+                <div class="field-label">URL ：</div>
+                <div class="url-box">
+                    <textarea id="urls" placeholder="YouTube や Abema の URL を入力"></textarea>
+                    <button onclick="start()">ダウンロード</button>
+                </div>
             </div>
             <div class="options">
-                <select id="fmt">
-                    <option
-                        value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        4320p（7680 x 4320）</option>
-                    <option
-                        value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        2160p（3840 x 2160）</option>
-                    <option
-                        value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        1440p（2560 x 1440）</option>
-                    <option
-                        value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        1080p（1920 x 1080）</option>
-                    <option
-                        value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        720p （1280 x 720 ）</option>
-                    <option
-                        value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        480p （720 x 480 ）</option>
-                    <option
-                        value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        360p （640 x 360 ）</option>
-                    <option value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
-                        240p （ 426 x 240 ）</option>
-                    <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">144p （256 x 144 ）</option>
-                </select>
-
-                <select id="comment-options">
-                    <option value="none">コメントはダウンロードしない</option>
-                    <option value="comments">動画のコメント</option>
-                    <option value="sub">ライブ中のチャット</option>
-                    <option value="both">コメントとチャット</option>
-                </select>
-
-                <div class="url-box">
-                    <input type="text" id="savePath" placeholder="保存先フォルダパス (空白の場合はデフォルト)">
+                <div class="field-row">
+                    <div class="field-label">画質：</div>
+                    <select id="fmt">
+                        <option
+                            value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            4320p（7680 x 4320）</option>
+                        <option
+                            value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            2160p（3840 x 2160）</option>
+                        <option
+                            value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            1440p（2560 x 1440）</option>
+                        <option
+                            value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            1080p（1920 x 1080）</option>
+                        <option
+                            value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            720p （1280 x 720 ）</option>
+                        <option
+                            value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            480p （720 x 480 ）</option>
+                        <option
+                            value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            360p （640 x 360 ）</option>
+                        <option value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
+                            240p （ 426 x 240 ）</option>
+                        <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">144p （256 x 144 ）</option>
+                    </select>
                 </div>
+
+                <div class="field-row">
+                    <div class="field-label">ｺﾒﾝﾄ：</div>
+                    <select id="comment-options">
+                        <option value="none">ダウンロードしない</option>
+                        <option value="comments">動画のコメント</option>
+                        <option value="sub">ライブ中のチャット</option>
+                        <option value="both">コメントとチャット</option>
+                    </select>
+                </div>
+
+                <div class="field-row">
+                    <div class="field-label">保存：</div>
+                    <div class="url-box">
+                        <input type="text" id="savePath" placeholder="保存先フォルダパス (空白の場合はデフォルト)">
+                    </div>
+                </div>
+
+                <div class="toggle">
+                    <div>
+                        Cookieファイル
+                        <small id="cookie-status-display">設定されていません</small>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button id="set-firefox-btn"
+                            style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">FireFox</button>
+                        <input type="file" id="cookiePathSet" accept=".txt" style="display: none;">
+                        <button id="manual-select-btn"
+                            style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">手動選択</button>
+                    </div>
+                </div>
+
                 <div class="toggle">
                     <div>
                         同時ダウンロード数: <span id="parallelDownloadsValue">10</span>
@@ -227,52 +394,43 @@
                     </div>
                     <input type="range" id="optConcurrentFragments" min="1" max="16" value="4">
                 </div>
-            </div>
-            <div class="toggle">
-                <div>
-                    Cookieファイル
-                    <small id="cookie-status-display">設定されていません</small>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <button id="set-firefox-btn" style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">FireFox</button>
-                    <input type="file" id="cookiePathSet" accept=".txt" style="display: none;">
-                    <button id="manual-select-btn" style="background: #333; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;">手動選択</button>
-                </div>
-            </div>
-            <div class="toggle">
-                <div>
-                    ダウンロード履歴を保存
-                    <small>再度同じ動画がダウンロードされないようになります。</small>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="optHistory" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="toggle">
-                <div>
-                    サムネイルをダウンロード
-                    <small>動画一覧・再生画面で使用</small>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="optThumb" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="toggle">
-                <div>
-                    DRM 保護を回避
-                    <div class="warn">
-                        <small>非推奨（必要なときのみ使用してください。）詳しくは<a
-                                href="https://github.com/yt-dlp/yt-dlp/issues/12563">こちら</a>(英語)</small>
+
+                <div class="toggle">
+                    <div>
+                        ダウンロード履歴を保存
+                        <small>再度同じ動画がダウンロードされないようになります。</small>
                     </div>
+                    <label class="switch">
+                        <input type="checkbox" id="optHistory" checked>
+                        <span class="slider"></span>
+                    </label>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="optDrm">
-                    <span class="slider"></span>
-                </label>
+                <div class="toggle">
+                    <div>
+                        サムネイルをダウンロード
+                        <small>動画一覧・再生画面で使用</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="optThumb" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle">
+                    <div>
+                        DRM 保護を回避
+                        <div class="warn">
+                            <small>非推奨（必要なときのみ使用してください。）詳しくは<a
+                                    href="https://github.com/yt-dlp/yt-dlp/issues/12563">こちら</a>(英語)</small>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="optDrm">
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
+
 
         <div id="job-queue"></div>
     </main>
@@ -291,7 +449,7 @@
                 default: return '❔';
             }
         }
-        
+
         function renderJob(job) {
             jobStates.set(job.id, job);
             const statusIcon = getStatusIcon(job.status);
@@ -321,10 +479,10 @@
             jobElement.querySelector('.job-status-icon').textContent = getStatusIcon(job.status);
             jobElement.querySelector('.job-title').textContent = job.title;
             jobElement.querySelector('.job-title').title = job.title;
-            
+
             const progressBar = jobElement.querySelector('.job-progress-bar');
             const progressTextElement = jobElement.querySelector('.job-progress-text');
-            
+
             let progressText = '';
             if (job.status === 'downloading') {
                 progressBar.style.width = `${job.progress.percentage}%`;
@@ -336,8 +494,8 @@
                 progressBar.style.width = '100%';
                 progressText = job.progress.eta || 'エラー';
             } else {
-                 progressBar.style.width = '0%';
-                 progressText = job.progress.eta || job.status;
+                progressBar.style.width = '0%';
+                progressText = job.progress.eta || job.status;
             }
             progressTextElement.textContent = progressText;
         }
@@ -368,7 +526,8 @@
                 cookieStatusDisplay: document.getElementById('cookie-status-display'),
                 setFirefoxBtn: document.getElementById('set-firefox-btn'),
                 manualSelectBtn: document.getElementById('manual-select-btn'),
-                cookiePathSet: document.getElementById('cookiePathSet')
+                cookiePathSet: document.getElementById('cookiePathSet'),
+                commentOptions: document.getElementById('comment-options')
             };
 
             // Load general settings from localStorage
@@ -383,6 +542,7 @@
             const loadedFragments = loadSetting('optConcurrentFragments', '4');
             elements.optConcurrentFragments.value = loadedFragments;
             elements.concurrentFragmentsValue.textContent = loadedFragments;
+            elements.commentOptions.value = loadSetting('commentOptions', elements.commentOptions.value);
 
             // Event listeners for general settings
             elements.fmt.addEventListener('change', (e) => saveSetting('fmt', e.target.value));
@@ -398,6 +558,10 @@
                 elements.concurrentFragmentsValue.textContent = e.target.value;
                 saveSetting('optConcurrentFragments', e.target.value);
             });
+            elements.commentOptions.addEventListener('change', (e) =>
+                saveSetting('commentOptions', e.target.value)
+            );
+
 
             // --- Cookie Settings Management ---
             function updateCookieButtonStyles(activeButton) {
@@ -419,14 +583,14 @@
                             updateCookieButtonStyles(elements.setFirefoxBtn);
                         } else {
                             elements.cookieStatusDisplay.textContent = '設定されていません';
-                             updateCookieButtonStyles(null);
+                            updateCookieButtonStyles(null);
                         }
                     }
                 } catch (error) {
                     console.error('Failed to load settings:', error);
                 }
             })();
-            
+
             // Event listener for Firefox button
             elements.setFirefoxBtn.addEventListener('click', async () => {
                 window.selectedCookieFile = null; // Clear manual selection
@@ -471,9 +635,9 @@
                         elements.cookieStatusDisplay.textContent = `手動指定: ${file.name}`;
                         updateCookieButtonStyles(elements.manualSelectBtn);
                     } else {
-                         console.error('ブラウザ設定のリセットに失敗しました。');
+                        console.error('ブラウザ設定のリセットに失敗しました。');
                     }
-                } catch (error)                    {
+                } catch (error) {
                     console.error('ネットワークエラー:', error);
                 }
             });
@@ -493,7 +657,7 @@
             eventSource.addEventListener('jobs_added', (e) => {
                 const newJobs = JSON.parse(e.data);
                 newJobs.forEach(job => {
-                     elements.jobQueue.insertAdjacentHTML('beforeend', renderJob(job));
+                    elements.jobQueue.insertAdjacentHTML('beforeend', renderJob(job));
                 });
             });
 
@@ -520,7 +684,7 @@
                 const job = jobStates.get(id);
                 if (job) {
                     job.status = status;
-                    if(progress) job.progress = progress;
+                    if (progress) job.progress = progress;
                     updateJobElement(job);
                 }
             });
@@ -528,7 +692,7 @@
             eventSource.onerror = (err) => {
                 console.error('EventSource failed:', err);
                 const jobQueueDiv = document.getElementById('job-queue');
-                jobQueueDiv.innerHTML = '<div style="color: var(--warn);">サーバーとの接続が切れました。ページをリロードしてください。</div>' + jobQueueDiv.innerHTML;
+                jobQueueDiv.innerHTML = '<div style="color: var(--warn);">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' + jobQueueDiv.innerHTML;
                 eventSource.close();
             };
         });
@@ -575,4 +739,5 @@
         }
     </script>
 </body>
+
 </html>
