@@ -31,6 +31,10 @@ const movieDir = path.join(downloadsDir, '動画');
 if (!fs.existsSync(movieDir)) fs.mkdirSync(movieDir);
 const thumbnailDir = path.join(downloadsDir, 'サムネイル');
 if (!fs.existsSync(thumbnailDir)) fs.mkdirSync(thumbnailDir);
+const commentsDir = path.join(downloadsDir, 'コメント');
+if (!fs.existsSync(commentsDir)) fs.mkdirSync(commentsDir);
+const liveChatDir = path.join(downloadsDir, 'ライブチャット');
+if (!fs.existsSync(liveChatDir)) fs.mkdirSync(liveChatDir);
 
 // ■ ダウンロードキューと状態管理
 // --------------------------------------------------
@@ -111,7 +115,7 @@ app.get('/jobs', (req, res) => {
 });
 
 app.post('/download', upload.single('cookieFile'), async (req, res) => {
-    const { urls, format, saveHistory, downloadThumb, drmProtect, savePath, parallelDownloads, concurrentFragments } = req.body;
+    const { urls, format, saveHistory, downloadThumb, drmProtect, savePath, parallelDownloads, concurrentFragments, commentOptions } = req.body;
     const cookieFile = req.file;
 
     if (!urls) {
@@ -131,7 +135,7 @@ app.post('/download', upload.single('cookieFile'), async (req, res) => {
                 const job = {
                     id: jobId,
                     url: videoUrl.trim(),
-                    options: { format, saveHistory: saveHistory === 'true', downloadThumb: downloadThumb === 'true', drmProtect: drmProtect === 'true', savePath, concurrentFragments },
+                    options: { format, saveHistory: saveHistory === 'true', downloadThumb: downloadThumb === 'true', drmProtect: drmProtect === 'true', savePath, concurrentFragments, commentOptions },
                     cookieFile,
                     status: 'queued',
                     title: videoUrl.trim(),
@@ -385,6 +389,15 @@ async function processDownloadJob(job) {
 
         ytDlp.on('close', async (code) => {
             if (code === 0) {
+                const isProcessingExtras = job.options.commentOptions && job.options.commentOptions !== 'none';
+
+                // コメント/チャットのダウンロードが要求されている場合、ステータスを更新
+                if (isProcessingExtras) {
+                    job.progress.eta = 'コメント/チャットを整理中...';
+                    broadcast('status_update', { id: job.id, status: 'downloading', progress: job.progress });
+                }
+
+                await moveExtraFiles(finalMovieDir); // ファイル仕分け処理を呼び出す
                 resolve(); // すべて成功
             } else {
                 reject(new Error(`yt-dlpがエラーコード${code}で終了しました。Stderr: ${stderrOutput}`));
@@ -456,65 +469,194 @@ function buildArgs(job, paths, settings) {
     if (options.drmProtect) {
         args.push('--add-header', 'youtube:player-client=default,-tv,web_safari,web_embedded');
     }
+
+    // --- コメント関連の引数を追加 ---
+    if (options.commentOptions === 'comments' || options.commentOptions === 'both') {
+        args.push('--get-comments');
+    }
+    if (options.commentOptions === 'sub' || options.commentOptions === 'both') {
+        args.push('--write-sub');
+    }
+
     return args;
 }
 
 // タイトルを取得するヘルパー関数
 
 function getTitle(ytDlpPath, url, cookiePath, settings) {
+
     return new Promise((resolve, reject) => {
+
         const args = [url, '--get-title', '--no-warnings'];
 
+        
+
         // --- Cookie関連の引数を決定 ---
+
         if (cookiePath) {
+
             // 1. 手動でのファイル指定が最優先
+
             args.push('--cookies', cookiePath);
 
         } else if (settings && settings.selectedBrowser) {
+
             // 2. 設定ファイルでのブラウザ指定
+
             args.push('--cookies-from-browser', settings.selectedBrowser);
+
         }
 
         // 3. どちらもなければCookie関連の引数は追加しない
+
+
+
         // ★★★ yt-dlpに送信されるコマンドをログ出力 (タイトル取得時) ★★★
 
         console.log(`[yt-dlp Title Command] Path: ${ytDlpPath}, Args: ${args.join(' ')}`);
+
+        
+
         const ytDlpProcess = spawn(ytDlpPath, args);
+
+
+
         const stdoutChunks = [];
+
         const stderrChunks = [];
 
+
+
         ytDlpProcess.stdout.on('data', (data) => {
+
             stdoutChunks.push(data);
+
         });
 
 
 
         ytDlpProcess.stderr.on('data', (data) => {
+
             stderrChunks.push(data);
+
         });
 
 
 
         ytDlpProcess.on('close', (code) => {
+
             const stdoutBuffer = Buffer.concat(stdoutChunks);
+
             // iconv-liteを使って、Bufferをcp932(Shift_JIS)としてデコード
+
             const title = iconv.decode(stdoutBuffer, 'cp932');
 
+
+
             if (code === 0 && title.trim() !== '') {
+
                 resolve(title.trim());
+
             } else {
+
                 const stderrBuffer = Buffer.concat(stderrChunks);
+
                 const stderr = iconv.decode(stderrBuffer, 'cp932');
+
                 reject(new Error(`yt-dlp exited with code ${code}. Stderr: ${stderr}`));
+
             }
+
         });
 
 
 
         ytDlpProcess.on('error', (err) => {
+
             reject(err);
+
         });
+
     });
+
+}
+
+
+
+// ダウンロード完了後に余分なファイルを仕分けるヘルパー関数
+
+async function moveExtraFiles(sourceDir) {
+
+    try {
+
+        const files = await fs.promises.readdir(sourceDir);
+
+        for (const file of files) {
+
+            const oldPath = path.join(sourceDir, file);
+
+
+
+            try {
+
+                const stat = await fs.promises.stat(oldPath);
+
+                if (!stat.isFile()) continue;
+
+            } catch (e) {
+
+                // ファイルが存在しないなどの場合はスキップ
+
+                if (e.code === 'ENOENT') continue;
+
+                throw e;
+
+            }
+
+
+
+            let newPath;
+
+            if (file.endsWith('.info.json')) {
+
+                newPath = path.join(commentsDir, file);
+
+            } else if (file.endsWith('.live_chat.json')) {
+
+                newPath = path.join(liveChatDir, file);
+
+            }
+
+
+
+            if (newPath) {
+
+                try {
+
+                    await fs.promises.rename(oldPath, newPath);
+
+                    console.log(`Moved ${file} to ${newPath}`);
+
+                } catch (err) {
+
+                    console.error(`Failed to move ${file}: ${err}`);
+
+                    // ファイルの移動に失敗しても、エラーをスローせずに処理を続行
+
+                }
+
+            }
+
+        }
+
+    } catch (err) {
+
+        console.error(`Error while sorting extra files in ${sourceDir}: ${err}`);
+
+        // ここでもエラーをスローしない
+
+    }
+
 }
 
 
