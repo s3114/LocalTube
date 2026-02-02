@@ -20,14 +20,20 @@ set "TEMP_REMOTE_VERSION=%~dp0remote_version.txt"
 
 echo [0/6] Checking version information...
 
-powershell -NoProfile -Command "$r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; $r.Content.Trim() | Out-File -Encoding utf8 '%TEMP_REMOTE_VERSION%'"
+powershell -NoProfile -Command ^
+  "$r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; " ^
+  "$r.Content.Trim() | Out-File -Encoding utf8 '%TEMP_REMOTE_VERSION%'"
 
 if not exist "%LOCAL_VERSION_FILE%" (
   echo Local version.txt not found. Update required.
   set NEED_UPDATE=1
 ) else (
-  for /f "usebackq tokens=* delims=" %%R in ("%TEMP_REMOTE_VERSION%") do set REMOTE_VER=%%R
-  for /f "usebackq tokens=* delims=" %%L in ("%LOCAL_VERSION_FILE%") do set LOCAL_VER=%%L
+
+  for /f "usebackq tokens=* delims=" %%R in ('powershell -NoProfile -Command ^
+    "Get-Content '%TEMP_REMOTE_VERSION%' -Raw | ForEach-Object { $_.Trim() -replace '^\uFEFF', '' }"') do set REMOTE_VER=%%R
+
+  for /f "usebackq tokens=* delims=" %%L in ('powershell -NoProfile -Command ^
+    "Get-Content '%LOCAL_VERSION_FILE%' -Raw | ForEach-Object { $_.Trim() -replace '^\uFEFF', '' }"') do set LOCAL_VER=%%L
 
   echo Local version : [!LOCAL_VER!]
   echo Remote version: [!REMOTE_VER!]
@@ -43,45 +49,45 @@ if not exist "%LOCAL_VERSION_FILE%" (
 
 del "%TEMP_REMOTE_VERSION%" >nul 2>&1
 
-
 if "%NEED_UPDATE%"=="1" (
   echo.
   echo [1/6] Checking for LocalTube updates...
-  
+
   echo ===== LocalTube Auto Update =====
-  
+
   set "ZIP_URL=https://github.com/s3114/LocalTube/archive/refs/heads/main.zip"
   set "TEMP_DIR=%~dp0temp_update"
   set "ZIP_FILE=%~dp0update.zip"
-  
+
   echo [1/4 /6] Downloading the latest version...
-  powershell -Command "Invoke-WebRequest -Uri '%ZIP_URL%' -OutFile '%ZIP_FILE%'"
+
+  powershell -Command "Invoke-WebRequest -Uri '!ZIP_URL!' -OutFile '!ZIP_FILE!'"
   if errorlevel 1 (
     echo ERROR: Failed to download update package.
     pause
     exit /b 1
   )
-  
+
   echo [2/4 /6] Extracting files...
-  powershell -Command "Expand-Archive -Force '%ZIP_FILE%' '%TEMP_DIR%'"
+  powershell -Command "Expand-Archive -Force '!ZIP_FILE!' '!TEMP_DIR!'"
   if errorlevel 1 (
     echo ERROR: Failed to extract update package.
     pause
     exit /b 1
   )
-  
+
   echo [3/4 /6] Updating files...
-  xcopy /E /Y "%TEMP_DIR%\LocalTube-main\*" "%~dp0"
+  xcopy /E /Y "!TEMP_DIR!\LocalTube-main\*" "%~dp0"
   if errorlevel 1 (
     echo ERROR: Failed to copy updated files.
     pause
     exit /b 1
   )
-  
+
   echo [4/4 /6] Cleaning up temporary files...
-  rd /s /q "%TEMP_DIR%"
-  del "%ZIP_FILE%"
-  
+  rd /s /q "!TEMP_DIR!"
+  del "!ZIP_FILE!"
+
   echo Checking dependencies...
   call npm install
   if errorlevel 1 (
@@ -89,6 +95,7 @@ if "%NEED_UPDATE%"=="1" (
     pause
     exit /b 1
   )
+
   copy /y "%~dp0version.txt" "%LOCAL_VERSION_FILE%"
 )
 
@@ -144,7 +151,7 @@ echo.
 echo [4/6] Checking and setting up yt-dlp...
 if exist "%SAVE_DIR%yt-dlp.exe" (
   echo Updating yt-dlp.exe...
-  ) else (
+) else (
   echo Downloading yt-dlp.exe...
   curl -L -o "%SAVE_DIR%yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" || (echo ERROR: Failed to download yt-dlp. & pause & exit /b)
 )
@@ -155,7 +162,7 @@ echo.
 echo [5/6] Checking and setting up AtomicParsley...
 if exist "%SAVE_DIR%AtomicParsley.exe" (
   echo AtomicParsley.exe already exists.
-  ) else (
+) else (
   echo Downloading AtomicParsley...
   curl -L -o "%SAVE_DIR%AtomicParsley.zip" "https://github.com/wez/atomicparsley/releases/download/20240608.083822.1ed9031/AtomicParsleyWindows.zip" || (echo ERROR: Failed to download AtomicParsley. & pause & exit /b)
   if exist "%SAVE_DIR%AtomicParsley.zip" (
@@ -171,10 +178,8 @@ echo [6/6] Checking and setting up Deno...
 if exist "%SAVE_DIR%deno.exe" (
   echo Upgrading Deno...
   "%SAVE_DIR%deno.exe" upgrade
-  if exist "%SAVE_DIR%deno.old.exe" (
-    del "%SAVE_DIR%deno.old.exe"
-  )
-  ) else (
+  if exist "%SAVE_DIR%deno.old.exe" del "%SAVE_DIR%deno.old.exe"
+) else (
   echo Downloading Deno...
   curl -L -o "%SAVE_DIR%deno.zip" "https://github.com/denoland/deno/releases/download/v1.44.4/deno-x86_64-pc-windows-msvc.zip" || (echo ERROR: Failed to download Deno. & pause & exit /b)
   if exist "%SAVE_DIR%deno.zip" (
