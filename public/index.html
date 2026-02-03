@@ -344,6 +344,44 @@
 
       .info-value {
         font-weight: bold;
+        background: #111;
+        padding: 2px 8px;
+        border-radius: 8px;
+      }
+
+      #info-completed-count {
+        color: var(--green);
+      }
+
+      #info-running-count {
+        color: var(--blue);
+      }
+
+      #info-error-count {
+        color: var(--accent);
+      }
+
+      .completion-bar-container {
+        width: 100%;
+        height: 8px;
+        background: #333;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 6px;
+      }
+
+      .completion-bar {
+        height: 100%;
+        width: 0%;
+        background: var(--green);
+        transition: width 0.3s ease;
+      }
+
+      .completion-text {
+        text-align: right;
+        font-size: 12px;
+        color: var(--subtext);
+        margin-top: 4px;
       }
     </style>
   </head>
@@ -561,7 +599,7 @@
           </div>
         </div>
         <div class="card-side">
-          <h3>情報パネル</h3>
+          <h3>システム情報</h3>
           <div class="info-item">
             <div class="info-label">現在時刻</div>
             <div id="info-clock" class="info-value">—</div>
@@ -580,6 +618,34 @@
           </div>
           <div class="info-panel">
             <canvas id="networkChart" height="100"></canvas>
+          </div>
+          <h3>進捗状況</h3>
+          <div class="info-item">
+            <div class="info-label">合計</div>
+            <div id="info-total-count" class="info-value">0 件</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">完了</div>
+            <div id="info-completed-count" class="info-value">0 件</div>
+          </div>
+
+          <div class="info-item">
+            <div class="info-label">実行中</div>
+            <div id="info-running-count" class="info-value">0 件</div>
+          </div>
+
+          <div class="info-item">
+            <div class="info-label">エラー</div>
+            <div id="info-error-count" class="info-value">0 件</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">完了率</div>
+            <div class="info-value" style="width: 80%">
+              <div class="completion-bar-container">
+                <div id="completion-bar" class="completion-bar"></div>
+              </div>
+              <div id="completion-text" class="completion-text">0%</div>
+            </div>
           </div>
         </div>
       </div>
@@ -848,11 +914,48 @@
           }
         });
 
-
         // ===== 5秒移動平均用バッファ =====
         const netBuffer = []; // Mbps 用
         const latencyBuffer = []; // ms 用
         const AVG_WINDOW = 5; // 5秒平均
+
+        function updateJobCounts() {
+          let completed = 0;
+          let running = 0;
+          let error = 0;
+
+          for (const job of jobStates.values()) {
+            if (job.status === "completed") {
+              completed++;
+            } else if (job.status === "downloading") {
+              running++;
+            } else if (job.status === "error") {
+              error++;
+            }
+          }
+
+          const total = completed + running + error;
+          const completionRate =
+            total > 0 ? Math.round((completed / total) * 100) : 0;
+
+          // --- 件数表示 ---
+          const totalEl = document.getElementById("info-total-count");
+          const completedEl = document.getElementById("info-completed-count");
+          const runningEl = document.getElementById("info-running-count");
+          const errorEl = document.getElementById("info-error-count");
+
+          if (totalEl) totalEl.textContent = `${total} 件`;
+          if (completedEl) completedEl.textContent = `${completed} 件`;
+          if (runningEl) runningEl.textContent = `${running} 件`;
+          if (errorEl) errorEl.textContent = `${error} 件`;
+
+          // --- 完了率バー（★ 追加部分）---
+          const bar = document.getElementById("completion-bar");
+          const text = document.getElementById("completion-text");
+
+          if (bar) bar.style.width = `${completionRate}%`;
+          if (text) text.textContent = `${completionRate}%`;
+        }
 
         // --- SSE Connection ---
         const eventSource = new EventSource("/events");
@@ -903,6 +1006,7 @@
           jobs.forEach((job) => {
             elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
           });
+          updateJobCounts();
         });
 
         eventSource.addEventListener("jobs_added", (e) => {
@@ -910,6 +1014,7 @@
           newJobs.forEach((job) => {
             elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
           });
+          updateJobCounts();
         });
 
         eventSource.addEventListener("title_update", (e) => {
@@ -937,6 +1042,7 @@
             job.status = status;
             if (progress) job.progress = progress;
             updateJobElement(job);
+            updateJobCounts();
           }
         });
 

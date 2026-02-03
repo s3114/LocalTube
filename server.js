@@ -472,9 +472,7 @@ async function processDownloadJob(job) {
 
       for (const line of lines) {
         if (line.trim() === "") continue;
-        const progressMatch = line.match(
-          /\[download\]\s+([\d.]+)% of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/,
-        );
+        const progressMatch = line.match(/\[download\]\s+([\d.]+)%/);
         if (progressMatch) {
           job.progress = {
             percentage: parseFloat(progressMatch[1]),
@@ -695,6 +693,8 @@ async function moveExtraFiles(sourceDir) {
     // ここでもエラーをスローしない
   }
 }
+
+
 
 // ■ サーバーの起動
 // --------------------------------------------------
