@@ -517,6 +517,31 @@
         background: #0f0f0f;
       }
 
+      .yt-volume {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: white;
+      }
+
+      #volume-bar {
+        width: 80px;
+        height: 4px;
+        appearance: none;
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 2px;
+        cursor: pointer;
+      }
+
+      /* スライダーつまみ */
+      #volume-bar::-webkit-slider-thumb {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border-radius: 50%;
+      }
+
       /* サイドバー */
       .player-sidebar {
         background: var(--bg);
@@ -585,6 +610,17 @@
           rgba(0, 0, 0, 0.4),
           rgba(0, 0, 0, 0)
         );
+
+        /* ★ ここから追加 */
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      /* 表示用クラス */
+      .yt-controls.show {
+        opacity: 1;
+        pointer-events: auto;
       }
 
       .yt-btn {
@@ -620,6 +656,55 @@
         appearance: none;
         cursor: pointer;
         transition: background 0.1s linear;
+      }
+
+      /* ===== 音量スライダー：ホバー時のみ表示 ===== */
+      .yt-volume-hover {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        overflow: hidden;
+      }
+
+      /* 普段はスライダーを隠す */
+      .yt-volume-hover #volume-bar {
+        width: 0;
+        opacity: 0;
+        transition:
+          width 0.15s ease,
+          opacity 0.15s ease;
+      }
+
+      /* スピーカーにカーソルを合わせた時だけ表示 */
+      .yt-volume-hover:hover #volume-bar {
+        width: 90px; /* YouTubeっぽい幅 */
+        opacity: 1;
+      }
+
+      /* ===== YouTube風ツールチップ ===== */
+      .yt-skip {
+        position: relative;
+      }
+
+      .yt-skip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 130%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+      }
+
+      .yt-skip:hover::after {
+        opacity: 1;
       }
 
       /* つまみ（ノブ）も少し映えるように */
@@ -728,12 +813,43 @@
         <div class="player-layout">
           <!-- ===== 左：メインプレイヤー ===== -->
           <div class="player-main">
-            <div class="player-video-wrap">
+            <div class="player-video-wrap" id="player-container">
               <video id="local-player"></video>
               <div class="yt-controls">
                 <button id="btn-play" class="yt-btn">
                   <i class="fa-solid fa-play"></i>
                 </button>
+
+                <!-- ★ 追加：±5秒ボタン -->
+                <button
+                  id="btn-rew5"
+                  class="yt-btn yt-skip"
+                  data-tooltip="-5秒"
+                >
+                  <i class="fa-solid fa-backward-step"></i>
+                </button>
+
+                <!-- ★ YouTube風：5秒進む -->
+                <button
+                  id="btn-fwd5"
+                  class="yt-btn yt-skip"
+                  data-tooltip="+5秒"
+                >
+                  <i class="fa-solid fa-forward-step"></i>
+                </button>
+
+                <!-- ★ 追加：音量バー -->
+                <div class="yt-volume yt-volume-hover">
+                  <i class="fa-solid fa-volume-high"></i>
+                  <input
+                    type="range"
+                    id="volume-bar"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value="1"
+                  />
+                </div>
 
                 <input type="range" id="seek-bar" min="0" max="100" value="0" />
 
@@ -1860,6 +1976,171 @@
 
         // 初回ロード
         loadLocalVideos();
+
+        // ===============================
+        // ★ 追加：ショートカット＋ボタン制御
+        // ===============================
+
+        // 5秒スキップ関数
+        function skip(sec) {
+          const t = videoPlayer.currentTime + sec;
+          videoPlayer.currentTime = Math.max(
+            0,
+            Math.min(videoPlayer.duration, t),
+          );
+        }
+
+        // 音量変更関数（±5%）
+        function changeVolume(delta) {
+          videoPlayer.volume = Math.max(
+            0,
+            Math.min(1, videoPlayer.volume + delta),
+          );
+        }
+
+        // 再生/一時停止トグル
+        function togglePlay() {
+          if (videoPlayer.paused) {
+            videoPlayer.play();
+          } else {
+            videoPlayer.pause();
+          }
+        }
+
+        // === 追加ボタンの動作 ===
+        const btnRew5 = document.getElementById("btn-rew5");
+        const btnFwd5 = document.getElementById("btn-fwd5");
+        const volumeBar = document.getElementById("volume-bar");
+        const volumeIcon = document.querySelector(".yt-volume i");
+
+        let lastVolume = volumeBar.value; // 最後の音量を記憶
+
+        volumeIcon.addEventListener("click", () => {
+          if (videoPlayer.muted) {
+            // ミュート解除 → 元の音量に戻す
+            videoPlayer.muted = false;
+            videoPlayer.volume = lastVolume || 0.5;
+          } else {
+            // ミュートON → 音量は変えない
+            videoPlayer.muted = true;
+          }
+        });
+
+        btnRew5.addEventListener("click", () => skip(-5));
+        btnFwd5.addEventListener("click", () => skip(5));
+
+        volumeBar.addEventListener("input", (e) => {
+          const v = Number(e.target.value);
+          videoPlayer.volume = v;
+          videoPlayer.muted = false; // スライダー触ったら自動でミュート解除
+          lastVolume = v;
+        });
+
+        videoPlayer.addEventListener("volumechange", () => {
+          // ミュート中はスライダーを動かさない
+          if (!videoPlayer.muted) {
+            volumeBar.value = videoPlayer.volume;
+            lastVolume = videoPlayer.volume;
+          }
+
+          // アイコンだけは常に更新
+          if (videoPlayer.muted || videoPlayer.volume === 0) {
+            volumeIcon.className = "fa-solid fa-volume-xmark";
+          } else if (videoPlayer.volume < 0.5) {
+            volumeIcon.className = "fa-solid fa-volume-low";
+          } else {
+            volumeIcon.className = "fa-solid fa-volume-high";
+          }
+        });
+
+        // === キーボードショートカット ===
+        document.addEventListener("keydown", (e) => {
+          // テキスト入力中は無効
+          if (
+            document.activeElement.tagName === "TEXTAREA" ||
+            document.activeElement.tagName === "INPUT"
+          )
+            return;
+
+          switch (e.key) {
+            case " ":
+            case "k":
+              e.preventDefault();
+              togglePlay();
+              break;
+
+            case "j":
+              skip(-10);
+              break;
+
+            case "l":
+              skip(10);
+              break;
+
+            case "ArrowLeft":
+              skip(-5);
+              break;
+
+            case "ArrowRight":
+              skip(5);
+              break;
+
+            case "ArrowUp":
+              changeVolume(0.05);
+              break;
+
+            case "ArrowDown":
+              changeVolume(-0.05);
+              break;
+
+            case "m":
+            case "M":
+              videoPlayer.muted = !videoPlayer.muted;
+              break;
+
+            default:
+              // 0〜9でシーク（YouTube仕様）
+              if (/^[0-9]$/.test(e.key) && videoPlayer.duration) {
+                const percent = Number(e.key) * 10;
+                videoPlayer.currentTime =
+                  (percent / 100) * videoPlayer.duration;
+              }
+              break;
+          }
+        });
+
+        // ===============================
+        // ★ 追加：YouTube風 UI 自動表示
+        // ===============================
+
+        const playerContainer = document.getElementById("player-container");
+        const ytControls = document.querySelector(".yt-controls");
+
+        let hideTimer = null;
+
+        // マウスが動画エリアに入った → 表示
+        playerContainer.addEventListener("mouseenter", () => {
+          ytControls.classList.add("show");
+        });
+
+        // マウスが動いた → 表示＋一定時間後に隠す準備
+        playerContainer.addEventListener("mousemove", () => {
+          ytControls.classList.add("show");
+
+          // すでにあるタイマーをクリア
+          if (hideTimer) clearTimeout(hideTimer);
+
+          // 2秒間動きがなければ非表示（YouTube風）
+          hideTimer = setTimeout(() => {
+            ytControls.classList.remove("show");
+          }, 2000);
+        });
+
+        // マウスが動画エリアから出た → 即非表示
+        playerContainer.addEventListener("mouseleave", () => {
+          ytControls.classList.remove("show");
+          if (hideTimer) clearTimeout(hideTimer);
+        });
       });
 
       document.addEventListener("job_completed", () => {
