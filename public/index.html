@@ -475,6 +475,19 @@
                 >
                   手動選択
                 </button>
+                <button
+                  id="none-select-btn"
+                  style="
+                    background: #333;
+                    border: 1px solid var(--border);
+                    color: var(--text);
+                    padding: 8px 9px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                  "
+                >
+                  使用しない
+                </button>
               </div>
             </div>
 
@@ -682,6 +695,7 @@
           cookieStatusDisplay: document.getElementById("cookie-status-display"),
           setFirefoxBtn: document.getElementById("set-firefox-btn"),
           manualSelectBtn: document.getElementById("manual-select-btn"),
+          noneSelectBtn: document.getElementById("none-select-btn"),
           cookiePathSet: document.getElementById("cookiePathSet"),
           commentOptions: document.getElementById("comment-options"),
         };
@@ -735,6 +749,7 @@
         function updateCookieButtonStyles(activeButton) {
           elements.setFirefoxBtn.style.background = "#333";
           elements.manualSelectBtn.style.background = "#333";
+          elements.noneSelectBtn.style.background = "#333";
           if (activeButton) {
             activeButton.style.background = "var(--blue)"; // Active color
           }
@@ -811,6 +826,28 @@
             console.error("ネットワークエラー:", error);
           }
         });
+
+        // Event listener for None button
+        elements.noneSelectBtn.addEventListener("click", async () => {
+          window.selectedCookieFile = null; // Clear manual selection
+          try {
+            const response = await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ browser: "" }),
+            });
+            if (response.ok) {
+              console.log("Cookieファイルの使用を解除しました。");
+              elements.cookieStatusDisplay.textContent = "設定されていません";
+              updateCookieButtonStyles(elements.noneSelectBtn);
+            } else {
+              console.error("Cookie設定のリセットに失敗しました。");
+            }
+          } catch (error) {
+            console.error("ネットワークエラー:", error);
+          }
+        });
+
 
         // ===== 5秒移動平均用バッファ =====
         const netBuffer = []; // Mbps 用
