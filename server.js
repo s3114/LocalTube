@@ -18,6 +18,7 @@ const port = 3000; // サーバーがリッスンするポート番号
 // --------------------------------------------------
 app.use(express.static(path.join(__dirname, "public"))); // 'public' ディレクトリ内の静的ファイルを提供
 app.use(express.json()); // JSONリクエストボディをパースするためのミドルウェアを追加
+app.use("/downloads", express.static(path.join(__dirname, "downloads")));
 
 // ■ ファイルアップロードの設定
 // --------------------------------------------------
@@ -694,7 +695,57 @@ async function moveExtraFiles(sourceDir) {
   }
 }
 
+// ==================================================
+// ■ ローカル動画一覧API（プレイヤー用）
+// ==================================================
+app.get("/api/local-videos", async (req, res) => {
+  try {
+    const movieDir = path.join(__dirname, "downloads", "動画");
+    const thumbDir = path.join(__dirname, "downloads", "サムネイル");
 
+    const files = await fs.promises.readdir(movieDir);
+
+    // 再生可能な動画拡張子
+    const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
+
+    const videos = [];
+
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (!videoExt.includes(ext)) continue;
+
+      const base = path.parse(file).name;
+
+      // 対応するサムネイルを探す
+      let thumb = null;
+      const possibleThumbs = [`${base}.jpg`, `${base}.png`, `${base}.webp`];
+
+      for (const t of possibleThumbs) {
+        const tpath = path.join(thumbDir, t);
+        if (fs.existsSync(tpath)) {
+          thumb = `/downloads/サムネイル/${encodeURIComponent(t)}`;
+          break;
+        }
+      }
+
+      videos.push({
+        title: base,
+        video: `/downloads/動画/${encodeURIComponent(file)}`,
+        thumb: thumb || null,
+        filename: file,
+        mtime: (await fs.promises.stat(path.join(movieDir, file))).mtimeMs,
+      });
+    }
+
+    // 新しい順にソート
+    videos.sort((a, b) => b.mtime - a.mtime);
+
+    res.json(videos);
+  } catch (e) {
+    console.error("Failed to scan local videos:", e);
+    res.status(500).json({ error: "動画一覧の取得に失敗しました。" });
+  }
+});
 
 // ■ サーバーの起動
 // --------------------------------------------------
