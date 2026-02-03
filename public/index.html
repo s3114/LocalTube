@@ -459,22 +459,40 @@
         margin-top: 4px;
       }
 
+      .chat-line {
+        display: flex;
+        gap: 6px;
+        font-size: 12px;
+        padding: 2px 0;
+        line-height: 1.3;
+      }
+
+      .chat-line .time {
+        color: var(--subtext);
+        min-width: 40px;
+      }
+
+      .chat-line .name {
+        color: #7aa2f7;
+        margin-right: 4px;
+      }
+
       /* ==================================================
    9) PLAYER LAYOUT（動画プレイヤー）
 ================================================== */
 
       .player-layout {
         display: grid;
-        grid-template-columns: 1fr 380px;
+        grid-template-columns: 1.18fr 400px;
         gap: 24px;
         align-items: start;
       }
 
       .player-main {
         background: #000;
-        border: none;
+        border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 0;
+        padding: 12px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
         overflow: hidden;
         position: relative;
@@ -483,13 +501,20 @@
       .player-video-wrap {
         position: relative;
         width: 100%;
+        /* 追加：16:9を保証 */
+        aspect-ratio: 16 / 9;
+        background: black;
+        border-radius: 8px 8px 0 0;
+        overflow: hidden;
       }
 
       #local-player {
+        position: absolute; /* 親にピッタリ合わせる */
+        top: 0;
+        left: 0;
         width: 100%;
-        aspect-ratio: 16 / 9; /* YouTube標準 */
-        max-height: 720px; /* 大画面でも巨大化しすぎない */
-        border-radius: 8px 8px 0 0; /* 上だけ丸く */
+        height: 100%;
+        object-fit: contain; /* 縦横比を崩さず中央表示 */
         background: black;
       }
 
@@ -548,14 +573,130 @@
         border: 1px solid var(--border);
         border-radius: 14px;
         padding: 12px;
-        max-height: 680px;
+        max-height: 6800px;
         overflow-y: auto;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        min-width: 400px;
       }
 
       .sidebar-title {
         font-weight: 700;
         margin-bottom: 8px;
+      }
+
+      /* ===== サイドバーのヘッダー（タイトル＋ボタン） ===== */
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      /* 開閉ボタン */
+      .sidebar-toggle {
+        background: transparent;
+        border: none;
+        color: #aaa;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 4px 6px;
+        border-radius: 6px;
+      }
+
+      .sidebar-toggle:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* FontAwesomeアイコンのサイズ調整 */
+      .sidebar-toggle i {
+        font-size: 12px;
+        transition: transform 0.2s ease;
+      }
+
+      /* 折りたたみ時にアイコンを回転させたい場合（オプション） */
+      .player-sidebar.collapsed .sidebar-toggle i {
+        transform: rotate(-90deg);
+      }
+
+      /* ===== 折りたたみ時の状態 ===== */
+      .player-sidebar.collapsed {
+        padding: 10px 8px;
+      }
+
+      /* タイトルの下マージンも消す */
+      .player-sidebar.collapsed .sidebar-header {
+        margin-bottom: 0;
+      }
+
+      /* ===== サイドバー：セクション単位の開閉 ===== */
+      .sidebar-section {
+        margin-bottom: 10px;
+      }
+
+      /* 最後のセクションは余白を消す */
+      .sidebar-section:last-child {
+        margin-bottom: 0;
+      }
+
+      /* 折りたたみ時：そのセクションの中身だけ隠す */
+      .sidebar-section.collapsed .sidebar-content {
+        display: none;
+      }
+
+      /* 折りたたみ時：ヘッダー下の余白を消す */
+      .sidebar-section.collapsed .sidebar-header {
+        margin-bottom: 0;
+      }
+
+      /* ===== 見た目を“分離”するためのスタイル ===== */
+      .sidebar-section {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px;
+        margin-bottom: 12px;
+      }
+
+      /* もともとのサイドバーは“外枠”っぽく調整 */
+      .player-sidebar {
+        background: transparent; /* ← 変更 */
+        border: none; /* ← 変更 */
+        padding: 6px; /* 少しだけ余白 */
+      }
+
+      /* 最後のセクションの余白は不要 */
+      .sidebar-section:last-child {
+        margin-bottom: 0;
+      }
+
+      /* セクション内のヘッダーを整える */
+      .sidebar-section .sidebar-header {
+        margin-bottom: 6px;
+      }
+
+      /* 折りたたみ時はヘッダーだけ残す */
+      .sidebar-section.collapsed {
+        padding-bottom: 6px;
+      }
+
+      .chat-content {
+        min-height: none;
+        max-height: none;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 12px;
+        transition: height 0.2s ease; /* 開閉をなめらかに */
+      }
+
+      /* ライブチャットだけ少しだけ色を変える（さりげなく） */
+      #chat-section {
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.02),
+          var(--bg)
+        );
       }
 
       /* ローカル動画一覧 */
@@ -656,6 +797,7 @@
         appearance: none;
         cursor: pointer;
         transition: background 0.1s linear;
+        transform: translateY(-3px); /* ← ここで高さ調整 */
       }
 
       /* ===== 音量スライダー：ホバー時のみ表示 ===== */
@@ -673,6 +815,7 @@
         transition:
           width 0.15s ease,
           opacity 0.15s ease;
+        transform: translateY(-3px); /* ← ここで高さ調整 */
       }
 
       /* スピーカーにカーソルを合わせた時だけ表示 */
@@ -766,6 +909,39 @@
         color: #ddd;
         font-variant-numeric: tabular-nums;
       }
+
+      .speed-control-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+
+      .speed-menu {
+        position: absolute;
+        bottom: 48px;
+        right: 0;
+        background: #181818;
+        border-radius: 8px;
+        padding: 6px 0;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        min-width: 90px;
+        z-index: 1000;
+      }
+
+      .speed-option {
+        color: white;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .speed-option:hover {
+        background: #282828;
+      }
+
+      .hidden {
+        display: none;
+      }
     </style>
     <link
       rel="stylesheet"
@@ -855,6 +1031,26 @@
 
                 <span id="time-display" class="yt-time">00:00 / 00:00</span>
 
+                <!-- ★ ここに再生速度ボタンを追加（全画面の左） -->
+                <div class="speed-control-wrapper">
+                  <button id="btn-speed" class="yt-btn" title="再生速度">
+                    1.0×
+                  </button>
+
+                  <div id="speed-menu" class="speed-menu hidden">
+                    <div class="speed-option" data-speed="0.25">0.25×</div>
+                    <div class="speed-option" data-speed="0.5">0.5×</div>
+                    <div class="speed-option" data-speed="0.75">0.75×</div>
+                    <div class="speed-option" data-speed="1.0">1.0×</div>
+                    <div class="speed-option" data-speed="1.25">1.25×</div>
+                    <div class="speed-option" data-speed="1.5">1.5×</div>
+                    <div class="speed-option" data-speed="1.75">1.75×</div>
+                    <div class="speed-option" data-speed="2.0">2.0×</div>
+                    <div class="speed-option" data-speed="3.0">3.0×</div>
+                    <div class="speed-option" data-speed="4.0">4.0×</div>
+                  </div>
+                </div>
+
                 <button id="btn-full" class="yt-btn">
                   <i class="fa-solid fa-expand"></i>
                 </button>
@@ -868,9 +1064,34 @@
           </div>
 
           <!-- ===== 右：ローカル動画一覧 ===== -->
-          <div class="player-sidebar">
-            <div class="sidebar-title">ローカル動画</div>
-            <div id="local-video-list"></div>
+          <div class="player-sidebar" id="player-sidebar">
+            <!-- ===== ライブチャット（新規） ===== -->
+            <div class="sidebar-section" id="chat-section">
+              <div class="sidebar-header">
+                <div class="sidebar-title">ライブチャット</div>
+                <button class="sidebar-toggle" data-target="chat-section">
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+              </div>
+              <div
+                class="sidebar-content chat-content"
+                id="live-chat-container"
+              >
+                <div id="chat-messages"></div>
+                <div class="chat-empty">チャットを選択してください</div>
+              </div>
+            </div>
+
+            <!-- ===== ローカル動画（既存） ===== -->
+            <div class="sidebar-section" id="video-section">
+              <div class="sidebar-header">
+                <div class="sidebar-title">ローカル動画</div>
+                <button class="sidebar-toggle" data-target="video-section">
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+              </div>
+              <div id="local-video-list" class="sidebar-content"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1815,6 +2036,38 @@
         // 再生中は常に同期
         videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
 
+        // ===== ★ ライブチャット同期スクロール =====
+        videoPlayer.addEventListener("timeupdate", () => {
+          const chatContainer = document.getElementById("chat-messages");
+          if (!chatContainer) return;
+
+          const currentSec = Math.floor(videoPlayer.currentTime);
+
+          // 全コメントを取得
+          const lines = chatContainer.querySelectorAll(".chat-line[data-time]");
+
+          if (lines.length === 0) return;
+
+          // 「現在時刻以下で一番新しいコメント」を探す
+          let target = null;
+
+          for (const line of lines) {
+            const t = parseInt(line.dataset.time, 10);
+            if (t <= currentSec) {
+              target = line;
+            } else {
+              break; // 時間順なのでここで止めてOK
+            }
+          }
+
+          if (target) {
+            target.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+        });
+
         function resetSeekBar() {
           seekBar.value = 0;
           seekBar.style.setProperty("--progress", "0%");
@@ -1838,6 +2091,61 @@
 
         // 初期化
         updateSeekBarFill();
+
+        // ===== サイドバー：個別セクション開閉 =====
+        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+
+            const targetId = btn.dataset.target;
+            const section = document.getElementById(targetId);
+            const icon = btn.querySelector("i");
+
+            const isCollapsed = section.classList.toggle("collapsed");
+
+            // FontAwesomeアイコン切り替え
+            icon.className = isCollapsed
+              ? "fa-solid fa-chevron-right"
+              : "fa-solid fa-chevron-down";
+          });
+        });
+
+        // ===== ライブチャットの高さをプレイヤーに合わせる =====
+        const playerMain = document.querySelector(".player-main");
+        const chatSection = document.getElementById("chat-section");
+        const chatContent = document.getElementById("live-chat-container"); // ★ これだけで十分
+
+        function syncChatHeight() {
+          if (!playerMain || !chatSection || !chatContent) {
+            console.warn("syncChatHeight: 必要な要素が見つかりません", {
+              playerMain,
+              chatSection,
+              chatContent,
+            });
+            return;
+          }
+
+          const h = playerMain.getBoundingClientRect().height - 200;
+
+          if (!chatSection.classList.contains("collapsed")) {
+            chatContent.style.height = h + "px";
+          } else {
+            chatContent.style.height = "";
+          }
+        }
+
+        // 既存のトグル処理に“高さ同期”を連動させる
+        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            setTimeout(syncChatHeight, 180);
+          });
+        });
+
+        // 初回ロード時にも合わせる（DOMContentLoaded後に実行）
+        setTimeout(syncChatHeight, 100);
+
+        // ウィンドウサイズ変更時にも追従
+        window.addEventListener("resize", syncChatHeight);
 
         // ユーザー操作時に更新
         seekBar.addEventListener("input", updateSeekBarFill);
@@ -1872,6 +2180,53 @@
           }
         }
 
+        // ===============================
+        // ★ 追加：クリックで再生／停止、ダブルクリックで全画面
+        // ===============================
+
+        let clickTimer = null;
+        const DOUBLE_CLICK_DELAY = 250; // ms（YouTubeっぽい値）
+
+        videoPlayer.addEventListener("click", (e) => {
+          // ★ コントロール（ボタン）をクリックした時は無視
+          if (e.target.closest(".yt-controls")) return;
+
+          // ダブルクリックと区別するため、少しだけ待つ
+          if (clickTimer) {
+            clearTimeout(clickTimer);
+            clickTimer = null;
+            return;
+          }
+
+          clickTimer = setTimeout(() => {
+            // ここで「シングルクリック」と確定
+            if (videoPlayer.paused) {
+              videoPlayer.play();
+            } else {
+              videoPlayer.pause();
+            }
+            clickTimer = null;
+          }, DOUBLE_CLICK_DELAY);
+        });
+
+        videoPlayer.addEventListener("dblclick", () => {
+          // ダブルクリック → 全画面トグル
+          if (!document.fullscreenElement) {
+            videoPlayer.requestFullscreen().catch(() => {
+              // 一部ブラウザ対策：ラッパーをフルスクリーン
+              document.getElementById("player-container")?.requestFullscreen();
+            });
+          } else {
+            document.exitFullscreen();
+          }
+
+          // シングルクリックのタイマーは無効化
+          if (clickTimer) {
+            clearTimeout(clickTimer);
+            clickTimer = null;
+          }
+        });
+
         // ---- フルスクリーン ----
         btnFull.addEventListener("click", async () => {
           if (document.fullscreenElement) {
@@ -1880,6 +2235,136 @@
             await videoPlayer.requestFullscreen();
           }
         });
+
+        const btnSpeed = document.getElementById("btn-speed");
+        const speedMenu = document.getElementById("speed-menu");
+        const speedOptions = document.querySelectorAll(".speed-option");
+
+        // メニュー開閉
+        btnSpeed.addEventListener("click", (e) => {
+          e.stopPropagation(); // プレイヤークリック判定を防ぐ
+          speedMenu.classList.toggle("hidden");
+        });
+
+        // 速度変更
+        speedOptions.forEach((option) => {
+          option.addEventListener("click", () => {
+            const speed = parseFloat(option.dataset.speed);
+            videoPlayer.playbackRate = speed;
+            btnSpeed.textContent = speed + "×";
+            speedMenu.classList.add("hidden");
+          });
+        });
+
+        // 画面クリックで閉じる
+        document.addEventListener("click", () => {
+          speedMenu.classList.add("hidden");
+        });
+
+        // ===============================
+        // ★ ライブチャット読み込み関数（ここに追加）
+        // ===============================
+        async function loadLiveChat(filename) {
+          try {
+            const chatContainer = document.getElementById("chat-messages");
+
+            // ★ より安全に取得（見つからなくても落ちない）
+            const emptyEl =
+              document.querySelector("#live-chat-container .chat-empty") ||
+              document.querySelector(".chat-empty");
+
+            if (!chatContainer) {
+              console.error("chat-messages が見つかりません");
+              return;
+            }
+
+            chatContainer.innerHTML = "";
+
+            if (emptyEl) {
+              emptyEl.style.display = "block";
+              emptyEl.textContent = "チャットを読み込み中…";
+            }
+
+            const chatFile = filename.replace(/\.mp4$/, ".live_chat.json");
+
+            const res = await fetch(
+              `/api/live-chat/${encodeURIComponent(chatFile)}`,
+            );
+
+            const text = await res.text(); // ★ まず生テキストで取得
+
+            // ====== ★ NDJSON（1行ごとのJSON）対応 ======
+            const lines = text
+              .split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter((l) => l.length > 0);
+
+            const messages = [];
+            for (const line of lines) {
+              try {
+                messages.push(JSON.parse(line));
+              } catch (e) {
+                console.warn("パース失敗した行:", line, e);
+              }
+            }
+            // ===========================================
+
+            if (messages.length === 0) {
+              emptyEl.textContent = "チャットがありません";
+              return;
+            }
+
+            emptyEl.style.display = "none";
+
+            // === 描画（超シンプル版：まずは動くこと優先） ===
+            // === ★ 時間付きで描画（同期スクロール用） ===
+            messages.forEach((msg) => {
+              const item =
+                msg?.replayChatItemAction?.actions?.[0]?.addChatItemAction
+                  ?.item;
+
+              const renderer =
+                item?.liveChatTextMessageRenderer ||
+                item?.liveChatViewerEngagementMessageRenderer;
+
+              if (!renderer) return;
+
+              // ★ YouTubeのチャット時刻（ミリ秒）を秒に変換
+              const timeMs = msg.replayChatItemAction?.videoOffsetTimeMsec;
+              const timeSec = timeMs ? Math.floor(timeMs / 1000) : null;
+
+              const div = document.createElement("div");
+              div.className = "chat-line";
+
+              // ★ 秒数を属性として保存（これが同期のキー）
+              if (timeSec !== null) {
+                div.dataset.time = timeSec;
+              }
+
+              const author = renderer.authorName?.simpleText || "Unknown";
+              let text = "";
+
+              if (renderer.message?.runs) {
+                text = renderer.message.runs.map((r) => r.text || "").join("");
+              }
+
+              div.textContent = `${author}: ${text}`;
+
+              chatContainer.appendChild(div);
+            });
+
+            // ★ 初回は一番上に戻す（時間順に見るため）
+            chatContainer.scrollTop = 0;
+
+            // 一番下までスクロール
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          } catch (e) {
+            console.error("loadLiveChat error:", e);
+            const emptyEl = document.querySelector(".chat-empty");
+            if (emptyEl)
+              emptyEl.textContent = "チャットの読み込みに失敗しました";
+          }
+        }
 
         function renderLocalVideos(videos) {
           videoList.innerHTML = "";
@@ -1925,6 +2410,7 @@
               videoPlayer.play().catch((err) => {
                 console.error("Play failed:", err);
               });
+              loadLiveChat(video.filename);
             });
 
             videoList.appendChild(item);
@@ -2006,6 +2492,31 @@
             videoPlayer.pause();
           }
         }
+
+        // ===== 既存の「個別トグル（ライブチャット／ローカル動画）」に合わせた処理 =====
+        const sidebar = document.getElementById("player-sidebar");
+
+        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const targetId = btn.getAttribute("data-target");
+            const section = document.getElementById(targetId);
+
+            if (!section) return;
+
+            const isCollapsed = section.classList.toggle("collapsed");
+
+            // アイコンだけ切り替え（横幅は変えない）
+            const icon = btn.querySelector("i");
+            if (icon) {
+              icon.className = isCollapsed
+                ? "fa-solid fa-chevron-right"
+                : "fa-solid fa-chevron-down";
+            }
+
+            // ライブチャット側の高さを再同期
+            setTimeout(syncChatHeight, 180);
+          });
+        });
 
         // === 追加ボタンの動作 ===
         const btnRew5 = document.getElementById("btn-rew5");
