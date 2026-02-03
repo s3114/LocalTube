@@ -471,17 +471,26 @@
       }
 
       .player-main {
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        background: #000;
+        border: none;
+        border-radius: 8px;
+        padding: 0;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .player-video-wrap {
+        position: relative;
+        width: 100%;
       }
 
       #local-player {
         width: 100%;
-        max-height: 620px;
-        border-radius: 14px;
+        aspect-ratio: 16 / 9; /* YouTube標準 */
+        max-height: 720px; /* 大画面でも巨大化しすぎない */
+        border-radius: 8px 8px 0 0; /* 上だけ丸く */
+        background: black;
       }
 
       .player-info {
@@ -491,16 +500,21 @@
 
       .player-title,
       .yt-title {
-        font-size: 20px;
-        font-weight: 700;
-        margin-top: 10px;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.3;
       }
 
       .player-meta,
       .yt-meta {
         color: #aaa;
         font-size: 12px;
-        margin-top: 4px;
+        margin-top: 6px;
+      }
+
+      .yt-info {
+        padding: 12px 14px 14px;
+        background: #0f0f0f;
       }
 
       /* サイドバー */
@@ -557,14 +571,20 @@
 ================================================== */
 
       .yt-controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
         display: flex;
         align-items: center;
         gap: 14px;
-        margin-top: 10px;
-        padding: 8px 10px;
-        background: rgba(0, 0, 0, 0.65);
-        border-radius: 14px;
-        backdrop-filter: blur(4px);
+        padding: 10px 12px 12px;
+        background: linear-gradient(
+          to top,
+          rgba(0, 0, 0, 0.9),
+          rgba(0, 0, 0, 0.4),
+          rgba(0, 0, 0, 0)
+        );
       }
 
       .yt-btn {
@@ -593,23 +613,65 @@
         background: rgba(255, 255, 255, 0.18);
       }
 
-      /* シークバー */
       #seek-bar {
         flex: 1;
         height: 4px;
-        appearance: none;
-        background: rgba(255, 255, 255, 0.2);
         border-radius: 2px;
+        appearance: none;
         cursor: pointer;
+        transition: background 0.1s linear;
       }
 
+      /* つまみ（ノブ）も少し映えるように */
       #seek-bar::-webkit-slider-thumb {
         appearance: none;
-        width: 12px;
-        height: 12px;
-        background: white;
+        width: 14px;
+        height: 14px;
+        background: #ff0000;
         border-radius: 50%;
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+        transform: translateY(-5px); /* 位置微調整 */
+        transition:
+          transform 0.1s ease,
+          left 0.12s linear;
+      }
+
+      #seek-bar::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.25);
+        transition: transform 0.1s ease;
+      }
+
+      #seek-bar::-moz-range-progress {
+        height: 4px;
+        background: #ff0000;
+      }
+
+      #seek-bar::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        background: #ff0000;
+        border-radius: 50%;
+        border: none;
+      }
+
+      #seek-bar::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(
+          to right,
+          #ff0000 var(--progress, 0%),
+          rgba(255, 255, 255, 0.25) var(--progress, 0%)
+        );
+      }
+
+      #seek-bar:hover {
+        background: rgba(255, 255, 255, 0.35);
+      }
+
+      #seek-bar:hover::-webkit-slider-thumb {
+        transform: translateY(-5px) scale(1.15);
       }
 
       .yt-time {
@@ -666,21 +728,22 @@
         <div class="player-layout">
           <!-- ===== 左：メインプレイヤー ===== -->
           <div class="player-main">
-            <video id="local-player"></video>
-            <div class="yt-controls">
-              <button id="btn-play" class="yt-btn">
-                <i class="fa-solid fa-play"></i>
-              </button>
+            <div class="player-video-wrap">
+              <video id="local-player"></video>
+              <div class="yt-controls">
+                <button id="btn-play" class="yt-btn">
+                  <i class="fa-solid fa-play"></i>
+                </button>
 
-              <input type="range" id="seek-bar" min="0" max="100" value="0" />
+                <input type="range" id="seek-bar" min="0" max="100" value="0" />
 
-              <span id="time-display" class="yt-time">00:00 / 00:00</span>
+                <span id="time-display" class="yt-time">00:00 / 00:00</span>
 
-              <button id="btn-full" class="yt-btn">
-                <i class="fa-solid fa-expand"></i>
-              </button>
+                <button id="btn-full" class="yt-btn">
+                  <i class="fa-solid fa-expand"></i>
+                </button>
+              </div>
             </div>
-
             <div class="yt-info">
               <div id="player-title" class="yt-title">
                 動画を選択してください
@@ -1060,7 +1123,24 @@
       // --- Main Logic ---
       document.addEventListener("DOMContentLoaded", () => {
         function saveSetting(key, value) {
-          localStorage.setItem(key, value);
+          try {
+            localStorage.setItem(key, value);
+          } catch (e) {
+            console.warn("localStorage 保存失敗:", e);
+          }
+        }
+
+        function loadSetting(key, defaultValue) {
+          try {
+            const storedValue = localStorage.getItem(key);
+            if (storedValue === null) return defaultValue;
+            if (typeof defaultValue === "boolean")
+              return storedValue === "true";
+            return storedValue;
+          } catch (e) {
+            console.warn("localStorage 読み込み失敗:", e);
+            return defaultValue;
+          }
         }
         function loadSetting(key, defaultValue) {
           const storedValue = localStorage.getItem(key);
@@ -1603,6 +1683,27 @@
         const btnFull = document.getElementById("btn-full");
         const timeDisplay = document.getElementById("time-display");
 
+        function syncSeekBarWithVideo() {
+          if (!videoPlayer.duration || isNaN(videoPlayer.duration)) return;
+
+          const progress =
+            (videoPlayer.currentTime / videoPlayer.duration) * 100;
+
+          // スライダーの位置を更新
+          seekBar.value = progress;
+
+          // 「左側を赤く塗る」ためのCSS変数も更新
+          seekBar.style.setProperty("--progress", progress + "%");
+        }
+
+        // 再生中は常に同期
+        videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
+
+        function resetSeekBar() {
+          seekBar.value = 0;
+          seekBar.style.setProperty("--progress", "0%");
+        }
+
         videoPlayer.addEventListener("timeupdate", () => {
           seekBar.value =
             (videoPlayer.currentTime / videoPlayer.duration) * 100;
@@ -1613,6 +1714,17 @@
           videoPlayer.currentTime =
             (seekBar.value / 100) * videoPlayer.duration;
         });
+
+        function updateSeekBarFill() {
+          const value = seekBar.value; // 0〜100
+          seekBar.style.setProperty("--progress", value + "%");
+        }
+
+        // 初期化
+        updateSeekBarFill();
+
+        // ユーザー操作時に更新
+        seekBar.addEventListener("input", updateSeekBarFill);
 
         btnPlay.addEventListener("click", () => {
           if (videoPlayer.paused) {
@@ -1688,6 +1800,9 @@
 
               videoPlayer.pause();
               videoPlayer.src = video.video;
+
+              resetSeekBar();
+
               videoPlayer.load();
               titleEl.textContent = video.title;
 
@@ -1700,18 +1815,23 @@
           });
         }
 
-        // ---- シークバー同期 ----
+        // ======== 滑らかなシークバー同期（時間表示は維持） ========
+
+        // 目標値（実際の動画の進捗）
+        let targetProgress = 0;
+
+        // ① timeupdate：時間表示＋目標値の更新だけ
         videoPlayer.addEventListener("timeupdate", () => {
           if (!videoPlayer.duration) return;
 
           const cur = Math.floor(videoPlayer.currentTime);
           const dur = Math.floor(videoPlayer.duration);
 
-          // シークバー更新
-          seekBar.value =
+          // ★ シークバーは「目標値」だけ更新
+          targetProgress =
             (videoPlayer.currentTime / videoPlayer.duration) * 100;
 
-          // 時間表示
+          // 時間表示（あなたの既存ロジックそのまま）
           const format = (s) => {
             const m = Math.floor(s / 60);
             const sec = s % 60;
@@ -1720,6 +1840,23 @@
 
           timeDisplay.textContent = `${format(cur)} / ${format(dur)}`;
         });
+
+        // ② requestAnimationFrame：つまみを“なめらかに”追従
+        function smoothSeek() {
+          const current = parseFloat(seekBar.value) || 0;
+          const diff = targetProgress - current;
+
+          const easing = 0.001; // 小さいほどヌルヌル
+          const newValue = current + diff * easing;
+
+          seekBar.value = newValue;
+          seekBar.style.setProperty("--progress", newValue + "%");
+
+          requestAnimationFrame(smoothSeek);
+        }
+
+        // アニメーション開始
+        requestAnimationFrame(smoothSeek);
 
         // 初回ロード
         loadLocalVideos();
