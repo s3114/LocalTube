@@ -461,10 +461,31 @@
 
       .chat-line {
         display: flex;
-        gap: 6px;
-        font-size: 12px;
-        padding: 2px 0;
-        line-height: 1.3;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #e0e0e0;
+        transition: background 0.15s ease;
+      }
+
+      /* アバター（あれば） */
+      .chat-line img {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+      }
+
+      /* 名前を少し薄く */
+      .chat-author {
+        color: #aaa;
+        margin-right: 6px;
+      }
+
+      /* マウスホバーで少しハイライト */
+      .chat-line:hover {
+        background: rgba(255, 255, 255, 0.05);
       }
 
       .chat-line .time {
@@ -475,6 +496,13 @@
       .chat-line .name {
         color: #7aa2f7;
         margin-right: 4px;
+      }
+
+      .chat-empty {
+        color: #888;
+        text-align: center;
+        font-size: 12px;
+        padding: 20px;
       }
 
       /* ==================================================
@@ -570,7 +598,7 @@
       /* サイドバー */
       .player-sidebar {
         background: var(--bg);
-        border: 1px solid var(--border);
+        border: 1px solid #222;
         border-radius: 14px;
         padding: 12px;
         max-height: 6800px;
@@ -680,14 +708,27 @@
       }
 
       .chat-content {
-        min-height: none;
-        max-height: none;
-        overflow-y: auto;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        background: #0b0b0b; /* プレイヤー寄りの黒 */
+        border-radius: 10px;
         padding: 8px;
-        font-size: 12px;
-        transition: height 0.2s ease; /* 開閉をなめらかに */
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+
+      /* スクロールバーを細くする（YouTube風） */
+      .chat-content::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .chat-content::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+      }
+
+      .chat-content::-webkit-scrollbar-track {
+        background: transparent;
       }
 
       /* ライブチャットだけ少しだけ色を変える（さりげなく） */
@@ -941,6 +982,11 @@
 
       .hidden {
         display: none;
+      }
+
+      #chat-messages {
+        overflow-y: auto;
+        height: 100%;
       }
     </style>
     <link
@@ -2033,22 +2079,25 @@
           seekBar.style.setProperty("--progress", progress + "%");
         }
 
+        let isUserScrolling = false;
+        let scrollTimeout = null;
+
         // 再生中は常に同期
         videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
 
-        // ===== ★ ライブチャット同期スクロール =====
+        // ===== ★ ライブチャット同期スクロール（確実に動く版） =====
         videoPlayer.addEventListener("timeupdate", () => {
           const chatContainer = document.getElementById("chat-messages");
           if (!chatContainer) return;
 
-          const currentSec = Math.floor(videoPlayer.currentTime);
+          // ユーザーがスクロール中は追従しない
+          if (isUserScrolling) return;
 
-          // 全コメントを取得
+          const currentSec = Math.floor(videoPlayer.currentTime);
           const lines = chatContainer.querySelectorAll(".chat-line[data-time]");
 
           if (lines.length === 0) return;
 
-          // 「現在時刻以下で一番新しいコメント」を探す
           let target = null;
 
           for (const line of lines) {
@@ -2056,16 +2105,22 @@
             if (t <= currentSec) {
               target = line;
             } else {
-              break; // 時間順なのでここで止めてOK
+              break;
             }
           }
 
-          if (target) {
-            target.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }
+          if (!target) return;
+
+          // ===== ★ 中央に表示（YouTube風） =====
+          const targetOffset =
+            target.offsetTop -
+            chatContainer.clientHeight / 2 +
+            target.clientHeight / 2;
+
+          chatContainer.scrollTo({
+            top: Math.max(0, targetOffset),
+            behavior: "smooth",
+          });
         });
 
         function resetSeekBar() {
@@ -2493,19 +2548,23 @@
           }
         }
 
-        // ===== 既存の「個別トグル（ライブチャット／ローカル動画）」に合わせた処理 =====
+        // ===== 個別トグル（ライブチャット／ローカル動画）【修正版】 =====
         const sidebar = document.getElementById("player-sidebar");
 
         document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-          btn.addEventListener("click", (e) => {
+          btn.addEventListener("click", () => {
             const targetId = btn.getAttribute("data-target");
             const section = document.getElementById(targetId);
 
             if (!section) return;
 
-            const isCollapsed = section.classList.toggle("collapsed");
+            const content = section.querySelector(".sidebar-content"); // ★ 重要
 
-            // アイコンだけ切り替え（横幅は変えない）
+            if (!content) return;
+
+            const isCollapsed = content.classList.toggle("collapsed"); // ★ ここを変更
+
+            // アイコン切り替え（横幅は変えない）
             const icon = btn.querySelector("i");
             if (icon) {
               icon.className = isCollapsed
