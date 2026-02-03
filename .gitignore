@@ -5,3 +5,4 @@ deno.exe
 ffmpeg.exe
 yt-dlp.exe
 finished.txt
+config.json
