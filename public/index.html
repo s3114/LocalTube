@@ -506,12 +506,12 @@
         white-space: nowrap;
       }
 
-      .chat-line {
-        color: #2ba13f !important;
-      }
-
       .chat-name.moderator {
         color: #ffb703;
+      }
+
+      .chat-name.member {
+        color: #2ba13f;
       }
 
       .chat-badge {
@@ -544,11 +544,6 @@
       .chat-line .time {
         color: var(--subtext);
         min-width: 40px;
-      }
-
-      .chat-line .name {
-        color: #7aa2f7;
-        margin-right: 4px;
       }
 
       .chat-empty {
@@ -2446,26 +2441,38 @@
               }
 
               // ===== メンバー／モデレーター等のバッジ取得 =====
-              let badgeUrl = null;
+              // ===== ★【判定用】メンバー／モデレーターの「元データ」=====
+              const badges = renderer.authorBadges || [];
 
-              const badges =
-                renderer.authorBadges?.[0]?.liveChatAuthorBadgeRenderer
-                  ?.customThumbnail?.thumbnails || []; // ← ★ここが重要
-
-              const isMember = badges.some((b) =>
-                b.liveChatAuthorBadgeRenderer?.tooltip?.includes("Member"),
-              );
-              const isModerator = badges.some((b) =>
-                b.liveChatAuthorBadgeRenderer?.tooltip?.includes("Moderator"),
+              const isMember = badges.some(
+                (b) =>
+                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes("Member") ||
+                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes("メンバー"),
               );
 
-              if (badges && badges.length > 0) {
-                // 一番解像度が高いものを使用
-                badgeUrl = badges[badges.length - 1].url;
-              }
+              const isModerator = badges.some(
+                (b) =>
+                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes(
+                    "Moderator",
+                  ) ||
+                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes(
+                    "モデレーター",
+                  ),
+              );
+
+              // ★ 画像バッジ用（追加）
+              const badgeImages = badges
+                .map(
+                  (b) =>
+                    b?.liveChatAuthorBadgeRenderer?.customThumbnail?.thumbnails?.slice(
+                      -1,
+                    )[0],
+                )
+                .filter(Boolean)
+                .flat();
 
               // ===== まず「author」を確定（★ これが一番先） =====
-              const author = renderer.authorName?.simpleText || "Unknown";
+              const author = renderer.authorName?.simpleText || "NoName";
 
               // ===== アイコン（YouTubeのauthorPhotoを使用） =====
               const avatar = document.createElement("div");
@@ -2475,13 +2482,19 @@
               const badge = document.createElement("div");
               badge.className = "chat-badge";
 
-              if (badgeUrl) {
-                const badgeImg = document.createElement("img");
-                badgeImg.src = badgeUrl;
-                badgeImg.alt = "badge";
-                badgeImg.loading = "lazy";
-                badge.appendChild(badgeImg);
-              }
+              // ★ ここでコンテナを作る（正しい場所）
+              const badgeContainer = document.createElement("div");
+              badgeContainer.className = "badge-container";
+              badge.appendChild(badgeContainer);
+              badgeContainer.innerHTML = "";
+
+              badgeImages?.forEach((thumb) => {
+                const img = document.createElement("img");
+                img.src = thumb.url;
+                img.style.width = "16px";
+                img.style.height = "16px";
+                badgeContainer.appendChild(img);
+              });
 
               // サムネURLを安全に取得
               const thumbUrl =
@@ -2503,20 +2516,11 @@
               nameEl.className = "chat-name";
               nameEl.textContent = author;
 
-              // ===== メンバーバッジ（仮）=====
-              const badgeEl = document.createElement("span");
-              badgeEl.className = "chat-badge";
-
+              // ===== ユーザー名へのクラス付与 =====
               if (isModerator) {
-                badgeEl.textContent = "MOD";
-                badgeEl.classList.add("moderator-badge");
                 nameEl.classList.add("moderator");
               } else if (isMember) {
-                badgeEl.textContent = "メンバー";
-                badgeEl.classList.add("member-badge");
                 nameEl.classList.add("member");
-              } else {
-                badgeEl.style.display = "none";
               }
 
               // ===== コメント要素 =====
