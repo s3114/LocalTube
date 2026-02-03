@@ -383,274 +383,421 @@
         color: var(--subtext);
         margin-top: 4px;
       }
+
+      header {
+        width: 100%;
+      }
+
+      .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between; /* 左にロゴ・右にボタン */
+        width: 100%;
+      }
+
+      .icon-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 6px 8px;
+        border-radius: 6px;
+      }
+
+      .icon-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      /* ===== ヘッダーのボタンレイアウト ===== */
+      .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between; /* ロゴは左、ボタンは右 */
+        width: 100%;
+      }
+
+      .header-buttons {
+        display: flex;
+        gap: 12px;
+        transform: scale(1.1);
+      }
+
+      .icon-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        transition: background 0.2s;
+      }
+
+      .icon-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .icon-btn:active {
+        background: rgba(255, 0, 0, 0.2);
+      }
+
+      /* ===== ヘッダーボタン：選択中（現在の画面） ===== */
+      .icon-btn.active {
+        border: 2.5px solid var(--text); /* ★ 赤→白に変更 */
+        background: rgba(255, 255, 255, 0.05);
+      }
+      /* ===== ページ切り替え用 ===== */
+      .page {
+        display: none;
+      }
+
+      .page.active-page {
+        display: block;
+      }
     </style>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
   </head>
 
   <body>
     <header>
-      <div class="logo"><span>▶</span> LocalTube</div>
+      <div class="header-inner">
+        <div class="logo"><span>▶</span> LocalTube</div>
+
+        <div class="header-buttons">
+          <button
+            class="icon-btn"
+            id="btn-player"
+            data-page="page-player"
+            title="プレイヤー"
+          >
+            <i class="fa-solid fa-play"></i>
+          </button>
+          <button
+            class="icon-btn active"
+            id="btn-downloader"
+            data-page="page-downloader"
+            title="ダウンローダー"
+          >
+            <i class="fa-solid fa-download"></i>
+          </button>
+          <button
+            class="icon-btn"
+            id="btn-settings"
+            data-page="page-settings"
+            title="設定"
+          >
+            <i class="fa-solid fa-gear"></i>
+          </button>
+        </div>
+      </div>
     </header>
 
     <main>
-      <div class="card card-layout">
-        <div class="card-main">
-          <div class="url-row">
-            <div class="field-label">URL ：</div>
-            <div class="url-box">
-              <textarea
-                id="urls"
-                placeholder="YouTube や Abema の URL を入力"
-              ></textarea>
-              <button onclick="start()">ダウンロード</button>
-            </div>
-          </div>
-          <div class="options">
-            <div class="field-row">
-              <div class="field-label">画質：</div>
-              <select id="fmt">
-                <option
-                  value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  4320p（7680 x 4320）
-                </option>
-                <option
-                  value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  2160p（3840 x 2160）
-                </option>
-                <option
-                  value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  1440p（2560 x 1440）
-                </option>
-                <option
-                  value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  1080p（1920 x 1080）
-                </option>
-                <option
-                  value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  720p （1280 x 720 ）
-                </option>
-                <option
-                  value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  480p （720 x 480 ）
-                </option>
-                <option
-                  value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  360p （640 x 360 ）
-                </option>
-                <option
-                  value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                >
-                  240p （ 426 x 240 ）
-                </option>
-                <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">
-                  144p （256 x 144 ）
-                </option>
-              </select>
-            </div>
+      <!-- ===== ページ切り替え用コンテナ ===== -->
+      <div id="page-player" class="page" style="display: none">
+        <div class="card">
+          <h2>🎬 プレイヤー</h2>
+          <p>（ここに動画プレイヤーを後で実装します）</p>
+          <video
+            id="local-player"
+            controls
+            style="width: 100%; max-height: 500px; background: #000"
+          ></video>
+        </div>
+      </div>
 
-            <div class="field-row">
-              <div class="field-label">ｺﾒﾝﾄ：</div>
-              <select id="comment-options">
-                <option value="none">ダウンロードしない</option>
-                <option value="comments">動画のコメント</option>
-                <option value="sub">ライブ中のチャット</option>
-                <option value="both">コメントとチャット</option>
-              </select>
-            </div>
-
-            <div class="field-row">
-              <div class="field-label">保存：</div>
+      <div id="page-downloader" class="page active-page">
+        <div class="card card-layout">
+          <div class="card-main">
+            <div class="url-row">
+              <div class="field-label">URL ：</div>
               <div class="url-box">
-                <input
-                  type="text"
-                  id="savePath"
-                  placeholder="保存先フォルダパス (空白の場合はデフォルト)"
-                />
+                <textarea
+                  id="urls"
+                  placeholder="YouTube や Abema の URL を入力"
+                ></textarea>
+                <button onclick="start()">ダウンロード</button>
               </div>
             </div>
-
-            <div class="toggle">
-              <div>
-                Cookieファイル
-                <small id="cookie-status-display">設定されていません</small>
-              </div>
-              <div style="display: flex; align-items: center; gap: 10px">
-                <button
-                  id="set-firefox-btn"
-                  style="
-                    background: #333;
-                    border: 1px solid var(--border);
-                    color: var(--text);
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                  "
-                >
-                  FireFox
-                </button>
-                <input
-                  type="file"
-                  id="cookiePathSet"
-                  accept=".txt"
-                  style="display: none"
-                />
-                <button
-                  id="manual-select-btn"
-                  style="
-                    background: #333;
-                    border: 1px solid var(--border);
-                    color: var(--text);
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                  "
-                >
-                  手動選択
-                </button>
-                <button
-                  id="none-select-btn"
-                  style="
-                    background: #333;
-                    border: 1px solid var(--border);
-                    color: var(--text);
-                    padding: 8px 9px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                  "
-                >
-                  使用しない
-                </button>
-              </div>
-            </div>
-
-            <div class="toggle">
-              <div>
-                同時ダウンロード数: <span id="parallelDownloadsValue">10</span>
-                <small>動画を同時にダウンロードする最大数</small>
-              </div>
-              <input
-                type="range"
-                id="optParallelDownloads"
-                min="1"
-                max="999"
-                value="3"
-              />
-            </div>
-            <div class="toggle">
-              <div>
-                フラグメントの並列ダウンロード数:
-                <span id="concurrentFragmentsValue">4</span>
-                <small>1つの動画をダウンロードする際の分割数</small>
-              </div>
-              <input
-                type="range"
-                id="optConcurrentFragments"
-                min="1"
-                max="16"
-                value="4"
-              />
-            </div>
-
-            <div class="toggle">
-              <div>
-                ダウンロード履歴を保存
-                <small
-                  >再度同じ動画がダウンロードされないようになります。</small
-                >
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="optHistory" checked />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="toggle">
-              <div>
-                サムネイルをダウンロード
-                <small>動画一覧・再生画面で使用</small>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="optThumb" checked />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="toggle">
-              <div>
-                DRM 保護を回避
-                <div class="warn">
-                  <small
-                    >非推奨（必要なときのみ使用してください。）詳しくは<a
-                      href="https://github.com/yt-dlp/yt-dlp/issues/12563"
-                      >こちら</a
-                    >(英語)</small
+            <div class="options">
+              <div class="field-row">
+                <div class="field-label">画質：</div>
+                <select id="fmt">
+                  <option
+                    value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
                   >
+                    4320p（7680 x 4320）
+                  </option>
+                  <option
+                    value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    2160p（3840 x 2160）
+                  </option>
+                  <option
+                    value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    1440p（2560 x 1440）
+                  </option>
+                  <option
+                    value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    1080p（1920 x 1080）
+                  </option>
+                  <option
+                    value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    720p （1280 x 720 ）
+                  </option>
+                  <option
+                    value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    480p （720 x 480 ）
+                  </option>
+                  <option
+                    value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    360p （640 x 360 ）
+                  </option>
+                  <option
+                    value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
+                  >
+                    240p （ 426 x 240 ）
+                  </option>
+                  <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">
+                    144p （256 x 144 ）
+                  </option>
+                </select>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">ｺﾒﾝﾄ：</div>
+                <select id="comment-options">
+                  <option value="none">ダウンロードしない</option>
+                  <option value="comments">動画のコメント</option>
+                  <option value="sub">ライブ中のチャット</option>
+                  <option value="both">コメントとチャット</option>
+                </select>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">保存：</div>
+                <div class="url-box">
+                  <input
+                    type="text"
+                    id="savePath"
+                    placeholder="保存先フォルダパス (空白の場合はデフォルト)"
+                  />
                 </div>
               </div>
-              <label class="switch">
-                <input type="checkbox" id="optDrm" />
-                <span class="slider"></span>
-              </label>
+
+              <div class="toggle">
+                <div>
+                  Cookieファイル
+                  <small id="cookie-status-display">設定されていません</small>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <button
+                    id="set-firefox-btn"
+                    style="
+                      background: #333;
+                      border: 1px solid var(--border);
+                      color: var(--text);
+                      padding: 8px 12px;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                  >
+                    FireFox
+                  </button>
+                  <input
+                    type="file"
+                    id="cookiePathSet"
+                    accept=".txt"
+                    style="display: none"
+                  />
+                  <button
+                    id="manual-select-btn"
+                    style="
+                      background: #333;
+                      border: 1px solid var(--border);
+                      color: var(--text);
+                      padding: 8px 12px;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                  >
+                    手動選択
+                  </button>
+                  <button
+                    id="none-select-btn"
+                    style="
+                      background: #333;
+                      border: 1px solid var(--border);
+                      color: var(--text);
+                      padding: 8px 9px;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                  >
+                    使用しない
+                  </button>
+                </div>
+              </div>
+
+              <div class="toggle">
+                <div>
+                  同時ダウンロード数:
+                  <span id="parallelDownloadsValue">10</span>
+                  <small>動画を同時にダウンロードする最大数</small>
+                </div>
+                <input
+                  type="range"
+                  id="optParallelDownloads"
+                  min="1"
+                  max="999"
+                  value="3"
+                />
+              </div>
+              <div class="toggle">
+                <div>
+                  フラグメントの並列ダウンロード数:
+                  <span id="concurrentFragmentsValue">4</span>
+                  <small>1つの動画をダウンロードする際の分割数</small>
+                </div>
+                <input
+                  type="range"
+                  id="optConcurrentFragments"
+                  min="1"
+                  max="16"
+                  value="4"
+                />
+              </div>
+
+              <div class="toggle">
+                <div>
+                  ダウンロード履歴を保存
+                  <small
+                    >再度同じ動画がダウンロードされないようになります。</small
+                  >
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="optHistory" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="toggle">
+                <div>
+                  サムネイルをダウンロード
+                  <small>動画一覧・再生画面で使用</small>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="optThumb" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="toggle">
+                <div>
+                  DRM 保護を回避
+                  <div class="warn">
+                    <small
+                      >非推奨（必要なときのみ使用してください。）詳しくは<a
+                        href="https://github.com/yt-dlp/yt-dlp/issues/12563"
+                        >こちら</a
+                      >(英語)</small
+                    >
+                  </div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="optDrm" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="card-side">
+            <h3>システム情報</h3>
+            <div class="info-item">
+              <div class="info-label">現在時刻</div>
+              <div id="info-clock" class="info-value">—</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">稼働時間</div>
+              <div id="info-uptime" class="info-value">—</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">ネットワーク</div>
+              <div id="info-network" class="info-value">—</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">レイテンシ</div>
+              <div id="info-latency" class="info-value">—</div>
+            </div>
+            <div class="info-panel">
+              <canvas id="networkChart" height="100"></canvas>
+            </div>
+            <h3>進捗状況</h3>
+            <div class="info-item">
+              <div class="info-label">合計</div>
+              <div id="info-total-count" class="info-value">0 件</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">完了</div>
+              <div id="info-completed-count" class="info-value">0 件</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">実行中</div>
+              <div id="info-running-count" class="info-value">0 件</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">エラー</div>
+              <div id="info-error-count" class="info-value">0 件</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">完了率</div>
+              <div class="info-value" style="width: 80%">
+                <div class="completion-bar-container">
+                  <div id="completion-bar" class="completion-bar"></div>
+                </div>
+                <div id="completion-text" class="completion-text">0%</div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="card-side">
-          <h3>システム情報</h3>
-          <div class="info-item">
-            <div class="info-label">現在時刻</div>
-            <div id="info-clock" class="info-value">—</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">稼働時間</div>
-            <div id="info-uptime" class="info-value">—</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">ネットワーク</div>
-            <div id="info-network" class="info-value">—</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">レイテンシ</div>
-            <div id="info-latency" class="info-value">—</div>
-          </div>
-          <div class="info-panel">
-            <canvas id="networkChart" height="100"></canvas>
-          </div>
-          <h3>進捗状況</h3>
-          <div class="info-item">
-            <div class="info-label">合計</div>
-            <div id="info-total-count" class="info-value">0 件</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">完了</div>
-            <div id="info-completed-count" class="info-value">0 件</div>
-          </div>
+        <div id="job-queue"></div>
+      </div>
 
-          <div class="info-item">
-            <div class="info-label">実行中</div>
-            <div id="info-running-count" class="info-value">0 件</div>
-          </div>
+      <div id="page-settings" class="page" style="display: none">
+        <div class="card">
+          <h2>⚙ 設定</h2>
 
-          <div class="info-item">
-            <div class="info-label">エラー</div>
-            <div id="info-error-count" class="info-value">0 件</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">完了率</div>
-            <div class="info-value" style="width: 80%">
-              <div class="completion-bar-container">
-                <div id="completion-bar" class="completion-bar"></div>
-              </div>
-              <div id="completion-text" class="completion-text">0%</div>
+          <div class="options">
+            <div class="field-row">
+              <div class="field-label">ブラウザ連携：</div>
+              <select id="settings-browser">
+                <option value="">なし</option>
+                <option value="firefox">Firefox</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <div class="field-label">テーマ：</div>
+              <select id="settings-theme">
+                <option value="dark">ダーク</option>
+                <option value="light">ライト（未実装）</option>
+              </select>
             </div>
           </div>
         </div>
       </div>
-
-      <div id="job-queue"></div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1188,6 +1335,78 @@
           console.error("Fetch error:", error);
         }
       }
+
+      // ===== ヘッダーボタンの「現在の画面」表示 =====
+      // ===== ヘッダーボタンで「ページ切替」＋「縁の移動」 =====
+      // ===== URLルーティング対応のページ切替 =====
+      document.addEventListener("DOMContentLoaded", () => {
+        const buttons = document.querySelectorAll(".icon-btn");
+        const pages = document.querySelectorAll(".page");
+
+        function showPage(pageId) {
+          // すべて非表示
+          pages.forEach((p) => p.classList.remove("active-page"));
+
+          // 指定ページだけ表示
+          const target = document.getElementById(pageId);
+          if (target) {
+            target.classList.add("active-page");
+          }
+        }
+
+        function setActiveButton(pageId) {
+          buttons.forEach((b) => {
+            if (b.dataset.page === pageId) {
+              b.classList.add("active");
+            } else {
+              b.classList.remove("active");
+            }
+          });
+        }
+
+        function routeFromHash() {
+          const hash = location.hash.replace("#", "");
+
+          let pageId;
+          switch (hash) {
+            case "player":
+              pageId = "page-player";
+              break;
+            case "settings":
+              pageId = "page-settings";
+              break;
+            case "downloader":
+            case "":
+              pageId = "page-downloader";
+              break;
+            default:
+              pageId = "page-downloader"; // 不明なURLはダウンローダーへ
+          }
+
+          showPage(pageId);
+          setActiveButton(pageId);
+        }
+
+        // ボタンクリック時 → URLも変更
+        buttons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const pageId = btn.dataset.page;
+
+            // URLを更新（ページ再読み込みなし）
+            const hash = pageId.replace("page-", ""); // page-player → player
+            history.pushState(null, "", "#" + hash);
+
+            showPage(pageId);
+            setActiveButton(pageId);
+          });
+        });
+
+        // ブラウザの「戻る／進む」に対応
+        window.addEventListener("popstate", routeFromHash);
+
+        // 初期表示（URLに合わせて表示）
+        routeFromHash();
+      });
     </script>
   </body>
 </html>
