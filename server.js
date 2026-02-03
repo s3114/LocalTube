@@ -696,8 +696,67 @@ async function moveExtraFiles(sourceDir) {
 }
 
 // ==================================================
+// ■ ライブチャット取得API（新規）
+// ==================================================
+app.get("/api/live-chat/:filename", async (req, res) => {
+  try {
+    const filename = req.params.filename;
+
+    // 保存先（あなたの環境と一致）
+    const liveChatPath = path.join(
+      __dirname,
+      "downloads",
+      "ライブチャット",
+      filename,
+    );
+
+    if (!fs.existsSync(liveChatPath)) {
+      console.error("Live chat not found:", liveChatPath);
+      return res.status(404).json({ error: "ライブチャットが見つかりません" });
+    }
+
+    // NDJSON（1行=1JSON）としてそのまま返す
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    fs.createReadStream(liveChatPath).pipe(res);
+  } catch (e) {
+    console.error("Failed to serve live chat:", e);
+    res.status(500).json({ error: "ライブチャットの取得に失敗しました" });
+  }
+});
+
+// ==================================================
 // ■ ローカル動画一覧API（プレイヤー用）
 // ==================================================
+// ==================================================
+// ■ ライブチャット取得API（★これを追加）
+// ==================================================
+app.get("/api/live-chat/:videoFile", async (req, res) => {
+  try {
+    const videoFile = decodeURIComponent(req.params.videoFile);
+
+    // 拡張子を置き換えてチャットファイル名を作る
+    const base = videoFile.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+    const chatFile = path.join(
+      __dirname,
+      "downloads",
+      "ライブチャット",
+      `${base}.live_chat.json`,
+    );
+
+    if (!fs.existsSync(chatFile)) {
+      return res
+        .status(404)
+        .json({ error: "対応するライブチャットがありません" });
+    }
+
+    const data = await fs.promises.readFile(chatFile, "utf8");
+    res.type("application/json").send(data);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "読み込みに失敗しました" });
+  }
+});
+
 app.get("/api/local-videos", async (req, res) => {
   try {
     const movieDir = path.join(__dirname, "downloads", "動画");
