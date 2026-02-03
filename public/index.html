@@ -402,6 +402,7 @@
         cursor: pointer;
         padding: 6px 8px;
         border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
       }
 
       .icon-btn:hover {
@@ -458,6 +459,135 @@
       .page.active-page {
         display: block;
       }
+
+      .player-layout {
+        display: grid;
+        grid-template-columns: 1fr 380px; /* 右側を固定幅に */
+        gap: 24px;
+        align-items: start;
+      }
+
+      /* 左メインパネル */
+      .player-main {
+        background: #0f0f0f;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      }
+
+      /* プレイヤー本体 */
+      #local-player {
+        width: 100%;
+        max-height: 620px; /* ちょっと拡大 */
+        border-radius: 14px;
+      }
+
+      /* 動画タイトル */
+      .player-title {
+        font-size: 19px;
+        font-weight: 700;
+        margin-top: 10px;
+      }
+
+      /* 再生時間などのメタ情報 */
+      .player-meta {
+        color: #aaa;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      /* タイトルをプレイヤー直下に（YouTube風） */
+      .player-info {
+        margin-top: 14px;
+        padding: 0 6px;
+      }
+      .player-sidebar {
+        background: #0f0f0f;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        max-height: 680px;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      }
+
+      /* 見出し */
+      .sidebar-title {
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      /* 動画アイテム */
+      .local-video-item {
+        display: flex;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.1s ease;
+      }
+
+      .local-video-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* 選択中の動画（新規） */
+      .local-video-item.active {
+        background: rgba(255, 255, 255, 0.12);
+        border-left: 3px solid #ffffff;
+      }
+
+      /* サムネ */
+      .local-video-thumb {
+        width: 120px;
+        height: 68px;
+        background: #000;
+        border-radius: 8px;
+        object-fit: cover;
+      }
+
+      .local-video-text {
+        flex: 1;
+        font-size: 13px;
+      }
+
+      .yt-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+        padding: 6px 8px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 10px;
+      }
+
+      #seek-bar {
+        flex: 1;
+      }
+      .yt-title {
+        font-size: 20px;
+        font-weight: 700;
+        margin-top: 10px;
+      }
+
+      .yt-meta {
+        color: #aaa;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .local-video-item {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 10px;
+      }
+
+      .local-video-thumb {
+        width: 160px; /* 少し大きく */
+        height: 90px;
+      }
     </style>
     <link
       rel="stylesheet"
@@ -501,15 +631,33 @@
 
     <main>
       <!-- ===== ページ切り替え用コンテナ ===== -->
-      <div id="page-player" class="page" style="display: none">
-        <div class="card">
-          <h2>🎬 プレイヤー</h2>
-          <p>（ここに動画プレイヤーを後で実装します）</p>
-          <video
-            id="local-player"
-            controls
-            style="width: 100%; max-height: 500px; background: #000"
-          ></video>
+      <div id="page-player" class="page">
+        <div class="player-layout">
+          <!-- ===== 左：メインプレイヤー ===== -->
+          <div class="player-main">
+            <video id="local-player"></video>
+
+            <div class="yt-controls">
+              <button id="btn-play"><i class="fa-solid fa-play"></i></button>
+              <input type="range" id="seek-bar" min="0" max="100" value="0" />
+              <span id="time-display">00:00 / 00:00</span>
+              <button id="btn-full"><i class="fa-solid fa-expand"></i></button>
+            </div>
+            <div class="yt-info">
+              <div id="player-title" class="yt-title">
+                動画を選択してください
+              </div>
+              <div class="yt-meta">
+                <span id="player-time">00:00 / 00:00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== 右：ローカル動画一覧 ===== -->
+          <div class="player-sidebar">
+            <div class="sidebar-title">ローカル動画</div>
+            <div id="local-video-list"></div>
+          </div>
         </div>
       </div>
 
@@ -1406,6 +1554,144 @@
 
         // 初期表示（URLに合わせて表示）
         routeFromHash();
+      });
+
+      // ===== ローカル動画プレイヤー（サーバー連携版） =====
+      document.addEventListener("DOMContentLoaded", () => {
+        const videoPlayer = document.getElementById("local-player");
+        const videoList = document.getElementById("local-video-list");
+        const titleEl = document.getElementById("player-title");
+        const timeEl = document.getElementById("player-time");
+
+        const seekBar = document.getElementById("seek-bar");
+        const btnPlay = document.getElementById("btn-play");
+        const btnFull = document.getElementById("btn-full");
+        const timeDisplay = document.getElementById("time-display");
+
+        videoPlayer.addEventListener("timeupdate", () => {
+          seekBar.value =
+            (videoPlayer.currentTime / videoPlayer.duration) * 100;
+        });
+
+        seekBar.addEventListener("input", () => {
+          if (!videoPlayer.duration) return;
+          videoPlayer.currentTime =
+            (seekBar.value / 100) * videoPlayer.duration;
+        });
+
+        btnPlay.addEventListener("click", () => {
+          if (videoPlayer.paused) {
+            videoPlayer.play();
+          } else {
+            videoPlayer.pause();
+          }
+        });
+
+        // 再生状態に応じてアイコンを切り替え
+        videoPlayer.addEventListener("play", () => {
+          btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        });
+
+        videoPlayer.addEventListener("pause", () => {
+          btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+        });
+
+        async function loadLocalVideos() {
+          try {
+            const res = await fetch("/api/local-videos");
+            const videos = await res.json();
+
+            renderLocalVideos(videos);
+          } catch (e) {
+            console.error("Failed to load local videos:", e);
+            videoList.innerHTML =
+              '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+          }
+        }
+
+        // ---- フルスクリーン ----
+        btnFull.addEventListener("click", async () => {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          } else {
+            await videoPlayer.requestFullscreen();
+          }
+        });
+
+        function renderLocalVideos(videos) {
+          videoList.innerHTML = "";
+
+          if (videos.length === 0) {
+            videoList.innerHTML =
+              '<div style="color:var(--subtext)">動画が見つかりません</div>';
+            return;
+          }
+
+          videos.forEach((video) => {
+            const item = document.createElement("div");
+            item.className = "local-video-item";
+
+            const thumbHtml = video.thumb
+              ? `<img src="${video.thumb}" class="local-video-thumb">`
+              : `<div class="local-video-thumb"></div>`;
+
+            item.innerHTML = `
+        ${thumbHtml}
+        <div class="local-video-text">
+          ${video.title}
+        </div>
+      `;
+
+            item.addEventListener("click", () => {
+              // いったん全解除
+              document
+                .querySelectorAll(".local-video-item")
+                .forEach((el) => el.classList.remove("active"));
+
+              // 自分だけアクティブ
+              item.classList.add("active");
+
+              videoPlayer.pause();
+              videoPlayer.src = video.video;
+              videoPlayer.load();
+              titleEl.textContent = video.title;
+
+              videoPlayer.play().catch((err) => {
+                console.error("Play failed:", err);
+              });
+            });
+
+            videoList.appendChild(item);
+          });
+        }
+
+        // ---- シークバー同期 ----
+        videoPlayer.addEventListener("timeupdate", () => {
+          if (!videoPlayer.duration) return;
+
+          const cur = Math.floor(videoPlayer.currentTime);
+          const dur = Math.floor(videoPlayer.duration);
+
+          // シークバー更新
+          seekBar.value =
+            (videoPlayer.currentTime / videoPlayer.duration) * 100;
+
+          // 時間表示
+          const format = (s) => {
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+          };
+
+          timeDisplay.textContent = `${format(cur)} / ${format(dur)}`;
+        });
+
+        // 初回ロード
+        loadLocalVideos();
+      });
+
+      document.addEventListener("job_completed", () => {
+        loadLocalVideos();
       });
     </script>
   </body>
