@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <title>LocalTube</title>
     <style>
+      /* ==================================================
+   1) DESIGN TOKENS / VARIABLES
+================================================== */
+
       :root {
         --bg: #0f0f0f;
         --panel: #181818;
@@ -14,7 +18,12 @@
         --warn: #ff9800;
         --green: #4caf50;
         --blue: #2196f3;
+        --black-panel: #000;
       }
+
+      /* ==================================================
+   2) RESET / BASE
+================================================== */
 
       * {
         box-sizing: border-box;
@@ -26,6 +35,40 @@
         background: var(--bg);
         color: var(--text);
       }
+
+      /* ==================================================
+   3) COMMON UI PATTERNS（共通パーツ）
+================================================== */
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      /* 黒ベースのボックス共通化 */
+      .panel-black {
+        background: var(--black-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      /* フォーム共通 */
+      select,
+      input[type="text"],
+      textarea {
+        background: var(--black-panel);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 10px;
+        border-radius: 8px;
+        font-family: "Segoe UI", Roboto, sans-serif;
+      }
+
+      /* ==================================================
+   4) HEADER
+================================================== */
 
       header {
         position: fixed;
@@ -39,6 +82,14 @@
         padding: 0 16px;
         border-bottom: 1px solid var(--border);
         z-index: 10;
+        width: 100%;
+      }
+
+      .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
       }
 
       .logo {
@@ -50,18 +101,84 @@
         color: var(--accent);
       }
 
+      /* ヘッダーボタン */
+      .header-buttons {
+        display: flex;
+        gap: 12px;
+        transform: scale(1.1);
+      }
+
+      .icon-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        transition: background 0.2s;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+
+      .icon-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .icon-btn:active {
+        background: rgba(255, 0, 0, 0.2);
+      }
+
+      /* 現在のページ */
+      .icon-btn.active {
+        border: 2.5px solid var(--text);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      /* ==================================================
+   5) PAGE LAYOUT
+================================================== */
+
       main {
         max-width: 1800px;
         margin: 80px auto 40px;
         padding: 0 16px;
       }
 
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 20px;
+      /* ページ切替 */
+      .page {
+        display: none;
       }
+
+      .page.active-page {
+        display: block;
+      }
+
+      /* 2カラム（ダウンロード画面） */
+      .card-layout {
+        display: flex;
+        gap: 16px;
+      }
+
+      .card-main {
+        flex: 2;
+      }
+
+      .card-side {
+        flex: 1;
+        background: var(--black-panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        color: var(--text);
+      }
+
+      /* ==================================================
+   6) FORM / INPUT AREA（URL・オプション）
+================================================== */
 
       .url-row {
         display: flex;
@@ -85,12 +202,11 @@
       .url-box textarea,
       .url-box input {
         flex: 1;
-        background: #000;
+        background: var(--black-panel);
         border: 1px solid var(--border);
         color: var(--text);
         padding: 12px;
         border-radius: 8px;
-        font-family: "Segoe UI", Roboto, sans-serif;
         resize: vertical;
         min-height: 50px;
       }
@@ -107,6 +223,7 @@
         height: 50px;
       }
 
+      /* オプション列 */
       .field-row {
         display: flex;
         align-items: center;
@@ -125,18 +242,9 @@
         gap: 14px;
       }
 
-      select {
-        width: 100%;
-        background: #000;
-        border: 1px solid var(--border);
-        color: var(--text);
-        padding: 10px;
-        border-radius: 8px;
-      }
-
+      /* レンジスライダー */
       input[type="range"] {
         appearance: none;
-        -webkit-appearance: none;
         width: 48%;
         height: 8px;
         background: #555;
@@ -145,16 +253,7 @@
         margin-top: 10px;
       }
 
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: var(--accent);
-        cursor: pointer;
-        border: 1px solid var(--border);
-      }
-
+      input[type="range"]::-webkit-slider-thumb,
       input[type="range"]::-moz-range-thumb {
         width: 20px;
         height: 20px;
@@ -164,19 +263,20 @@
         border: 1px solid var(--border);
       }
 
+      /* トグルスイッチ */
       .toggle {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: #000;
+        background: var(--black-panel);
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 12px;
       }
 
       .toggle small {
-        color: var(--subtext);
         display: block;
+        color: var(--subtext);
         font-size: 12px;
       }
 
@@ -219,15 +319,10 @@
         transform: translateX(20px);
       }
 
-      .warn small {
-        color: var(--warn);
-      }
+      /* ==================================================
+   7) JOB QUEUE（ダウンロードキュー）
+================================================== */
 
-      #savePath {
-        opacity: 0.9;
-      }
-
-      /* ===== Job Queue ===== */
       #job-queue {
         margin-top: 20px;
         display: flex;
@@ -236,7 +331,7 @@
       }
 
       .job-item {
-        background: #000;
+        background: var(--black-panel);
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 15px;
@@ -300,30 +395,10 @@
         height: 1.2em;
       }
 
-      /* === 2カラムレイアウト === */
-      .card-layout {
-        display: flex;
-        gap: 16px;
-      }
+      /* ==================================================
+   8) INFO PANEL（右サイド）
+================================================== */
 
-      /* 左メインパネル */
-      .card-main {
-        flex: 2;
-        /* メインを広め */
-      }
-
-      /* 右サイドパネル */
-      .card-side {
-        flex: 1;
-        /* 右は少し狭め */
-        background: #000;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 12px;
-        color: var(--text);
-      }
-
-      /* 情報パネルの中身 */
       .card-side h3 {
         margin: 0 0 10px 0;
         font-size: 14px;
@@ -384,126 +459,53 @@
         margin-top: 4px;
       }
 
-      header {
-        width: 100%;
-      }
-
-      .header-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between; /* 左にロゴ・右にボタン */
-        width: 100%;
-      }
-
-      .icon-btn {
-        background: none;
-        border: none;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 6px 8px;
-        border-radius: 6px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      }
-
-      .icon-btn:hover {
-        background: rgba(255, 255, 255, 0.1);
-      }
-
-      /* ===== ヘッダーのボタンレイアウト ===== */
-      .header-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between; /* ロゴは左、ボタンは右 */
-        width: 100%;
-      }
-
-      .header-buttons {
-        display: flex;
-        gap: 12px;
-        transform: scale(1.1);
-      }
-
-      .icon-btn {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text);
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        font-size: 18px;
-        transition: background 0.2s;
-      }
-
-      .icon-btn:hover {
-        background: rgba(255, 255, 255, 0.1);
-      }
-
-      .icon-btn:active {
-        background: rgba(255, 0, 0, 0.2);
-      }
-
-      /* ===== ヘッダーボタン：選択中（現在の画面） ===== */
-      .icon-btn.active {
-        border: 2.5px solid var(--text); /* ★ 赤→白に変更 */
-        background: rgba(255, 255, 255, 0.05);
-      }
-      /* ===== ページ切り替え用 ===== */
-      .page {
-        display: none;
-      }
-
-      .page.active-page {
-        display: block;
-      }
+      /* ==================================================
+   9) PLAYER LAYOUT（動画プレイヤー）
+================================================== */
 
       .player-layout {
         display: grid;
-        grid-template-columns: 1fr 380px; /* 右側を固定幅に */
+        grid-template-columns: 1fr 380px;
         gap: 24px;
         align-items: start;
       }
 
-      /* 左メインパネル */
       .player-main {
-        background: #0f0f0f;
+        background: var(--bg);
         border: 1px solid var(--border);
         border-radius: 14px;
         padding: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
       }
 
-      /* プレイヤー本体 */
       #local-player {
         width: 100%;
-        max-height: 620px; /* ちょっと拡大 */
+        max-height: 620px;
         border-radius: 14px;
       }
 
-      /* 動画タイトル */
-      .player-title {
-        font-size: 19px;
+      .player-info {
+        margin-top: 14px;
+        padding: 0 6px;
+      }
+
+      .player-title,
+      .yt-title {
+        font-size: 20px;
         font-weight: 700;
         margin-top: 10px;
       }
 
-      /* 再生時間などのメタ情報 */
-      .player-meta {
+      .player-meta,
+      .yt-meta {
         color: #aaa;
         font-size: 12px;
         margin-top: 4px;
       }
 
-      /* タイトルをプレイヤー直下に（YouTube風） */
-      .player-info {
-        margin-top: 14px;
-        padding: 0 6px;
-      }
+      /* サイドバー */
       .player-sidebar {
-        background: #0f0f0f;
+        background: var(--bg);
         border: 1px solid var(--border);
         border-radius: 14px;
         padding: 12px;
@@ -512,15 +514,15 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
       }
 
-      /* 見出し */
       .sidebar-title {
         font-weight: 700;
         margin-bottom: 8px;
       }
 
-      /* 動画アイテム */
+      /* ローカル動画一覧 */
       .local-video-item {
-        display: flex;
+        display: grid;
+        grid-template-columns: 160px 1fr;
         gap: 10px;
         padding: 8px;
         border-radius: 10px;
@@ -532,17 +534,15 @@
         background: rgba(255, 255, 255, 0.08);
       }
 
-      /* 選択中の動画（新規） */
       .local-video-item.active {
         background: rgba(255, 255, 255, 0.12);
         border-left: 3px solid #ffffff;
       }
 
-      /* サムネ */
       .local-video-thumb {
-        width: 120px;
-        height: 68px;
-        background: #000;
+        width: 160px;
+        height: 90px;
+        background: var(--black-panel);
         border-radius: 8px;
         object-fit: cover;
       }
@@ -552,41 +552,72 @@
         font-size: 13px;
       }
 
+      /* ==================================================
+   10) PLAYER CONTROLS（YouTube風）
+================================================== */
+
       .yt-controls {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-top: 8px;
-        padding: 6px 8px;
-        background: rgba(0, 0, 0, 0.6);
-        border-radius: 10px;
+        gap: 14px;
+        margin-top: 10px;
+        padding: 8px 10px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 14px;
+        backdrop-filter: blur(4px);
       }
 
+      .yt-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 16px;
+        transition:
+          background 0.15s ease,
+          transform 0.05s ease;
+      }
+
+      .yt-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .yt-btn:active {
+        transform: scale(0.95);
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      /* シークバー */
       #seek-bar {
         flex: 1;
-      }
-      .yt-title {
-        font-size: 20px;
-        font-weight: 700;
-        margin-top: 10px;
+        height: 4px;
+        appearance: none;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        cursor: pointer;
       }
 
-      .yt-meta {
-        color: #aaa;
+      #seek-bar::-webkit-slider-thumb {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+      }
+
+      .yt-time {
+        min-width: 80px;
+        text-align: right;
         font-size: 12px;
-        margin-top: 4px;
-      }
-      .local-video-item {
-        display: grid;
-        grid-template-columns: 160px 1fr;
-        gap: 10px;
-        padding: 8px;
-        border-radius: 10px;
-      }
-
-      .local-video-thumb {
-        width: 160px; /* 少し大きく */
-        height: 90px;
+        color: #ddd;
+        font-variant-numeric: tabular-nums;
       }
     </style>
     <link
@@ -636,19 +667,23 @@
           <!-- ===== 左：メインプレイヤー ===== -->
           <div class="player-main">
             <video id="local-player"></video>
-
             <div class="yt-controls">
-              <button id="btn-play"><i class="fa-solid fa-play"></i></button>
+              <button id="btn-play" class="yt-btn">
+                <i class="fa-solid fa-play"></i>
+              </button>
+
               <input type="range" id="seek-bar" min="0" max="100" value="0" />
-              <span id="time-display">00:00 / 00:00</span>
-              <button id="btn-full"><i class="fa-solid fa-expand"></i></button>
+
+              <span id="time-display" class="yt-time">00:00 / 00:00</span>
+
+              <button id="btn-full" class="yt-btn">
+                <i class="fa-solid fa-expand"></i>
+              </button>
             </div>
+
             <div class="yt-info">
               <div id="player-title" class="yt-title">
                 動画を選択してください
-              </div>
-              <div class="yt-meta">
-                <span id="player-time">00:00 / 00:00</span>
               </div>
             </div>
           </div>
