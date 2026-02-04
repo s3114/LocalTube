@@ -22,7 +22,7 @@ const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
 
 if (!chatFile) {
   console.error("live_chat.json が見つかりません:", jobDir);
-  process.exit(1);
+  process.exit(0);
 }
 
 const chatJsonPath = path.join(jobDir, chatFile);

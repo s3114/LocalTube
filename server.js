@@ -646,12 +646,9 @@ async function processDownloadJob(job) {
           ? fs.existsSync(path.join(jobPendingDir, chatFile))
           : false;
 
-        if (!hasInfo || !hasChat) {
-          console.warn(
-            "[QUEUE] 警告: info または live_chat が不足。キュー登録をスキップ:",
-            jobPendingDir,
-          );
-          resolve(); // 処理は正常終了扱いにする
+        // ✅ 修正版（info があれば登録）
+        if (!infoFile) {
+          console.warn("[QUEUE] info.json が無いため登録不可:", jobPendingDir);
           return;
         }
 
