@@ -9,6 +9,7 @@ const os = require("os"); // OS情報（一時ディレクトリなど）を取�
 const sseExpress = require("sse-express"); // Server-Sent Eventsを扱うため
 const crypto = require("crypto"); // ユニークIDを生成するため
 const iconv = require("iconv-lite"); // 文字コード変換のため
+const { exec } = require("child_process");
 
 // Expressアプリケーションのインスタンスを作成します。
 const app = express();
@@ -39,6 +40,80 @@ if (!fs.existsSync(liveChatDir)) fs.mkdirSync(liveChatDir);
 
 const PENDING_CHAT_DIR = path.join(__dirname, "syorimachi_folder");
 fs.mkdirSync(PENDING_CHAT_DIR, { recursive: true });
+
+let processingQueue = [];
+let isProcessing = false;
+
+fs.watch(PENDING_CHAT_DIR, (eventType, filename) => {
+  if (!filename) return;
+
+  const jobPath = path.join(PENDING_CHAT_DIR, filename);
+
+  // job_xxxxx フォルダのみ対象
+  if (
+    filename.startsWith("job_") &&
+    fs.existsSync(jobPath) &&
+    fs.statSync(jobPath).isDirectory()
+  ) {
+    console.log(`[QUEUE] 新ジョブ検出: ${filename}`);
+
+    // 既にキューにない場合のみ追加
+    if (!processingQueue.includes(jobPath) && !isProcessing) {
+      processingQueue.push(jobPath);
+      processQueue();
+      setTimeout(processQueue, 300);
+    }
+  }
+});
+
+async function processQueue() {
+  if (isProcessing) return;
+  if (processingQueue.length === 0) return;
+
+  isProcessing = true;
+  const jobPath = processingQueue.shift(); // 先頭を取得
+
+  console.log(`[QUEUE] 処理開始: ${jobPath}`);
+
+  try {
+    // ① まずバッチ処理を実行（★重要：移動より先）
+    await runBatchScript(
+      `node "${path.join(__dirname, "メンバーバッチ保存.js")}" "${jobPath}"`,
+    );
+
+    await runBatchScript(
+      `node "${path.join(__dirname, "メンバー絵文字保存.js")}" "${jobPath}"`,
+    );
+
+    // ② ★バッチ処理が終わってから整理（A）
+    await moveExtraFiles(jobPath);
+
+    console.log(`[QUEUE] 完了: ${jobPath}`);
+  } catch (err) {
+    console.error(`[QUEUE] エラー: ${jobPath}`, err);
+  }
+
+  isProcessing = false;
+
+  // 次があれば自動で続行
+  processQueue();
+}
+
+function runBatchScript(command) {
+  return new Promise((resolve, reject) => {
+    console.log(`[EXEC] ${command}`);
+
+    const proc = exec(command, { shell: "powershell.exe" });
+
+    proc.stdout.on("data", (data) => console.log(data.toString()));
+    proc.stderr.on("data", (data) => console.error(data.toString()));
+
+    proc.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`スクリプト終了コード: ${code}`));
+    });
+  });
+}
 
 function makeJobFolderName() {
   const now = new Date();
@@ -518,49 +593,75 @@ async function processDownloadJob(job) {
           });
         }
 
-        // ==========================================================
-        // ★ ここから：仮置きフォルダへの振り分け（新規追加）
-        // ==========================================================
-
+        // ==============================
+        // ① info.json / live_chat.json を検出
+        // ==============================
         const files = fs.readdirSync(finalMovieDir);
 
         const infoFile = files.find((f) => f.endsWith(".info.json"));
         const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
 
-        // --- 仮置きフォルダを作成 ---
-        const PENDING_CHAT_DIR = path.join(__dirname, "syorimachi_folder");
-        fs.mkdirSync(PENDING_CHAT_DIR, { recursive: true });
-
-        // ジョブごとのフォルダ名を作成
-        const jobName = `job_${Date.now()}`;
-        const jobPendingDir = path.join(PENDING_CHAT_DIR, jobName);
+        // 仮置きジョブフォルダを作成
+        const jobPendingDir = path.join(PENDING_CHAT_DIR, `job_${Date.now()}`);
         fs.mkdirSync(jobPendingDir, { recursive: true });
 
         console.log("仮置きジョブフォルダ:", jobPendingDir);
 
-        // --- info.json / live_chat.json を仮置きへ移動 ---
+        // ==============================
+        // ② まず両方とも仮置きへ移動（★キューより先）
+        // ==============================
+
         if (infoFile) {
           const src = path.join(finalMovieDir, infoFile);
           const dest = path.join(jobPendingDir, infoFile);
-          fs.renameSync(src, dest);
-          console.log("仮置きへ移動（info）:", dest);
+
+          if (fs.existsSync(src)) {
+            fs.renameSync(src, dest);
+            console.log("仮置きへ移動（info）:", dest);
+          } else {
+            console.warn("info.json が見つかりません:", src);
+          }
         }
 
         if (chatFile) {
           const src = path.join(finalMovieDir, chatFile);
           const dest = path.join(jobPendingDir, chatFile);
-          fs.renameSync(src, dest);
-          console.log("仮置きへ移動（chat）:", dest);
+
+          if (fs.existsSync(src)) {
+            fs.renameSync(src, dest);
+            console.log("仮置きへ移動（chat）:", dest);
+          } else {
+            console.warn("live_chat.json が見つかりません:", src);
+          }
         }
 
-        // ==========================================================
-        // ★ ここまで
-        // ==========================================================
+        // ==============================
+        // ③ 両方そろっているか最終チェック
+        // ==============================
+        const hasInfo = infoFile
+          ? fs.existsSync(path.join(jobPendingDir, infoFile))
+          : false;
 
-        // その後で通常の整理処理（動画など）
-        await moveExtraFiles(finalMovieDir);
+        const hasChat = chatFile
+          ? fs.existsSync(path.join(jobPendingDir, chatFile))
+          : false;
 
-        resolve(); // すべて成功
+        if (!hasInfo || !hasChat) {
+          console.warn(
+            "[QUEUE] 警告: info または live_chat が不足。キュー登録をスキップ:",
+            jobPendingDir,
+          );
+          resolve(); // 処理は正常終了扱いにする
+          return;
+        }
+
+        // ==============================
+        // ④ ここで初めてキューに登録（★超重要）
+        // ==============================
+        processingQueue.push(jobPendingDir);
+        setTimeout(processQueue, 300);
+
+        resolve(); // yt-dlp 処理自体は成功扱い
       } else {
         reject(
           new Error(
@@ -744,6 +845,14 @@ async function moveExtraFiles(sourceDir) {
     console.error(`Error while sorting extra files in ${sourceDir}: ${err}`);
 
     // ここでもエラーをスローしない
+  }
+  try {
+    if (sourceDir.startsWith(PENDING_CHAT_DIR)) {
+      console.log(`[A] 仮置きジョブフォルダを削除: ${sourceDir}`);
+      fs.rmSync(sourceDir, { recursive: true, force: true });
+    }
+  } catch (err) {
+    console.error(`[A] 仮置きフォルダ削除に失敗: ${sourceDir}`, err);
   }
 }
 
