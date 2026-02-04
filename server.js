@@ -37,6 +37,17 @@ if (!fs.existsSync(commentsDir)) fs.mkdirSync(commentsDir);
 const liveChatDir = path.join(downloadsDir, "ライブチャット");
 if (!fs.existsSync(liveChatDir)) fs.mkdirSync(liveChatDir);
 
+const PENDING_CHAT_DIR = path.join(__dirname, "syorimachi_folder");
+fs.mkdirSync(PENDING_CHAT_DIR, { recursive: true });
+
+function makeJobFolderName() {
+  const now = new Date();
+  const ymd = now.toISOString().slice(0, 10).replace(/-/g, "");
+
+  const ms = now.getTime().toString().slice(-6); // 衝突防止
+  return `job_${ymd}_${ms}`;
+}
+
 // ■ ダウンロードキューと状態管理
 // --------------------------------------------------
 const jobHistory = new Map(); // 全てのジョブをIDで管理
@@ -507,7 +518,48 @@ async function processDownloadJob(job) {
           });
         }
 
-        await moveExtraFiles(finalMovieDir); // ファイル仕分け処理を呼び出す
+        // ==========================================================
+        // ★ ここから：仮置きフォルダへの振り分け（新規追加）
+        // ==========================================================
+
+        const files = fs.readdirSync(finalMovieDir);
+
+        const infoFile = files.find((f) => f.endsWith(".info.json"));
+        const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
+
+        // --- 仮置きフォルダを作成 ---
+        const PENDING_CHAT_DIR = path.join(__dirname, "syorimachi_folder");
+        fs.mkdirSync(PENDING_CHAT_DIR, { recursive: true });
+
+        // ジョブごとのフォルダ名を作成
+        const jobName = `job_${Date.now()}`;
+        const jobPendingDir = path.join(PENDING_CHAT_DIR, jobName);
+        fs.mkdirSync(jobPendingDir, { recursive: true });
+
+        console.log("仮置きジョブフォルダ:", jobPendingDir);
+
+        // --- info.json / live_chat.json を仮置きへ移動 ---
+        if (infoFile) {
+          const src = path.join(finalMovieDir, infoFile);
+          const dest = path.join(jobPendingDir, infoFile);
+          fs.renameSync(src, dest);
+          console.log("仮置きへ移動（info）:", dest);
+        }
+
+        if (chatFile) {
+          const src = path.join(finalMovieDir, chatFile);
+          const dest = path.join(jobPendingDir, chatFile);
+          fs.renameSync(src, dest);
+          console.log("仮置きへ移動（chat）:", dest);
+        }
+
+        // ==========================================================
+        // ★ ここまで
+        // ==========================================================
+
+        // その後で通常の整理処理（動画など）
+        await moveExtraFiles(finalMovieDir);
+
         resolve(); // すべて成功
       } else {
         reject(

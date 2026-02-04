@@ -1,18 +1,38 @@
-// メンバーバッチ保存.js（サイズ指定を除去して保存）
-
+// ======== ★ CommonJS 版（require）★ ========
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const BADGE_DIR = path.join("downloads", "メンバーバッチ");
-const CHAT_FILE = process.argv[2];
+// Node 18+ の標準 fetch を使う（node-fetch は不要）
+const fetch = global.fetch;
 
-if (!CHAT_FILE) {
-  console.error("使用方法: node メンバーバッチ保存.js <chat.jsonのパス>");
+// ======== ★ 入力：ジョブフォルダそのもの ★ ========
+const jobDir = process.argv[2];
+
+if (!jobDir) {
+  console.error(
+    "使用方法: node メンバーバッチ保存.js <syorimachi_folder/job_xxx>",
+  );
   process.exit(1);
 }
 
-fs.mkdirSync(BADGE_DIR, { recursive: true });
+// job_xxx の中から *.live_chat.json を探す
+const files = fs.readdirSync(jobDir);
+const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
+
+if (!chatFile) {
+  console.error("live_chat.json が見つかりません:", jobDir);
+  process.exit(1);
+}
+
+const chatJsonPath = path.join(jobDir, chatFile);
+
+// ======== ★ 出力フォルダ ★ ========
+const OUTPUT_DIR = path.join(process.cwd(), "downloads", "メンバーバッチ");
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+console.log("入力（chat）:", chatJsonPath);
+console.log("出力先:", OUTPUT_DIR);
 
 // ★★★ 追加：URL正規化（サイズ指定を削除）★★★
 function normalizeBadgeUrl(url) {
@@ -32,7 +52,7 @@ async function downloadIfNotExists(url) {
   // ★★★★★★★★★★★★★
 
   const filename = urlToFilename(normalizedUrl);
-  const filepath = path.join(BADGE_DIR, filename);
+  const filepath = path.join(OUTPUT_DIR, filename);
 
   if (fs.existsSync(filepath)) {
     return filepath;
@@ -78,7 +98,7 @@ function extract32pxBadgeUrls(obj, results = new Set()) {
 }
 
 async function main() {
-  const lines = fs.readFileSync(CHAT_FILE, "utf-8").split("\n");
+  const lines = fs.readFileSync(chatJsonPath, "utf-8").split("\n");
 
   for (const line of lines) {
     if (!line.trim()) continue;
