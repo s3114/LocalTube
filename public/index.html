@@ -1036,6 +1036,11 @@
         overflow-y: auto;
         height: 100%;
       }
+
+      #download-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
     </style>
     <link
       rel="stylesheet"
@@ -1200,7 +1205,9 @@
                   id="urls"
                   placeholder="YouTube や Abema の URL を入力"
                 ></textarea>
-                <button onclick="start()">ダウンロード</button>
+                <button id="download-btn" onclick="start()">
+                  ダウンロード
+                </button>
               </div>
             </div>
             <div class="options">
@@ -1967,6 +1974,15 @@
 
       // --- Actions ---
       async function start() {
+        const downloadBtn = document.getElementById("download-btn");
+
+        if (downloadBtn) {
+          downloadBtn.disabled = true;
+          setTimeout(() => {
+            downloadBtn.disabled = false;
+          }, 500);
+        }
+
         const urlsInput = document.getElementById("urls");
         if (urlsInput.value.trim() === "") {
           alert("URLを入力してください。");

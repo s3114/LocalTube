@@ -37,6 +37,8 @@ const commentsDir = path.join(downloadsDir, "コメント");
 if (!fs.existsSync(commentsDir)) fs.mkdirSync(commentsDir);
 const liveChatDir = path.join(downloadsDir, "ライブチャット");
 if (!fs.existsSync(liveChatDir)) fs.mkdirSync(liveChatDir);
+const subtitleDir = path.join(downloadsDir, "字幕");
+if (!fs.existsSync(subtitleDir)) fs.mkdirSync(subtitleDir);
 
 const PENDING_CHAT_DIR = path.join(__dirname, "syorimachi_folder");
 fs.mkdirSync(PENDING_CHAT_DIR, { recursive: true });
@@ -91,6 +93,16 @@ async function processQueue() {
     console.log(`[QUEUE] 完了: ${jobPath}`);
   } catch (err) {
     console.error(`[QUEUE] エラー: ${jobPath}`, err);
+
+    // ★★★ UI にエラー通知 ★★★
+    broadcast("status_update", {
+      id: path.basename(jobPath),
+      status: "error",
+      progress: {
+        percent: 0,
+        eta: "処理エラー",
+      },
+    });
   }
 
   isProcessing = false;
@@ -646,9 +658,19 @@ async function processDownloadJob(job) {
           ? fs.existsSync(path.join(jobPendingDir, chatFile))
           : false;
 
-        // ✅ 修正版（info があれば登録）
         if (!infoFile) {
           console.warn("[QUEUE] info.json が無いため登録不可:", jobPendingDir);
+
+          // ★★★ ここで UI に「完了」を通知 ★★★
+          broadcast("status_update", {
+            id: job.id,
+            status: "completed",
+            progress: {
+              percent: 100,
+              eta: "スキップ完了（info.jsonなし）",
+            },
+          });
+
           return;
         }
 
@@ -657,6 +679,16 @@ async function processDownloadJob(job) {
         // ==============================
         processingQueue.push(jobPendingDir);
         setTimeout(processQueue, 300);
+
+        // ★★★ UIに「完了」を必ず通知 ★★★
+        broadcast("status_update", {
+          id: job.id,
+          status: "completed",
+          progress: {
+            percent: 100,
+            eta: "完了",
+          },
+        });
 
         resolve(); // yt-dlp 処理自体は成功扱い
       } else {
@@ -824,6 +856,8 @@ async function moveExtraFiles(sourceDir) {
         newPath = path.join(commentsDir, file);
       } else if (file.endsWith(".live_chat.json")) {
         newPath = path.join(liveChatDir, file);
+      } else if (file.endsWith(".vtt") || file.endsWith(".srt")) {
+        newPath = path.join(subtitleDir, file);
       }
 
       if (newPath) {
