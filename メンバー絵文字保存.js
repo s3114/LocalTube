@@ -50,6 +50,11 @@ async function downloadIfNotExists(url) {
   const filename = urlToFilename(normalizedUrl);
   const filepath = path.join(OUTPUT_DIR, filename);
 
+  if (url.includes("fonts.gstatic.com")) {
+    console.log("Skip (Unicode emoji):", url);
+    return;
+  }
+
   if (fs.existsSync(filepath)) {
     return filepath;
   }
