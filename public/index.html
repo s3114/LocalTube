@@ -463,18 +463,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 6px 8px;
+        padding: 2px 8px;
+        line-height: 1.2;
         border-radius: 8px;
-        font-size: 13px;
+        font-size: 11px;
         color: #e0e0e0;
         transition: background 0.15s ease;
-      }
-
-      .chat-line {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 8px;
       }
 
       .chat-avatar {
@@ -494,6 +488,13 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+        /* transform: scale(0.75);
+        transform-origin: center; */
+      }
+
+      #chat-section .chat-avatar {
+        transform: scale(0.75);
+        transform-origin: center;
       }
 
       .chat-badge img {
@@ -717,6 +718,8 @@
       /* 折りたたみ時：そのセクションの中身だけ隠す */
       .sidebar-section.collapsed .sidebar-content {
         display: none;
+        overflow-y: auto;
+        flex: 1;
       }
 
       /* 折りたたみ時：ヘッダー下の余白を消す */
@@ -786,6 +789,14 @@
           rgba(255, 255, 255, 0.02),
           var(--bg)
         );
+        max-height: 650px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #chat-section .sidebar-content {
+        flex: 1;
+        overflow-y: auto; /* 中身だけスクロール */
       }
 
       /* ===== 概要欄 ===== */
@@ -1579,7 +1590,7 @@
                 <select id="comment-options">
                   <option value="none">ダウンロードしない</option>
                   <option value="comments">動画のコメント</option>
-                  <!-- <option value="sub">ライブ中のチャット</option> -->
+                  <option value="sub">ライブ中のチャット</option>
                   <option value="both">コメントとチャット</option>
                 </select>
               </div>
@@ -2584,30 +2595,19 @@
         const chatContent = document.getElementById("live-chat-container"); // ★ これだけで十分
 
         function syncChatHeight() {
-          if (!playerMain || !chatSection || !chatContent) {
-            console.warn("syncChatHeight: 必要な要素が見つかりません", {
-              playerMain,
-              chatSection,
-              chatContent,
-            });
+          if (!playerMain || !chatSection || !chatContent) return;
+
+          if (chatSection.classList.contains("collapsed")) {
+            // ★ 完全に閉じる（高さをゼロに）
+            chatContent.style.height = "0px";
+            chatContent.style.overflow = "hidden";
             return;
           }
 
-          const h = playerMain.getBoundingClientRect().height - 270;
-
-          if (!chatSection.classList.contains("collapsed")) {
-            chatContent.style.height = h + "px";
-          } else {
-            chatContent.style.height = "";
-          }
+          // 開いているときだけ同期
+          chatContent.style.height = h + "px";
+          chatContent.style.overflow = "auto";
         }
-
-        // // 既存のトグル処理に“高さ同期”を連動させる
-        // document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-        //   btn.addEventListener("click", () => {
-        //     setTimeout(syncChatHeight, 180);
-        //   });
-        // });
 
         // 初回ロード時にも合わせる（DOMContentLoaded後に実行）
         setTimeout(syncChatHeight, 100);
@@ -3011,6 +3011,7 @@
 
               videoPlayer.pause();
               videoPlayer.src = video.video;
+              lastSelectedFilename = video.filename; // ← これを保存
 
               resetSeekBar();
 
@@ -3039,8 +3040,19 @@
 
         function applyVideoInfo(info) {
           // タイトル
-          document.getElementById("player-title").textContent =
-            info.title || "無題";
+          const titleEl = document.getElementById("player-title");
+
+          if (info.title && info.title.trim() !== "") {
+            titleEl.textContent = info.title;
+          } else if (lastSelectedFilename) {
+            // 拡張子を除いたファイル名を表示
+            titleEl.textContent = lastSelectedFilename.replace(
+              /\.(mp4|mkv|webm|mov)$/i,
+              "",
+            );
+          } else {
+            titleEl.textContent = "無題";
+          }
 
           // ===== YouTube風：チャンネル情報（横並び＋アイコン）=====
           const avatar = document.getElementById("channel-avatar");
