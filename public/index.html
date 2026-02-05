@@ -800,6 +800,28 @@
         font-size: 14px;
       }
 
+      /* ===== 概要欄の折りたたみ ===== */
+      .yt-description.collapsed {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* もっと見るボタン */
+      #desc-toggle {
+        margin-top: 6px;
+        background: transparent;
+        border: none;
+        color: #8ab4ff;
+        padding: 4px 0;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      #desc-toggle:hover {
+        text-decoration: underline;
+      }
+
       /* ===== コメント欄 ===== */
       .comment-content {
         max-height: 400px;
@@ -1160,29 +1182,6 @@
         width: 28px;
         height: 28px;
       }
-
-      /* ===== 概要欄 折りたたみ用 ===== */
-      .desc-collapsed {
-        display: -webkit-box;
-        -webkit-line-clamp: 4; /* ★ 表示する行数（変更可） */
-        line-clamp: 4;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-
-      #desc-toggle {
-        margin-top: 8px;
-        background: none;
-        border: none;
-        color: #3ea6ff;
-        cursor: pointer;
-        padding: 0;
-        font-size: 14px;
-      }
-
-      #desc-toggle:hover {
-        text-decoration: underline;
-      }
     </style>
     <link
       rel="stylesheet"
@@ -1302,9 +1301,11 @@
                 動画を選択してください
               </div>
 
-              <div id="video-description" class="yt-description">
+              <div id="video-description" class="yt-description collapsed">
                 概要欄はここに表示されます
               </div>
+
+              <button id="desc-toggle">もっと見る</button>
 
               <div class="comment-section">
                 <div class="comment-header">💬 コメント</div>
@@ -2270,6 +2271,36 @@
 
       // ===== ローカル動画プレイヤー（サーバー連携版） =====
       document.addEventListener("DOMContentLoaded", () => {
+        // ===== 概要欄 折りたたみ処理 =====
+        const desc = document.getElementById("video-description");
+        const toggleBtn = document.getElementById("desc-toggle");
+
+        function updateDescButton() {
+          // 3行より短い場合はボタンを隠す
+          if (desc.scrollHeight <= desc.clientHeight) {
+            toggleBtn.style.display = "none";
+          } else {
+            toggleBtn.style.display = "inline";
+          }
+        }
+
+        // 初期チェック
+        updateDescButton();
+
+        // ウィンドウサイズ変更時にも再判定
+        window.addEventListener("resize", updateDescButton);
+
+        // ボタン押下時の挙動
+        toggleBtn.addEventListener("click", () => {
+          desc.classList.toggle("collapsed");
+
+          if (desc.classList.contains("collapsed")) {
+            toggleBtn.textContent = "もっと見る";
+          } else {
+            toggleBtn.textContent = "折りたたむ";
+          }
+        });
+
         const videoPlayer = document.getElementById("local-player");
         const videoList = document.getElementById("local-video-list");
         const titleEl = document.getElementById("player-title");
@@ -2850,6 +2881,10 @@
           } else {
             descEl.textContent = "（概要欄なし）";
           }
+
+          // ★★★【重要】概要を変更したら折りたたみ判定をやり直す★★★
+          descEl.classList.add("collapsed"); // ← 新しい動画では必ず折りたたみ状態に戻す
+          updateDescButton(); // ← 「もっと見る」ボタンの表示判定を再実行
 
           // ★【追加】コメント表示の状態をリセット（重要）
           const list = document.getElementById("comment-list");
