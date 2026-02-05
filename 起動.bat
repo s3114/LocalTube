@@ -83,14 +83,6 @@ if "%NEED_UPDATE%"=="1" (
   rd /s /q "!TEMP_DIR!"
   del "!ZIP_FILE!"
 
-  echo Checking dependencies...
-  call npm install
-  if errorlevel 1 (
-    echo ERROR: npm install failed during update.
-    pause
-    exit /b 1
-  )
-
   copy /y "%~dp0version.txt" "%LOCAL_VERSION_FILE%"
 )
 
