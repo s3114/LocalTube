@@ -93,12 +93,24 @@
       }
 
       .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         font-size: 18px;
-        font-weight: bold;
+        font-weight: 700;
       }
 
-      .logo span {
-        color: var(--accent);
+      .logo-icon {
+        width: 26px;
+        height: 26px;
+        background-image: url("favicon.ico");
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+
+      .logo-text {
+        line-height: 1;
       }
 
       /* ヘッダーボタン */
@@ -1336,8 +1348,10 @@
   <body>
     <header>
       <div class="header-inner">
-        <div class="logo"><span>▶</span> LocalTube</div>
-
+        <div class="logo">
+          <span class="logo-icon"></span>
+          <span class="logo-text">LocalTube</span>
+        </div>
         <div class="header-buttons">
           <button
             class="icon-btn"
@@ -1528,7 +1542,7 @@
               <div class="url-box">
                 <textarea
                   id="urls"
-                  placeholder="YouTube や Abema の URL を入力"
+                  placeholder="YouTube の URL を入力"
                 ></textarea>
                 <button id="download-btn" onclick="start()">
                   ダウンロード
@@ -1784,25 +1798,12 @@
         <div id="job-queue"></div>
       </div>
 
-      <div id="page-settings" class="page" style="display: none">
-        <div class="card">
-          <h2>⚙ 設定</h2>
-
-          <div class="options">
-            <div class="field-row">
-              <div class="field-label">ブラウザ連携：</div>
-              <select id="settings-browser">
-                <option value="">なし</option>
-                <option value="firefox">Firefox</option>
-              </select>
-            </div>
-
-            <div class="field-row">
-              <div class="field-label">テーマ：</div>
-              <select id="settings-theme">
-                <option value="dark">ダーク</option>
-                <option value="light">ライト（未実装）</option>
-              </select>
+      <div id="page-settings" class="page">
+        <div class="card card-layout">
+          <div class="card-main">
+            <h2>未実装</h2>
+            <div>
+              <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
             </div>
           </div>
         </div>
@@ -3035,7 +3036,7 @@
             });
 
             videoList.appendChild(item);
-          });
+            });
         }
 
         function applyVideoInfo(info) {
