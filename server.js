@@ -376,6 +376,7 @@ function getUrlsFromInput(url, cookiePath) {
       return;
     }
 
+    console.log(`[yt-dlp getUrlsFromInput Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`);
     const ytDlp = spawn(ytDlpPath, args);
     let videoUrls = "";
     ytDlp.stdout.on("data", (data) => {
@@ -559,6 +560,7 @@ async function processDownloadJob(job) {
       },
       settings,
     );
+    console.log(`[yt-dlp Download Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`);
     const ytDlp = spawn(ytDlpPath, args);
 
     let stderrOutput = "";
@@ -667,11 +669,11 @@ async function processDownloadJob(job) {
                   channelArgs.push(infoObj.channel_url);
 
                   // ③ どちらも無ければ Cookie 引数なし
-
-                  const channelJson = execSync(
-                    `"${path.join(__dirname, "yt-dlp.exe")}" ${channelArgs
-                      .map((a) => `"${a}"`)
-                      .join(" ")}`,
+                  const fullCommand = `"${path.join(__dirname, "yt-dlp.exe")}" ${channelArgs
+                    .map((a) => `"${a}"`)
+                    .join(" ")}`;
+                  console.log(`[yt-dlp Channel Info Command] Command: ${fullCommand}`);
+                  const channelJson = execSync(fullCommand,
                     { encoding: "utf-8", timeout: 45000 },
                   );
 
