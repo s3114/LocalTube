@@ -1812,6 +1812,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+      let pendingVideoId = null;
+
       // --- Global State ---
       const jobStates = new Map();
 
@@ -2370,6 +2372,22 @@
       // ===== ヘッダーボタンで「ページ切替」＋「縁の移動」 =====
       // ===== URLルーティング対応のページ切替 =====
       document.addEventListener("DOMContentLoaded", () => {
+        // ★ URL から動画IDで選択する
+        function selectVideoById(videoId) {
+          const items = document.querySelectorAll(".local-video-item");
+
+          items.forEach((item) => {
+            const titleEl = item.querySelector(".local-video-text");
+            if (!titleEl) return;
+
+            const title = titleEl.textContent.trim();
+
+            if (title === videoId) {
+              item.click(); // 既存の再生処理をそのまま使う
+            }
+          });
+        }
+
         const buttons = document.querySelectorAll(".icon-btn");
         const pages = document.querySelectorAll(".page");
 
@@ -2397,8 +2415,11 @@
         function routeFromHash() {
           const hash = location.hash.replace("#", "");
 
+          // ★ 追加：player/ID を分解
+          const [page, videoId] = hash.split("/");
+
           let pageId;
-          switch (hash) {
+          switch (page) {
             case "player":
               pageId = "page-player";
               break;
@@ -2410,11 +2431,15 @@
               pageId = "page-downloader";
               break;
             default:
-              pageId = "page-downloader"; // 不明なURLはダウンローダーへ
+              pageId = "page-downloader";
           }
 
           showPage(pageId);
           setActiveButton(pageId);
+
+          if (page === "player" && videoId) {
+            pendingVideoId = decodeURIComponent(videoId);
+          }
         }
 
         // ボタンクリック時 → URLも変更
@@ -2599,14 +2624,13 @@
           if (!playerMain || !chatSection || !chatContent) return;
 
           if (chatSection.classList.contains("collapsed")) {
-            // ★ 完全に閉じる（高さをゼロに）
             chatContent.style.height = "0px";
             chatContent.style.overflow = "hidden";
             return;
           }
 
-          // 開いているときだけ同期
-          chatContent.style.height = h + "px";
+          // 開いているとき
+          chatContent.style.height = "";
           chatContent.style.overflow = "auto";
         }
 
@@ -2995,48 +3019,54 @@
               : `<div class="local-video-thumb"></div>`;
 
             item.innerHTML = `
-        ${thumbHtml}
-        <div class="local-video-text">
-          ${video.title}
-        </div>
-      `;
+              ${thumbHtml}
+              <div class="local-video-text">
+                ${video.title}
+              </div>
+            `;
 
             item.addEventListener("click", () => {
+              // ★ ここで定義（clickの中）
+              const videoId = video.filename.replace(
+                /\.(mp4|mkv|webm|mov)$/i,
+                "",
+              );
+
               // いったん全解除
               document
                 .querySelectorAll(".local-video-item")
                 .forEach((el) => el.classList.remove("active"));
 
-              // 自分だけアクティブ
               item.classList.add("active");
 
               videoPlayer.pause();
               videoPlayer.src = video.video;
-              lastSelectedFilename = video.filename; // ← これを保存
+              lastSelectedFilename = video.filename;
 
               resetSeekBar();
-
               videoPlayer.load();
               titleEl.textContent = video.title;
 
               videoPlayer.play().catch((err) => {
                 console.error("Play failed:", err);
               });
-              const videoId = video.filename.replace(
-                /\.(mp4|mkv|webm|mov)$/i,
-                "",
-              );
+
               fetch(`/info/${encodeURIComponent(videoId)}`)
                 .then((r) => r.json())
                 .then((info) => applyVideoInfo(info))
                 .catch((err) => console.error("info.json 読み込み失敗:", err));
 
-              const base = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
-              loadLiveChat(base);
-            });
+              loadLiveChat(videoId);
 
-            videoList.appendChild(item);
+              // ★ URL変更は「必ず最後」「clickの中」
+              history.pushState(
+                null,
+                "",
+                "#player/" + encodeURIComponent(videoId),
+              );
             });
+            videoList.appendChild(item);
+          });
         }
 
         function applyVideoInfo(info) {
