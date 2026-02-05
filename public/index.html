@@ -800,6 +800,16 @@
         font-size: 14px;
       }
 
+      /* ===== 概要欄のリンク ===== */
+      .yt-description a.desc-link {
+        color: #8ab4ff; /* YouTubeっぽい青 */
+        text-decoration: none;
+      }
+
+      .yt-description a.desc-link:hover {
+        text-decoration: underline;
+      }
+
       /* ===== 概要欄の折りたたみ ===== */
       .yt-description.collapsed {
         display: -webkit-box;
@@ -1133,7 +1143,6 @@
       }
 
       .comment-list {
-        max-height: 320px;
         overflow-y: auto;
       }
 
@@ -1165,6 +1174,16 @@
 
       .comment-text {
         white-space: pre-wrap; /* 改行を反映 */
+      }
+
+      /* ===== コメント内のリンク ===== */
+      .comment-text a.desc-link {
+        color: #8ab4ff; /* YouTubeっぽい青 */
+        text-decoration: none;
+      }
+
+      .comment-text a.desc-link:hover {
+        text-decoration: underline;
       }
 
       .comment-replies {
@@ -2271,6 +2290,17 @@
 
       // ===== ローカル動画プレイヤー（サーバー連携版） =====
       document.addEventListener("DOMContentLoaded", () => {
+        // ===== 概要欄のURLをリンク化する関数 =====
+        function linkify(text) {
+          if (!text) return "";
+
+          const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+          return text.replace(urlRegex, (url) => {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="desc-link">${url}</a>`;
+          });
+        }
+
         // ===== 概要欄 折りたたみ処理 =====
         const desc = document.getElementById("video-description");
         const toggleBtn = document.getElementById("desc-toggle");
@@ -2874,13 +2904,18 @@
           document.getElementById("player-title").textContent =
             info.title || "無題";
 
-          // ★ 概要欄
+          // ★ 概要欄（URLリンク化版）
           const descEl = document.getElementById("video-description");
           if (info.description) {
-            descEl.textContent = info.description;
+            // URLをリンク化しつつ、改行も保持
+            descEl.innerHTML = linkify(info.description);
           } else {
             descEl.textContent = "（概要欄なし）";
           }
+
+          // ★★★ 折りたたみ処理の再判定（あなたが既に入れたもの）★★★
+          descEl.classList.add("collapsed");
+          updateDescButton();
 
           // ★★★【重要】概要を変更したら折りたたみ判定をやり直す★★★
           descEl.classList.add("collapsed"); // ← 新しい動画では必ず折りたたみ状態に戻す
@@ -3065,7 +3100,7 @@
 
           const text = document.createElement("div");
           text.className = "comment-text";
-          text.textContent = comment.text || "";
+          text.innerHTML = comment.text ? linkify(comment.text) : "";
 
           const likes = document.createElement("div");
           likes.style.fontSize = "12px";
