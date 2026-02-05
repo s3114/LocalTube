@@ -674,7 +674,7 @@ async function processDownloadJob(job) {
                     .join(" ")}`;
                   console.log(`[yt-dlp Channel Info Command] Command: ${fullCommand}`);
                   const channelJson = execSync(fullCommand,
-                    { encoding: "utf-8", timeout: 45000 },
+                    { encoding: "utf-8", timeout: 3000 },
                   );
 
                   // ===== ★ チャンネル情報JSONを丸ごと保存 ★ =====
@@ -889,7 +889,7 @@ function buildArgs(job, paths, settings) {
     "--newline", // 進捗情報を改行で区切る
   ];
 
-  if (options.format) args.push("-f", options.format);
+  if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
   if (options.downloadThumb) {
     args.push("--write-thumbnail");
     // サムネイルの保存先を指定
