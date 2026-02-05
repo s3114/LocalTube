@@ -864,6 +864,27 @@
         font-size: 14px;
       }
 
+      /* ===== コメント本文の折りたたみ ===== */
+      .comment-text.clamped {
+        display: -webkit-box;
+        -webkit-line-clamp: 5; /* ★ 5行まで表示 */
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .comment-more {
+        background: transparent;
+        border: none;
+        color: #8ab4ff;
+        font-size: 12px;
+        padding: 4px 0 0 0;
+        cursor: pointer;
+      }
+
+      .comment-more:hover {
+        text-decoration: underline;
+      }
+
       /* ローカル動画一覧 */
       .local-video-item {
         display: grid;
@@ -3061,6 +3082,7 @@
           // --- ② 親コメントを描画 ---
           parents.forEach((parent) => {
             const parentEl = createCommentElement(parent, false);
+            parentEl.querySelector(".comment-text").classList.add("clamped");
 
             // ===== ★ 折りたたみボタン（← 区切れ線の“前”に出す）★ =====
             const replies = replyMap[parent.id];
@@ -3166,6 +3188,41 @@
 
           item.appendChild(avatar);
           item.appendChild(body);
+
+          // ===== ★ コメント長文の「もっと見る」処理 ★ =====
+          const moreBtn = document.createElement("button");
+          moreBtn.className = "comment-more";
+          moreBtn.textContent = "もっと見る ▼";
+          moreBtn.style.display = "none"; // 初期は隠す
+
+          // 一旦 body に入れてから高さ判定する（重要）
+          text.after(moreBtn);
+
+          // ★★★ 修正版：確実に5行判定できる版 ★★★
+          requestAnimationFrame(() => {
+            // line-height が "normal" の場合の保険
+            let lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+            if (isNaN(lineHeight)) lineHeight = 18; // ← フォールバック
+
+            const maxHeight = lineHeight * 5; // 5行分の高さ
+
+            // 一度クランプを外して正確に測る（重要）
+            text.classList.remove("clamped");
+
+            requestAnimationFrame(() => {
+              if (text.scrollHeight > maxHeight) {
+                text.classList.add("clamped"); // 5行に制限
+                moreBtn.style.display = "block"; // ★ ボタン表示
+              }
+            });
+          });
+
+          // ボタンクリックで開閉
+          moreBtn.addEventListener("click", () => {
+            const isClamped = text.classList.toggle("clamped");
+
+            moreBtn.textContent = isClamped ? "続きを見る ▼" : "一部を表示 ▲";
+          });
 
           return item;
         }
