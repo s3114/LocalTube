@@ -1206,6 +1206,10 @@
         margin-top: 8px;
       }
 
+      .comment-replies .comment-replies {
+        margin-left: 32px; /* 返信の返信をさらにインデント */
+      }
+
       .comment-reply {
         margin-bottom: 8px;
         display: flex;
@@ -1234,6 +1238,82 @@
 
       .comment-toggle:hover {
         text-decoration: underline;
+      }
+
+      .channel-info {
+        margin-top: 6px;
+        margin-bottom: 10px;
+        font-size: 14px;
+        color: #aaa;
+      }
+
+      .channel-name {
+        color: #fff;
+        font-weight: bold;
+        text-decoration: none;
+      }
+
+      .channel-handle {
+        margin-left: 6px;
+        color: #888;
+      }
+
+      .channel-subs {
+        margin-left: 10px;
+        color: #888;
+      }
+
+      /* ===== YouTube風：チャンネル行 ===== */
+      .channel-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+        margin-bottom: 10px;
+      }
+
+      .channel-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #222;
+      }
+
+      .channel-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .channel-name {
+        color: #fff;
+        font-weight: 600;
+        font-size: 14px;
+        text-decoration: none;
+      }
+
+      .channel-name:hover {
+        text-decoration: underline;
+      }
+
+      .channel-meta {
+        font-size: 12px;
+        color: #aaa;
+      }
+
+      .channel-meta .dot {
+        margin: 0 6px;
+      }
+
+      /* アイコンをクリック可能に見せる */
+      #channel-avatar-link {
+        display: inline-block;
+        border-radius: 50%;
+      }
+
+      #channel-avatar-link:hover {
+        opacity: 0.85;
       }
     </style>
     <link
@@ -1352,6 +1432,30 @@
             <div class="yt-info">
               <div id="player-title" class="yt-title">
                 動画を選択してください
+              </div>
+
+              <div id="channel-info" class="channel-row">
+                <a id="channel-avatar-link" href="#" target="_blank">
+                  <img
+                    id="channel-avatar"
+                    class="channel-avatar"
+                    src=""
+                    alt=""
+                  />
+                </a>
+                <div class="channel-text">
+                  <a
+                    id="channel-link"
+                    href="#"
+                    target="_blank"
+                    class="channel-name"
+                  ></a>
+                  <div class="channel-meta">
+                    <span id="channel-handle"></span>
+                    <span class="dot">•</span>
+                    <span id="channel-subs"></span>
+                  </div>
+                </div>
               </div>
 
               <div id="video-description" class="yt-description collapsed">
@@ -2938,6 +3042,37 @@
           document.getElementById("player-title").textContent =
             info.title || "無題";
 
+          // ===== YouTube風：チャンネル情報（横並び＋アイコン）=====
+          const avatar = document.getElementById("channel-avatar");
+          const channelLink = document.getElementById("channel-link");
+          const channelHandle = document.getElementById("channel-handle");
+          const channelSubs = document.getElementById("channel-subs");
+          const avatarLink = document.getElementById("channel-avatar-link");
+
+          // ===== チャンネルアイコン（見直し版：コメントを使わない） =====
+          if (info.channel_thumbnail && info.channel_thumbnail.trim() !== "") {
+            avatar.src = info.channel_thumbnail;
+          } else {
+            // ★★★ 最終フォールバック：ローカルの none_icon.jpg ★★★
+            avatar.src = "/none_icon.jpg";
+          }
+
+          // ★ 画像が壊れていた場合の保険（直後に追加）
+          avatar.onerror = () => {
+            avatar.src = "/none_icon.jpg";
+          };
+
+          // チャンネル名＋リンク
+          channelLink.textContent = info.channel;
+          channelLink.href = info.channel_url;
+          avatarLink.href = info.channel_url;
+
+          // ハンドル
+          channelHandle.textContent = info.uploader_id;
+
+          // 登録者数
+          channelSubs.textContent = `${info.channel_follower_count}人 登録`;
+
           // ★ 概要欄（URLリンク化版）
           const descEl = document.getElementById("video-description");
           if (info.description) {
@@ -3079,59 +3214,73 @@
             replyMap[c.parent].push(c);
           });
 
-          // --- ② 親コメントを描画 ---
+          // ★★★【追加】ネスト対応：ツリー構造を作る ★★★
+          const nodeMap = {};
+          comments.forEach((c) => {
+            nodeMap[c.id] = { ...c, children: [] };
+          });
+
+          comments.forEach((c) => {
+            if (c.parent && nodeMap[c.parent]) {
+              nodeMap[c.parent].children.push(nodeMap[c.id]);
+            }
+          });
+
+          // --- ② 親コメントを描画（★ ネスト対応版 ★）---
           parents.forEach((parent) => {
+            const parentNode = nodeMap[parent.id];
             const parentEl = createCommentElement(parent, false);
             parentEl.querySelector(".comment-text").classList.add("clamped");
 
-            // ===== ★ 折りたたみボタン（← 区切れ線の“前”に出す）★ =====
-            const replies = replyMap[parent.id];
-            let toggleBtn = null;
+            list.appendChild(parentEl);
 
-            if (replies && replies.length > 0) {
-              toggleBtn = document.createElement("button");
+            // ★ 再帰的に返信を描画
+            if (parentNode.children.length > 0) {
+              const replyContainer = document.createElement("div");
+              replyContainer.className = "comment-replies";
+              replyContainer.id = "replies-" + parent.id;
+
+              // 折りたたみボタン（親にだけ付ける）
+              const toggleBtn = document.createElement("button");
               toggleBtn.className = "comment-toggle";
-              toggleBtn.textContent = `返信${replies.length}件 ▼`;
+              toggleBtn.textContent = `返信${parentNode.children.length}件 ▼`;
               toggleBtn.dataset.parentId = parent.id;
 
               toggleBtn.addEventListener("click", () => {
                 const container = document.getElementById(
                   "replies-" + toggleBtn.dataset.parentId,
                 );
-
                 if (!container) return;
 
                 const isCollapsed = container.classList.toggle("collapsed");
-
                 toggleBtn.textContent = isCollapsed
-                  ? `返信${replies.length}件 ▼`
-                  : `返信${replies.length}件 ▲`;
+                  ? `返信${parentNode.children.length}件 ▼`
+                  : `返信${parentNode.children.length}件 ▲`;
               });
-            }
 
-            // ★★★【修正版：ボタンを“コメントの中”に入れる】★★★
-            list.appendChild(parentEl); // ① まず親コメントを追加
+              parentEl.querySelector(".comment-body").appendChild(toggleBtn);
 
-            if (toggleBtn) {
-              const body = parentEl.querySelector(".comment-body");
-              body.appendChild(toggleBtn); // ← ★ 親コメントの本文エリアの末尾に入れる
-            }
+              // ★ ここで「返信の返信」まで描画する
+              function renderNestedReplies(nodes, container) {
+                nodes.forEach((n) => {
+                  const replyEl = createCommentElement(n, true);
+                  container.appendChild(replyEl);
 
-            // --- ③ その親の返信を描画 ---
-            // const replies = replyMap[parent.id];
-            if (replies && replies.length > 0) {
-              const replyContainer = document.createElement("div");
-              replyContainer.className = "comment-replies";
-              replyContainer.id = "replies-" + parent.id;
+                  if (n.children.length > 0) {
+                    const nested = document.createElement("div");
+                    nested.className = "comment-replies";
+                    renderNestedReplies(n.children, nested);
+                    replyEl.querySelector(".comment-body").appendChild(nested);
+                  }
+                });
+              }
 
-              replies.forEach((reply) => {
-                const replyEl = createCommentElement(reply, true);
-                replyContainer.appendChild(replyEl);
-              });
+              renderNestedReplies(parentNode.children, replyContainer);
 
               replyContainer.classList.add("collapsed");
-              const body = parentEl.querySelector(".comment-body");
-              body.appendChild(replyContainer);
+              parentEl
+                .querySelector(".comment-body")
+                .appendChild(replyContainer);
             }
           });
         }
