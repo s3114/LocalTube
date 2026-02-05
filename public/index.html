@@ -788,6 +788,57 @@
         );
       }
 
+      /* ===== 概要欄 ===== */
+      .yt-description {
+        margin-top: 12px;
+        padding: 12px;
+        background: var(--black-panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        white-space: pre-wrap; /* 改行をそのまま表示 */
+        font-size: 14px;
+      }
+
+      /* ===== コメント欄 ===== */
+      .comment-content {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .comment-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .comment-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+      }
+
+      .comment-body {
+        flex: 1;
+      }
+
+      .comment-author {
+        font-weight: bold;
+        font-size: 13px;
+      }
+
+      .comment-time {
+        color: var(--subtext);
+        font-size: 12px;
+      }
+
+      .comment-text {
+        margin-top: 4px;
+        white-space: pre-wrap;
+        font-size: 14px;
+      }
+
       /* ローカル動画一覧 */
       .local-video-item {
         display: grid;
@@ -1041,6 +1092,97 @@
         opacity: 0.5;
         cursor: not-allowed;
       }
+
+      .chat-emoji {
+        width: 20px;
+        height: 20px;
+        vertical-align: middle;
+      }
+
+      .comment-section {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+
+      .comment-header {
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+
+      .comment-list {
+        max-height: 320px;
+        overflow-y: auto;
+      }
+
+      .comment-item {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .comment-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+      }
+
+      .comment-body {
+        flex: 1;
+      }
+
+      .comment-author {
+        font-weight: bold;
+        margin-right: 6px;
+      }
+
+      .comment-time {
+        color: #aaa;
+        font-size: 12px;
+      }
+
+      .comment-text {
+        white-space: pre-wrap; /* 改行を反映 */
+      }
+
+      .comment-replies {
+        margin-left: 46px; /* アバター幅(36px)+余白分 */
+        margin-top: 8px;
+      }
+
+      .comment-reply {
+        margin-bottom: 8px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .comment-reply .comment-avatar {
+        width: 28px;
+        height: 28px;
+      }
+
+      /* ===== 概要欄 折りたたみ用 ===== */
+      .desc-collapsed {
+        display: -webkit-box;
+        -webkit-line-clamp: 4; /* ★ 表示する行数（変更可） */
+        line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      #desc-toggle {
+        margin-top: 8px;
+        background: none;
+        border: none;
+        color: #3ea6ff;
+        cursor: pointer;
+        padding: 0;
+        font-size: 14px;
+      }
+
+      #desc-toggle:hover {
+        text-decoration: underline;
+      }
     </style>
     <link
       rel="stylesheet"
@@ -1158,6 +1300,20 @@
             <div class="yt-info">
               <div id="player-title" class="yt-title">
                 動画を選択してください
+              </div>
+
+              <div id="video-description" class="yt-description">
+                概要欄はここに表示されます
+              </div>
+
+              <div class="comment-section">
+                <div class="comment-header">💬 コメント</div>
+
+                <div class="comment-empty" style="display: none">
+                  コメントはありません
+                </div>
+
+                <div id="comment-list" class="comment-list"></div>
               </div>
             </div>
           </div>
@@ -2238,7 +2394,7 @@
             return;
           }
 
-          const h = playerMain.getBoundingClientRect().height - 200;
+          const h = playerMain.getBoundingClientRect().height - 270;
 
           if (!chatSection.classList.contains("collapsed")) {
             chatContent.style.height = h + "px";
@@ -2247,12 +2403,12 @@
           }
         }
 
-        // 既存のトグル処理に“高さ同期”を連動させる
-        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            setTimeout(syncChatHeight, 180);
-          });
-        });
+        // // 既存のトグル処理に“高さ同期”を連動させる
+        // document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
+        //   btn.addEventListener("click", () => {
+        //     setTimeout(syncChatHeight, 180);
+        //   });
+        // });
 
         // 初回ロード時にも合わせる（DOMContentLoaded後に実行）
         setTimeout(syncChatHeight, 100);
@@ -2377,6 +2533,54 @@
         // ===============================
         // ★ ライブチャット読み込み関数（ここに追加）
         // ===============================
+
+        // ===============================
+        // ★★ 追加：絵文字を含むチャットを正しく描画する関数 ★★
+        // ===============================
+        function renderChatMessage(message) {
+          if (!message?.runs) return "";
+
+          return message.runs
+            .map((run) => {
+              if (run.text) {
+                // 通常テキスト
+                return run.text;
+              }
+
+              if (run.emoji?.image?.thumbnails?.length) {
+                // 絵文字（メンバー絵文字含む）
+                const url = run.emoji.image.thumbnails.slice(-1)[0].url;
+                const alt = run.emoji.emojiId || "";
+                return `<img src="${url}" alt="${alt}" class="chat-emoji">`;
+              }
+
+              return "";
+            })
+            .join("");
+        }
+
+        function loadLiveChat(videoFile) {
+          // ★ 引数名に合わせて統一（これがポイント）
+          const base = videoFile.replace(/\.live_chat\.json$/i, "");
+
+          const url = `/api/live-chat/${encodeURIComponent(base)}.live_chat.json`;
+
+          fetch(url)
+            .then((r) => {
+              if (!r.ok) throw new Error(`HTTP ${r.status}`);
+              return r.json();
+            })
+            .then((data) => {
+              renderLiveChat(data);
+            })
+            .catch((err) => {
+              console.warn("ライブチャットなし or 読み込み失敗:", err);
+              if (typeof clearLiveChat === "function") {
+                clearLiveChat();
+              }
+            });
+        }
+
         async function loadLiveChat(filename) {
           try {
             const chatContainer = document.getElementById("chat-messages");
@@ -2540,14 +2744,14 @@
               }
 
               // ===== コメント要素 =====
-              const msgText =
-                renderer.message?.runs?.map((r) => r.text).join("") ||
+              const msgHtml =
+                renderChatMessage(renderer.message) ||
                 renderer.message?.simpleText ||
                 "（メッセージなし）";
 
               const msgEl = document.createElement("span");
               msgEl.className = "chat-message";
-              msgEl.textContent = msgText;
+              msgEl.innerHTML = msgHtml;
 
               // ===== 組み立て（横並び）=====
               div.innerHTML = ""; // いったんクリア
@@ -2617,11 +2821,242 @@
               videoPlayer.play().catch((err) => {
                 console.error("Play failed:", err);
               });
-              loadLiveChat(video.filename);
+              const videoId = video.filename.replace(
+                /\.(mp4|mkv|webm|mov)$/i,
+                "",
+              );
+              fetch(`/info/${encodeURIComponent(videoId)}`)
+                .then((r) => r.json())
+                .then((info) => applyVideoInfo(info))
+                .catch((err) => console.error("info.json 読み込み失敗:", err));
+
+              const base = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+              loadLiveChat(base);
             });
 
             videoList.appendChild(item);
           });
+        }
+
+        function applyVideoInfo(info) {
+          // タイトル
+          document.getElementById("player-title").textContent =
+            info.title || "無題";
+
+          // ★ 概要欄
+          const descEl = document.getElementById("video-description");
+          if (info.description) {
+            descEl.textContent = info.description;
+          } else {
+            descEl.textContent = "（概要欄なし）";
+          }
+
+          // ★【追加】コメント表示の状態をリセット（重要）
+          const list = document.getElementById("comment-list");
+          const empty = document.querySelector(".comment-empty");
+
+          list.innerHTML = ""; // ← 前の動画のコメントを完全クリア
+          // list.style.display = "block"; // ← コメント欄そのものを確実に表示
+          empty.style.display = "none"; // ← 「コメントはありません」を一旦消す
+
+          // ===== ★ 重要：yt-dlp のコメント形式を UI 用に変換 =====
+          const raw = info.comments || info.comment_threads || [];
+
+          const normalized = raw
+            .map((c) => {
+              // 既に整形済みならそのまま返す
+              if (c.id && c.text) return c;
+
+              // yt-dlp 形式（comment_threads）の場合の変換
+              const top = c.comment || c;
+              return {
+                id:
+                  top.id ||
+                  top.comment_id ||
+                  Math.random().toString(36).slice(2),
+                parent: top.parent || null,
+                author: top.author || top.author_name || "不明",
+                text: top.text || top.content || "",
+                like_count: top.like_count || 0,
+                _time_text: top._time_text || "",
+                author_thumbnail: top.author_thumbnail || null,
+              };
+            })
+            .filter((c) => c.text && c.text.trim() !== "");
+
+          // ================================
+          // ★★★ 正しいコメント正規化（確定版）★★★
+          // ================================
+
+          let flatComments = [];
+
+          // パターンA：すでに UI 用の comments がある場合
+          if (Array.isArray(info.comments) && info.comments.length > 0) {
+            flatComments = info.comments;
+          }
+          // パターンB：yt-dlp の comment_threads 形式の場合
+          else if (Array.isArray(info.comment_threads)) {
+            info.comment_threads.forEach((thread) => {
+              if (!thread || !thread.comment) return;
+
+              const parent = thread.comment;
+
+              // 親コメントを追加（最低限の項目を補正）
+              flatComments.push({
+                id:
+                  parent.id ||
+                  parent.comment_id ||
+                  Math.random().toString(36).slice(2),
+                parent: parent.parent || null,
+                author: parent.author || parent.author_name || "不明",
+                text: parent.text || parent.content || "",
+                like_count: parent.like_count || 0,
+                _time_text: parent._time_text || "",
+                author_thumbnail: parent.author_thumbnail || null,
+              });
+
+              // 返信があれば追加
+              if (Array.isArray(thread.replies)) {
+                thread.replies.forEach((rep) => {
+                  if (!rep || !rep.comment) return;
+                  const r = rep.comment;
+
+                  flatComments.push({
+                    id:
+                      r.id ||
+                      r.comment_id ||
+                      Math.random().toString(36).slice(2),
+                    parent: parent.id, // ★ ここが重要（UIのツリー用）
+                    author: r.author || r.author_name || "不明",
+                    text: r.text || r.content || "",
+                    like_count: r.like_count || 0,
+                    _time_text: r._time_text || "",
+                    author_thumbnail: r.author_thumbnail || null,
+                  });
+                });
+              }
+            });
+          }
+
+          // ★★★ 重要：YouTube の "root" を親なしに正規化 ★★★
+          flatComments = flatComments.map((c) => {
+            if (c.parent === "root") {
+              return { ...c, parent: null };
+            }
+            return c;
+          });
+
+          // ★ 最終的に「確定した配列」で描画
+          renderComments(flatComments);
+          return; // ← ここで処理終了
+        }
+
+        function renderComments(comments) {
+          const list = document.getElementById("comment-list");
+          list.style.display = "block";
+          const empty = document.querySelector(".comment-empty");
+
+          list.innerHTML = "";
+
+          if (!Array.isArray(comments) || comments.length === 0) {
+            empty.style.display = "block";
+            return;
+          }
+          empty.style.display = "none";
+
+          // --- ① 親と子に分ける ---
+          const parents = comments.filter((c) => !c.parent);
+          const children = comments.filter((c) => c.parent);
+
+          // parent → [子コメント配列] のマップを作る
+          const replyMap = {};
+          children.forEach((c) => {
+            if (!replyMap[c.parent]) replyMap[c.parent] = [];
+            replyMap[c.parent].push(c);
+          });
+
+          // --- ② 親コメントを描画 ---
+          parents.forEach((parent) => {
+            const parentEl = createCommentElement(parent, false);
+            list.appendChild(parentEl);
+
+            // --- ③ その親の返信を描画 ---
+            const replies = replyMap[parent.id];
+            if (replies && replies.length > 0) {
+              const replyContainer = document.createElement("div");
+              replyContainer.className = "comment-replies";
+
+              replies.forEach((reply) => {
+                const replyEl = createCommentElement(reply, true);
+                replyContainer.appendChild(replyEl);
+              });
+
+              list.appendChild(replyContainer);
+            }
+          });
+        }
+
+        function createCommentElement(comment, isReply) {
+          const item = document.createElement("div");
+          item.className = isReply ? "comment-reply" : "comment-item";
+
+          const avatar = document.createElement("img");
+          avatar.className = "comment-avatar";
+
+          // ★ 修正版：URLが無ければ最初からダミーにする
+          avatar.src =
+            comment.author_thumbnail && comment.author_thumbnail !== ""
+              ? comment.author_thumbnail
+              : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
+
+          avatar.onerror = () => {
+            // 失敗したら安全なインライン画像に切り替え
+            avatar.src =
+              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
+          };
+
+          const body = document.createElement("div");
+          body.className = "comment-body";
+
+          const header = document.createElement("div");
+
+          const author = document.createElement("span");
+          author.className = "comment-author";
+          author.textContent = comment.author || "不明";
+
+          const time = document.createElement("span");
+          time.className = "comment-time";
+          time.textContent = comment._time_text || "";
+
+          const text = document.createElement("div");
+          text.className = "comment-text";
+          text.textContent = comment.text || "";
+
+          const likes = document.createElement("div");
+          likes.style.fontSize = "12px";
+          likes.style.color = "#aaa";
+          if (comment.like_count && comment.like_count > 0) {
+            likes.textContent = `👍 ${comment.like_count}`;
+          }
+
+          header.appendChild(author);
+          header.appendChild(time);
+
+          body.appendChild(header);
+          body.appendChild(text);
+          body.appendChild(likes);
+
+          item.appendChild(avatar);
+          item.appendChild(body);
+
+          return item;
+        }
+
+        // XSS対策
+        function escapeHtml(str) {
+          const div = document.createElement("div");
+          div.textContent = str;
+          return div.innerHTML;
         }
 
         // ======== 滑らかなシークバー同期（時間表示は維持） ========
