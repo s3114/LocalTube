@@ -20,7 +20,7 @@ set "TEMP_REMOTE_VERSION=%~dp0remote_version.txt"
 
 echo [0/6] Checking version information...
 
-powershell -NoProfile -Command "$r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; $r.Content.Trim() | Out-File -Encoding utf8 '%TEMP_REMOTE_VERSION%'"
+powershell -NoProfile -Command "$path = '%TEMP_REMOTE_VERSION%'; $dir = Split-Path -Path $path -Parent; if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory | Out-Null }; $r = Invoke-WebRequest -Uri '%REMOTE_VERSION_URL%' -UseBasicParsing; $r.Content.Trim() | Out-File -Encoding utf8 $path"
 
 if not exist "%LOCAL_VERSION_FILE%" (
   echo Local version.txt not found. Update required.
@@ -55,13 +55,14 @@ if "%NEED_UPDATE%"=="1" (
 
   echo [1/4 /6] Downloading the latest version...
 
-  powershell -Command "Invoke-WebRequest -Uri '!ZIP_URL!' -OutFile '!ZIP_FILE!'"
+  powershell -Command "$path = '!ZIP_FILE!'; $dir = Split-Path -Path $path -Parent; if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory | Out-Null }; Invoke-WebRequest -Uri '!ZIP_URL!' -OutFile $path"
   if errorlevel 1 (
     echo ERROR: Failed to download update package.
     pause
     exit /b 1
   )
 
+  if not exist "!TEMP_DIR!" mkdir "!TEMP_DIR!"
   echo [2/4 /6] Extracting files...
   powershell -Command "Expand-Archive -Force '!ZIP_FILE!' '!TEMP_DIR!'"
   if errorlevel 1 (
@@ -161,7 +162,7 @@ if exist "%SAVE_DIR%AtomicParsley.exe" (
   curl -L -o "%SAVE_DIR%AtomicParsley.zip" "https://github.com/wez/atomicparsley/releases/download/20240608.083822.1ed9031/AtomicParsleyWindows.zip" || (echo ERROR: Failed to download AtomicParsley. & pause & exit /b)
   if exist "%SAVE_DIR%AtomicParsley.zip" (
     echo Extracting AtomicParsley.zip...
-    powershell -Command "Expand-Archive -Path '%SAVE_DIR%AtomicParsley.zip' -DestinationPath '%SAVE_DIR%' -Force"
+    powershell -Command "$destPath = '%SAVE_DIR%'; Expand-Archive -Path '%SAVE_DIR%AtomicParsley.zip' -DestinationPath $destPath -Force"
     del "%SAVE_DIR%AtomicParsley.zip"
   )
 )
@@ -178,7 +179,7 @@ if exist "%SAVE_DIR%deno.exe" (
   curl -L -o "%SAVE_DIR%deno.zip" "https://github.com/denoland/deno/releases/download/v1.44.4/deno-x86_64-pc-windows-msvc.zip" || (echo ERROR: Failed to download Deno. & pause & exit /b)
   if exist "%SAVE_DIR%deno.zip" (
     echo Extracting deno.zip...
-    powershell -Command "Expand-Archive -Path '%SAVE_DIR%deno.zip' -DestinationPath '%SAVE_DIR%' -Force"
+    powershell -Command "$destPath = '%SAVE_DIR%'; Expand-Archive -Path '%SAVE_DIR%deno.zip' -DestinationPath $destPath -Force"
     del "%SAVE_DIR%deno.zip"
   )
 )
