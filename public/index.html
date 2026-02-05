@@ -838,13 +838,6 @@
         overflow-y: auto;
       }
 
-      .comment-item {
-        display: flex;
-        gap: 10px;
-        padding: 10px;
-        border-bottom: 1px solid var(--border);
-      }
-
       .comment-avatar {
         width: 36px;
         height: 36px;
@@ -1149,7 +1142,8 @@
       .comment-item {
         display: flex;
         gap: 10px;
-        margin-bottom: 12px;
+        padding: 10px;
+        border-bottom: 1px solid var(--border);
       }
 
       .comment-avatar {
@@ -1200,6 +1194,25 @@
       .comment-reply .comment-avatar {
         width: 28px;
         height: 28px;
+      }
+
+      .comment-replies.collapsed {
+        display: none;
+      }
+
+      .comment-toggle {
+        background: transparent;
+        border: none;
+        color: #8ab4ff;
+        font-size: 12px;
+        padding: 4px 0;
+        cursor: pointer;
+        margin-left: 0; /* ← 変更 */
+        margin-top: 6px; /* ← 追加（本文との間隔） */
+      }
+
+      .comment-toggle:hover {
+        text-decoration: underline;
       }
     </style>
     <link
@@ -3048,20 +3061,55 @@
           // --- ② 親コメントを描画 ---
           parents.forEach((parent) => {
             const parentEl = createCommentElement(parent, false);
-            list.appendChild(parentEl);
+
+            // ===== ★ 折りたたみボタン（← 区切れ線の“前”に出す）★ =====
+            const replies = replyMap[parent.id];
+            let toggleBtn = null;
+
+            if (replies && replies.length > 0) {
+              toggleBtn = document.createElement("button");
+              toggleBtn.className = "comment-toggle";
+              toggleBtn.textContent = `返信${replies.length}件 ▼`;
+              toggleBtn.dataset.parentId = parent.id;
+
+              toggleBtn.addEventListener("click", () => {
+                const container = document.getElementById(
+                  "replies-" + toggleBtn.dataset.parentId,
+                );
+
+                if (!container) return;
+
+                const isCollapsed = container.classList.toggle("collapsed");
+
+                toggleBtn.textContent = isCollapsed
+                  ? `返信${replies.length}件 ▼`
+                  : `返信${replies.length}件 ▲`;
+              });
+            }
+
+            // ★★★【修正版：ボタンを“コメントの中”に入れる】★★★
+            list.appendChild(parentEl); // ① まず親コメントを追加
+
+            if (toggleBtn) {
+              const body = parentEl.querySelector(".comment-body");
+              body.appendChild(toggleBtn); // ← ★ 親コメントの本文エリアの末尾に入れる
+            }
 
             // --- ③ その親の返信を描画 ---
-            const replies = replyMap[parent.id];
+            // const replies = replyMap[parent.id];
             if (replies && replies.length > 0) {
               const replyContainer = document.createElement("div");
               replyContainer.className = "comment-replies";
+              replyContainer.id = "replies-" + parent.id;
 
               replies.forEach((reply) => {
                 const replyEl = createCommentElement(reply, true);
                 replyContainer.appendChild(replyEl);
               });
 
-              list.appendChild(replyContainer);
+              replyContainer.classList.add("collapsed");
+              const body = parentEl.querySelector(".comment-body");
+              body.appendChild(replyContainer);
             }
           });
         }
