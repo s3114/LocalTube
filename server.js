@@ -628,6 +628,151 @@ async function processDownloadJob(job) {
           const dest = path.join(jobPendingDir, infoFile);
 
           if (fs.existsSync(src)) {
+            // ===== ★ ここで info.json を読み込んで書き換える（仮置き直前） =====
+            // ===== ★ ここで info.json を読み込んで書き換える（仮置き直前） =====
+            try {
+              const infoRaw = fs.readFileSync(src, "utf-8");
+              const infoObj = JSON.parse(infoRaw);
+
+              let channelThumbUrl = null;
+
+              // ★【唯一の正解】チャンネルURLに対して yt-dlp -J を実行
+              if (typeof infoObj.channel_url === "string") {
+                try {
+                  const { execSync } = require("child_process");
+
+                  console.log(
+                    "[INFO EDIT] チャンネル情報を取得:",
+                    infoObj.channel_url,
+                  );
+
+                  let channelArgs = [
+                    "-J",
+                    "--no-playlist",
+                    "--playlist-items",
+                    "0",
+                  ];
+
+                  // ★ 先にCookieを入れる（重要）
+                  if (job.cookieFile?.path) {
+                    channelArgs.push("--cookies", job.cookieFile.path);
+                  } else if (settings && settings.selectedBrowser) {
+                    channelArgs.push(
+                      "--cookies-from-browser",
+                      settings.selectedBrowser,
+                    );
+                  }
+
+                  // ★ 最後にURLを追加（これが正しい並び）
+                  channelArgs.push(infoObj.channel_url);
+
+                  // ③ どちらも無ければ Cookie 引数なし
+
+                  const channelJson = execSync(
+                    `"${path.join(__dirname, "yt-dlp.exe")}" ${channelArgs
+                      .map((a) => `"${a}"`)
+                      .join(" ")}`,
+                    { encoding: "utf-8", timeout: 45000 },
+                  );
+
+                  // ===== ★ チャンネル情報JSONを丸ごと保存 ★ =====
+                  try {
+                    const channelSaveDir = path.join(
+                      downloadsDir,
+                      "チャンネル",
+                    );
+
+                    // フォルダが無ければ作成
+                    fs.mkdirSync(channelSaveDir, { recursive: true });
+
+                    const channelObj = JSON.parse(channelJson);
+
+                    // info.json と同じベース名で保存
+                    const channelJsonPath = path.join(
+                      channelSaveDir,
+                      channelObj.channel_id + ".channel.json",
+                    );
+
+                    fs.writeFileSync(channelJsonPath, channelJson, "utf-8");
+
+                    console.log(
+                      "[INFO EDIT] チャンネルJSONを保存:",
+                      channelJsonPath,
+                    );
+                  } catch (err) {
+                    console.error(
+                      "[INFO EDIT] チャンネルJSONの保存に失敗:",
+                      err.message,
+                    );
+                  }
+                  // ===============================================
+
+                  const channelObj = JSON.parse(channelJson);
+
+                  // ★★★ ここから：avatar_uncropped を明示的に取得 ★★★
+                  let foundAvatar = null;
+
+                  if (Array.isArray(channelObj.thumbnails)) {
+                    // ① まず avatar_uncropped を探す（最優先）
+                    foundAvatar = channelObj.thumbnails.find(
+                      (t) => t.id === "avatar_uncropped",
+                    );
+
+                    // ② 万が一なければ、preference が一番高いものを探す（保険）
+                    if (!foundAvatar) {
+                      foundAvatar = channelObj.thumbnails.reduce(
+                        (best, cur) => {
+                          if (!best) return cur;
+                          if (
+                            typeof cur.preference === "number" &&
+                            typeof best.preference === "number"
+                          ) {
+                            return cur.preference > best.preference
+                              ? cur
+                              : best;
+                          }
+                          return best;
+                        },
+                        null,
+                      );
+                    }
+
+                    // ③ それでもダメなら先頭（最終フォールバック）
+                    if (!foundAvatar && channelObj.thumbnails.length > 0) {
+                      foundAvatar = channelObj.thumbnails[0];
+                    }
+                  }
+
+                  if (foundAvatar && foundAvatar.url) {
+                    channelThumbUrl = foundAvatar.url;
+                    console.log(
+                      "[INFO EDIT] channel_thumbnail（avatar_uncropped）を取得:",
+                      channelThumbUrl,
+                    );
+                  }
+                } catch (err) {
+                  console.error(
+                    "[INFO EDIT] チャンネル情報取得に失敗:",
+                    err.message,
+                  );
+                }
+              }
+
+              // ★ 取得できた場合のみ追加（ここ以外からは取らない）
+              if (channelThumbUrl) {
+                infoObj.channel_thumbnail = channelThumbUrl;
+              } else {
+                console.log(
+                  "[INFO EDIT] channel_thumbnail を取得できませんでした",
+                );
+              }
+
+              // 上書き保存（同じパスに書き戻す）
+              fs.writeFileSync(src, JSON.stringify(infoObj, null, 2), "utf-8");
+            } catch (e) {
+              console.error("[INFO EDIT] info.json の書き換えに失敗:", e);
+            }
+
             fs.renameSync(src, dest);
             console.log("仮置きへ移動（info）:", dest);
           } else {
