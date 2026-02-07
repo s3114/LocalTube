@@ -1171,6 +1171,8 @@
         cursor: pointer;
         transition: background 0.1s linear;
         transform: translateY(-3px); /* ← ここで高さ調整 */
+        padding: 8px 0; /* ★ 上下の当たり判定を拡大 */
+        background-clip: content-box; /* ★ padding部分を透明に */
       }
 
       /* ===== 音量スライダー：ホバー時のみ表示 ===== */
@@ -1269,6 +1271,7 @@
 
       #seek-bar:hover {
         background: rgba(255, 255, 255, 0.35);
+        background-clip: content-box; /* ★ ホバー時もpadding部分を透明に */
       }
 
       #seek-bar:hover::-webkit-slider-thumb {
