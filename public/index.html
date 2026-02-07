@@ -1606,6 +1606,12 @@
                     <span id="channel-subs"></span>
                   </div>
                 </div>
+                <!-- ★ 動画統計情報（右寄せ） -->
+                <div class="video-stats" style="margin-left: auto; display: flex; gap: 16px; color: #aaa; font-size: 14px; align-items: center;">
+                    <div title="高評価数">
+                        <i class="fa-regular fa-thumbs-up"></i> <span id="stat-likes"></span>
+                    </div>
+                </div>
               </div>
 
               <div id="video-description" class="yt-description collapsed">
@@ -3251,16 +3257,61 @@
           channelHandle.textContent = info.uploader_id;
 
           // 登録者数
-          channelSubs.textContent = `${info.channel_follower_count}人 登録`;
+          let subText = "";
+          const subCount = info.channel_follower_count;
+          if (typeof subCount === 'number') {
+              if (subCount < 10000) {
+                  subText = `${subCount}人`;
+              } else {
+                  // 1.12万人 -> 1.1万人
+                  const v = Math.floor(subCount / 1000) / 10;
+                  subText = `${v}万人`;
+              }
+          } else {
+              subText = "登録者数不明"; 
+          }
+          channelSubs.textContent = `${subText} 登録`;
+
+          // ★ 動画統計情報の更新（高評価のみ）
+          const statLikes = document.getElementById("stat-likes");
+          // const statViews = document.getElementById("stat-views"); // 削除
+          // const statDate = document.getElementById("stat-date");   // 削除
+
+          if (statLikes) statLikes.textContent = info.like_count ? info.like_count.toLocaleString() : "---";
+          
+          // ★ 概要欄の冒頭に「視聴回数」「投稿日」を表示するための文字列作成
+          let statsHeader = "";
+
+          // 視聴回数
+          if (info.view_count) {
+             statsHeader += `<b>${info.view_count.toLocaleString()}回視聴</b>`;
+          } else {
+             statsHeader += `<b>視聴回数不明</b>`;
+          }
+
+          // 投稿日
+          if (info.upload_date) {
+            const d = info.upload_date;
+            let dateStr = d;
+            if (d.length === 8) {
+                dateStr = `${d.substring(0, 4)}/${d.substring(4, 6)}/${d.substring(6, 8)}`;
+            }
+            statsHeader += ` • <b>${dateStr}</b>`; // 中黒でつなぐ
+          }
 
           // ★ 概要欄（URLリンク化版）
           const descEl = document.getElementById("video-description");
+          let descContent = "";
+          
           if (info.description) {
             // URLをリンク化しつつ、改行も保持
-            descEl.innerHTML = linkify(info.description);
+            descContent = linkify(info.description);
           } else {
-            descEl.textContent = "（概要欄なし）";
+            descContent = "（概要欄なし）";
           }
+          
+          // 冒頭に結合
+          descEl.innerHTML = `${statsHeader}<br><br>${descContent}`;
 
           // ★★★ 折りたたみ処理の再判定（あなたが既に入れたもの）★★★
           descEl.classList.add("collapsed");
