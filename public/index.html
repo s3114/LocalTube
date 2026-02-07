@@ -707,7 +707,57 @@
         transform: rotate(-90deg);
       }
 
-      /* ===== 折りたたみ時の状態 ===== */
+      /* ===== 並び替えメニュー ===== */
+      .sort-btn {
+        background: transparent;
+        border: none;
+        color: var(--subtext);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 4px;
+      }
+      .sort-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text);
+      }
+      
+      .sort-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: #282828;
+        border-radius: 12px;
+        padding: 8px 0;
+        width: 150px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+        margin-top: 4px;
+      }
+      .sort-menu.hidden {
+        display: none;
+      }
+      
+      .sort-item {
+        padding: 10px 16px;
+        font-size: 14px;
+        color: var(--text);
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .sort-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .sort-item.active {
+        background: rgba(255, 255, 255, 0.2);
+        font-weight: bold;
+      }
+
+      /* ===== ローカル動画アイテム ===== */
       .player-sidebar.collapsed {
         padding: 10px 8px;
       }
@@ -1622,7 +1672,20 @@
 
               <div class="comment-section">
                 <div class="comment-header">
-                  <span id="comment-count-display"></span> 件のコメント
+                  <div style="display: flex; align-items: center; gap: 20px;">
+                    <div><span id="comment-count-display"></span> 件のコメント</div>
+                    
+                    <!-- ★ 並び替えボタン -->
+                    <div class="sort-container" style="position: relative;">
+                        <button id="sort-toggle" class="sort-btn">
+                            <i class="fa-solid fa-arrow-down-short-wide"></i> 並び替え
+                        </button>
+                        <div id="sort-menu" class="sort-menu hidden">
+                            <div class="sort-item" data-sort="popular">人気順</div>
+                            <div class="sort-item active" data-sort="newest">新しい順</div>
+                        </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="comment-empty" style="display: none">
@@ -3332,10 +3395,14 @@
           // ===== ★ 重要：yt-dlp のコメント形式を UI 用に変換 =====
           const raw = info.comments || info.comment_threads || [];
 
-          const normalized = raw
+          // グローバル変数として保持して、並び替え時に再利用する
+          window.currentVideoComments = raw
             .map((c) => {
               // 既に整形済みならそのまま返す
-              if (c.id && c.text) return c;
+              if (c.id && c.text) {
+                if (c.parent === 'root') c.parent = null; // ★ ここでも直す
+                return c;
+              }
 
               // yt-dlp 形式（comment_threads）の場合の変換
               const top = c.comment || c;
@@ -3344,80 +3411,28 @@
                   top.id ||
                   top.comment_id ||
                   Math.random().toString(36).slice(2),
-                parent: top.parent || null,
+                parent: (() => {
+                  const p = top.parent;
+                  // console.log("id:", top.id, "raw parent:", p); // デバッグ用
+                  if (p === 'root') return null;
+                  return p || null;
+                })(),
                 author: top.author || top.author_name || "不明",
                 text: top.text || top.content || "",
                 like_count: top.like_count || 0,
                 _time_text: top._time_text || "",
                 author_thumbnail: top.author_thumbnail || null,
+                timestamp: top.timestamp || 0, // ★ ソート用
+                is_pinned: top.is_pinned || false, // ★ ピン止め用
               };
             })
             .filter((c) => c.text && c.text.trim() !== "");
 
-          // ================================
-          // ★★★ 正しいコメント正規化（確定版）★★★
-          // ================================
 
-          let flatComments = [];
-
-          // パターンA：すでに UI 用の comments がある場合
-          if (Array.isArray(info.comments) && info.comments.length > 0) {
-            flatComments = info.comments;
-          }
-          // パターンB：yt-dlp の comment_threads 形式の場合
-          else if (Array.isArray(info.comment_threads)) {
-            info.comment_threads.forEach((thread) => {
-              if (!thread || !thread.comment) return;
-
-              const parent = thread.comment;
-
-              // 親コメントを追加（最低限の項目を補正）
-              flatComments.push({
-                id:
-                  parent.id ||
-                  parent.comment_id ||
-                  Math.random().toString(36).slice(2),
-                parent: parent.parent || null,
-                author: parent.author || parent.author_name || "不明",
-                text: parent.text || parent.content || "",
-                like_count: parent.like_count || 0,
-                _time_text: parent._time_text || "",
-                author_thumbnail: parent.author_thumbnail || null,
-              });
-
-              // 返信があれば追加
-              if (Array.isArray(thread.replies)) {
-                thread.replies.forEach((rep) => {
-                  if (!rep || !rep.comment) return;
-                  const r = rep.comment;
-
-                  flatComments.push({
-                    id:
-                      r.id ||
-                      r.comment_id ||
-                      Math.random().toString(36).slice(2),
-                    parent: parent.id, // ★ ここが重要（UIのツリー用）
-                    author: r.author || r.author_name || "不明",
-                    text: r.text || r.content || "",
-                    like_count: r.like_count || 0,
-                    _time_text: r._time_text || "",
-                    author_thumbnail: r.author_thumbnail || null,
-                  });
-                });
-              }
-            });
-          }
-
-          // ★★★ 重要：YouTube の "root" を親なしに正規化 ★★★
-          flatComments = flatComments.map((c) => {
-            if (c.parent === "root") {
-              return { ...c, parent: null };
-            }
-            return c;
-          });
 
           // ★ 最終的に「確定した配列」で描画
-          renderComments(flatComments);
+          // ★ 最終的に「確定した配列」で描画
+          renderComments(window.currentVideoComments);
           return; // ← ここで処理終了
         }
 
@@ -3425,6 +3440,8 @@
           const list = document.getElementById("comment-list");
           const countDisplay = document.getElementById("comment-count-display");
           
+          if (!list) return;
+
           list.style.display = "block";
           const empty = document.querySelector(".comment-empty");
 
@@ -3436,10 +3453,10 @@
           }
 
           if (!Array.isArray(comments) || comments.length === 0) {
-            empty.style.display = "block";
+            if (empty) empty.style.display = "block";
             return;
           }
-          empty.style.display = "none";
+          if (empty) empty.style.display = "none";
 
           // --- ① 親と子に分ける ---
           const parents = comments.filter((c) => !c.parent);
@@ -3644,6 +3661,32 @@
           return item;
         }
 
+        // URLをリンク化
+        function linkify(text) {
+          const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+          return text.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+        }
+
+        // YouTubeチャットメッセージのレンダリング（runs対応）
+        function renderChatMessage(message) {
+          if (!message) return "";
+          if (message.simpleText) return escapeHtml(message.simpleText);
+          
+          if (message.runs) {
+            return message.runs.map(run => {
+              if (run.text) return escapeHtml(run.text);
+              if (run.emoji) {
+                // 絵文字の場合
+                const url = run.emoji.image.thumbnails[0]?.url;
+                const alt = run.emoji.image.accessibility?.accessibilityData?.label || "emoji";
+                return url ? `<img src="${url}" alt="${alt}" class="chat-emoji" style="width:16px;height:16px;vertical-align:middle;">` : "";
+              }
+              return "";
+            }).join("");
+          }
+          return "";
+        }
+
         // XSS対策
         function escapeHtml(str) {
           const div = document.createElement("div");
@@ -3755,6 +3798,54 @@
             setTimeout(syncChatHeight, 180);
           });
         });
+
+        // ===== ★ コメント並び替えロジック =====
+        const sortToggle = document.getElementById("sort-toggle");
+        const sortMenu = document.getElementById("sort-menu");
+        const sortItems = document.querySelectorAll(".sort-item");
+
+        if (sortToggle && sortMenu) {
+            // メニュー開閉
+            sortToggle.addEventListener("click", (e) => {
+                e.stopPropagation();
+                sortMenu.classList.toggle("hidden");
+            });
+
+            // 外部クリックで閉じる
+            document.addEventListener("click", (e) => {
+                if (!sortToggle.contains(e.target) && !sortMenu.contains(e.target)) {
+                    sortMenu.classList.add("hidden");
+                }
+            });
+
+            // 並び替え実行
+            sortItems.forEach(item => {
+                item.addEventListener("click", () => {
+                    const sortType = item.dataset.sort;
+                    
+                    // アクティブ表示の切り替え
+                    sortItems.forEach(i => i.classList.remove("active"));
+                    item.classList.add("active");
+                    
+                    sortMenu.classList.add("hidden");
+
+                    if (!window.currentVideoComments || window.currentVideoComments.length === 0) return;
+
+                    // 並び替え処理
+                    let sorted = [...window.currentVideoComments];
+                    if (sortType === "popular") {
+                        // いいね数順（降順）
+                        sorted.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
+                    } else if (sortType === "newest") {
+                        // 新しい順（降順）
+                        sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                    }
+
+                    // 再描画
+                    renderComments(sorted);
+                });
+            });
+        }
 
         // === 追加ボタンの動作 ===
         const btnRew5 = document.getElementById("btn-rew5");
