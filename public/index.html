@@ -855,42 +855,110 @@
         text-decoration: underline;
       }
 
-      /* ===== コメント欄 ===== */
-      .comment-content {
-        max-height: 400px;
-        overflow-y: auto;
+      /* ===== コメント欄（YouTube風） ===== */
+      .comment-section {
+        margin-top: 24px;
+        padding-top: 0;
+        border-top: none; /* YouTubeは区切り線なし */
+      }
+
+      .comment-header {
+        font-weight: bold;
+        font-size: 20px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .comment-count {
+        color: var(--subtext);
+        font-weight: normal;
+        font-size: 16px;
+      }
+
+      .comment-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* 個々のコメントアイテム */
+      .comment-item,
+      .comment-reply {
+        display: flex;
+        gap: 16px;
+        padding: 0; /* ボーダーやパディングはなくす */
+        border-bottom: none;
+        align-items: flex-start;
       }
 
       .comment-avatar {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+        background-color: #222;
+      }
+
+      /* 返信のアイコンは少し小さい */
+      .comment-reply .comment-avatar {
+        width: 24px;
+        height: 24px;
       }
 
       .comment-body {
         flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0; /* テキスト折り返し用 */
+      }
+
+      /* ヘッダー行（名前 + 時間） */
+      .comment-meta {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        font-size: 13px;
+        line-height: 1.4;
       }
 
       .comment-author {
-        font-weight: bold;
-        font-size: 13px;
+        font-weight: 600;
+        color: #f1f1f1;
+        text-decoration: none;
+        margin-right: 4px;
+      }
+      
+      .comment-author:hover {
+        /* YouTubeは名前ホバーしても特に変わらないが、リンクならアンダーライン */
+        /* text-decoration: underline; */
       }
 
       .comment-time {
         color: var(--subtext);
         font-size: 12px;
       }
+      
+      .comment-time:hover {
+        color: var(--text); /* YouTubeはホバーで白くなる */
+      }
 
+      /* コメント本文 */
       .comment-text {
-        margin-top: 4px;
-        white-space: pre-wrap;
         font-size: 14px;
+        line-height: 1.4;
+        color: var(--text);
+        white-space: pre-wrap;
+        margin-top: 2px;
       }
 
       /* ===== コメント本文の折りたたみ ===== */
       .comment-text.clamped {
         display: -webkit-box;
-        -webkit-line-clamp: 5; /* ★ 5行まで表示 */
+        -webkit-line-clamp: 4; /* YouTubeは4行くらい */
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
@@ -898,15 +966,61 @@
       .comment-more {
         background: transparent;
         border: none;
-        color: #8ab4ff;
+        color: var(--subtext); /* YouTubeはグレー */
+        font-weight: bold;
         font-size: 12px;
-        padding: 4px 0 0 0;
+        padding: 4px 0;
         cursor: pointer;
+        align-self: flex-start;
+        margin-top: 4px;
       }
 
       .comment-more:hover {
-        text-decoration: underline;
+        text-decoration: underline; /* YouTubeはホバーで下線かも */
       }
+
+      /* アクションボタン群（高評価・低評価・返信） */
+      .comment-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px; /* ボタン間の隙間 */
+        margin-top: 4px;
+      }
+
+      .action-btn {
+        background: transparent;
+        border: none;
+        color: var(--text);
+        font-size: 12px;
+        padding: 6px 8px; /* ヒットエリア確保 */
+        border-radius: 18px; /* 丸み */
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.1s;
+      }
+
+      .action-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      
+      .action-btn i {
+        font-size: 14px; /* アイコンサイズ */
+      }
+
+      .comment-replies {
+        margin-left: 56px; /* アイコン40px + gap 16px */
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .comment-reply {
+         /* 返信自体も gap: 16px だが、親からのマージン等は comment-replies で制御 */
+      }
+
 
       /* ローカル動画一覧 */
       .local-video-item {
@@ -1252,15 +1366,21 @@
         background: transparent;
         border: none;
         color: #8ab4ff;
-        font-size: 12px;
-        padding: 4px 0;
+        font-size: 14px; /* 少し大きく */
+        padding: 6px 8px; /* ヒットエリア広げる */
         cursor: pointer;
-        margin-left: 0; /* ← 変更 */
-        margin-top: 6px; /* ← 追加（本文との間隔） */
+        margin-left: 0; /* ★ 左寄せを明示 */
+        margin-top: 6px;
+        display: flex;
+        font-weight: 500;
+        align-self: flex-start; /* Flexアイテムとして左寄せ */
+        border-radius: 18px;
       }
 
       .comment-toggle:hover {
-        text-decoration: underline;
+        background: rgba(62, 166, 255, 0.2); /* YouTube風のホバー背景 */
+        border-radius: 18px;
+        text-decoration: none; /* 下線なし */
       }
 
       .channel-info {
@@ -1455,8 +1575,13 @@
               </div>
             </div>
             <div class="yt-info">
-              <div id="player-title" class="yt-title">
-                動画を選択してください
+              <div class="video-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <div id="player-title" class="yt-title">
+                  動画を選択してください
+                </div>
+                <a id="youtube-link-btn" href="#" target="_blank" class="yt-btn" style="display: none; color: #ff0000;" title="YouTubeで見る">
+                  <i class="fa-brands fa-youtube" style="font-size: 24px;"></i>
+                </a>
               </div>
 
               <div id="channel-info" class="channel-row">
@@ -1490,7 +1615,9 @@
               <button id="desc-toggle">もっと見る</button>
 
               <div class="comment-section">
-                <div class="comment-header">💬 コメント</div>
+                <div class="comment-header">
+                  <span id="comment-count-display"></span> 件のコメント
+                </div>
 
                 <div class="comment-empty" style="display: none">
                   コメントはありません
@@ -1598,6 +1725,7 @@
                   </option>
                 </select>
               </div>
+
 
               <div class="field-row">
                 <div class="field-label">ｺﾒﾝﾄ：</div>
@@ -3072,6 +3200,7 @@
         function applyVideoInfo(info) {
           // タイトル
           const titleEl = document.getElementById("player-title");
+          const youtubeBtn = document.getElementById("youtube-link-btn");
 
           if (info.title && info.title.trim() !== "") {
             titleEl.textContent = info.title;
@@ -3083,6 +3212,14 @@
             );
           } else {
             titleEl.textContent = "無題";
+          }
+
+          // ★ YouTubeリンクボタンの更新
+          if (info.id) {
+            youtubeBtn.href = `https://www.youtube.com/watch?v=${info.id}`;
+            youtubeBtn.style.display = "inline-flex";
+          } else {
+            youtubeBtn.style.display = "none";
           }
 
           // ===== YouTube風：チャンネル情報（横並び＋アイコン）=====
@@ -3235,10 +3372,17 @@
 
         function renderComments(comments) {
           const list = document.getElementById("comment-list");
+          const countDisplay = document.getElementById("comment-count-display");
+          
           list.style.display = "block";
           const empty = document.querySelector(".comment-empty");
 
           list.innerHTML = "";
+
+          // ★ コメント件数を更新
+          if (countDisplay) {
+            countDisplay.textContent = comments ? comments.length : 0;
+          }
 
           if (!Array.isArray(comments) || comments.length === 0) {
             empty.style.display = "block";
@@ -3332,88 +3476,118 @@
           const item = document.createElement("div");
           item.className = isReply ? "comment-reply" : "comment-item";
 
+          // --- アバター（リンク付き） ---
+          const avatarLink = document.createElement("a");
+          avatarLink.href = "#"; // チャンネルURLがあれば入れるが、現状はないことが多いので#
+          avatarLink.className = "comment-avatar-link";
+          
           const avatar = document.createElement("img");
           avatar.className = "comment-avatar";
+          avatar.loading = "lazy";
 
-          // ★ 修正版：URLが無ければ最初からダミーにする
+          // URLが無ければフォールバック
           avatar.src =
             comment.author_thumbnail && comment.author_thumbnail !== ""
               ? comment.author_thumbnail
               : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
 
           avatar.onerror = () => {
-            // 失敗したら安全なインライン画像に切り替え
             avatar.src =
               "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
           };
+          
+          avatarLink.appendChild(avatar);
 
+          // --- ボディ部分 ---
           const body = document.createElement("div");
           body.className = "comment-body";
 
-          const header = document.createElement("div");
+          // 1. ヘッダー（名前 + 時間）
+          const meta = document.createElement("div");
+          meta.className = "comment-meta";
 
-          const author = document.createElement("span");
+          const author = document.createElement("span"); // YouTubeは名前クリックで飛べるが、spanにしておく
           author.className = "comment-author";
-          author.textContent = comment.author || "不明";
+          author.textContent = comment.author || "@Unknown";
 
           const time = document.createElement("span");
           time.className = "comment-time";
+          // YouTubeは「1年前」などの相対時間だが、ここでは元のテキストを使う
+          // ホバーで絶対時間を出せるとベスト
           time.textContent = comment._time_text || "";
 
+          meta.appendChild(author);
+          meta.appendChild(time);
+
+          // 2. 本文
           const text = document.createElement("div");
           text.className = "comment-text";
           text.innerHTML = comment.text ? linkify(comment.text) : "";
 
-          const likes = document.createElement("div");
-          likes.style.fontSize = "12px";
-          likes.style.color = "#aaa";
-          if (comment.like_count && comment.like_count > 0) {
-            likes.textContent = `👍 ${comment.like_count}`;
+          // 3. アクションボタン（高評価、返信）※低評価は削除
+          const actions = document.createElement("div");
+          actions.className = "comment-actions";
+
+          // Like
+          const btnLike = document.createElement("button");
+          btnLike.className = "action-btn";
+          btnLike.title = "高評価";
+          
+          let likeCountText = "";
+          if (comment.like_count > 0) {
+             // 1000以上を 1.2K とかにするのは別途関数が必要だが、一旦そのまま
+             likeCountText = comment.like_count;
           }
+          
+          btnLike.innerHTML = `<i class="fa-regular fa-thumbs-up"></i> ${likeCountText}`;
+          
+          // Dislike は削除
 
-          header.appendChild(author);
-          header.appendChild(time);
+          // Reply
+          const btnReply = document.createElement("button");
+          btnReply.className = "action-btn";
+          btnReply.textContent = "返信";
+          
+          actions.appendChild(btnLike);
+          // actions.appendChild(btnDislike); // 削除
+          actions.appendChild(btnReply);
 
-          body.appendChild(header);
+          // --- 組み立て ---
+          body.appendChild(meta);
           body.appendChild(text);
-          body.appendChild(likes);
-
-          item.appendChild(avatar);
-          item.appendChild(body);
-
-          // ===== ★ コメント長文の「もっと見る」処理 ★ =====
+          // コメント本文が長すぎる場合の「もっと見る」ボタン（後で判定）
           const moreBtn = document.createElement("button");
           moreBtn.className = "comment-more";
-          moreBtn.textContent = "もっと見る ▼";
-          moreBtn.style.display = "none"; // 初期は隠す
+          moreBtn.textContent = "もっと見る";
+          moreBtn.style.display = "none";
+          body.appendChild(moreBtn);
+          
+          body.appendChild(actions);
 
-          // 一旦 body に入れてから高さ判定する（重要）
-          text.after(moreBtn);
+          item.appendChild(avatarLink);
+          item.appendChild(body);
 
-          // ★★★ 修正版：確実に5行判定できる版 ★★★
+          // ===== ★ コメント長文の「もっと見る」判定（以前と同じロジック） ★ =====
           requestAnimationFrame(() => {
             // line-height が "normal" の場合の保険
             let lineHeight = parseFloat(getComputedStyle(text).lineHeight);
-            if (isNaN(lineHeight)) lineHeight = 18; // ← フォールバック
+            if (isNaN(lineHeight)) lineHeight = 19.6; // 14px * 1.4
 
-            const maxHeight = lineHeight * 5; // 5行分の高さ
+            const maxHeight = lineHeight * 4; // 4行分
 
             // 一度クランプを外して正確に測る（重要）
             text.classList.remove("clamped");
 
-            requestAnimationFrame(() => {
-              if (text.scrollHeight > maxHeight) {
-                text.classList.add("clamped"); // 5行に制限
-                moreBtn.style.display = "block"; // ★ ボタン表示
-              }
-            });
+            if (text.scrollHeight > maxHeight + 5) { // 誤差許容
+               text.classList.add("clamped"); 
+               moreBtn.style.display = "block"; 
+            }
           });
 
           // ボタンクリックで開閉
           moreBtn.addEventListener("click", () => {
-            const isClamped = text.classList.toggle("clamped");
-
-            moreBtn.textContent = isClamped ? "続きを見る ▼" : "一部を表示 ▲";
+             const isClamped = text.classList.toggle("clamped");
+             moreBtn.textContent = isClamped ? "もっと見る" : "一部を表示";
           });
 
           return item;
