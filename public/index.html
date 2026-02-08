@@ -725,7 +725,7 @@
         background: rgba(255, 255, 255, 0.1);
         color: var(--text);
       }
-      
+
       .sort-menu {
         position: absolute;
         top: 100%;
@@ -741,7 +741,7 @@
       .sort-menu.hidden {
         display: none;
       }
-      
+
       .sort-item {
         padding: 10px 16px;
         font-size: 14px;
@@ -981,7 +981,7 @@
         text-decoration: none;
         margin-right: 4px;
       }
-      
+
       .comment-author:hover {
         /* YouTubeは名前ホバーしても特に変わらないが、リンクならアンダーライン */
         /* text-decoration: underline; */
@@ -991,7 +991,7 @@
         color: var(--subtext);
         font-size: 12px;
       }
-      
+
       .comment-time:hover {
         color: var(--text); /* YouTubeはホバーで白くなる */
       }
@@ -1054,7 +1054,7 @@
       .action-btn:hover {
         background: rgba(255, 255, 255, 0.1);
       }
-      
+
       .action-btn i {
         font-size: 14px; /* アイコンサイズ */
       }
@@ -1066,11 +1066,10 @@
         flex-direction: column;
         gap: 8px;
       }
-      
-      .comment-reply {
-         /* 返信自体も gap: 16px だが、親からのマージン等は comment-replies で制御 */
-      }
 
+      .comment-reply {
+        /* 返信自体も gap: 16px だが、親からのマージン等は comment-replies で制御 */
+      }
 
       /* ローカル動画一覧 */
       .local-video-item {
@@ -1628,12 +1627,27 @@
               </div>
             </div>
             <div class="yt-info">
-              <div class="video-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+              <div
+                class="video-header-row"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  gap: 10px;
+                "
+              >
                 <div id="player-title" class="yt-title">
                   動画を選択してください
                 </div>
-                <a id="youtube-link-btn" href="#" target="_blank" class="yt-btn" style="display: none; color: #ff0000;" title="YouTubeで見る">
-                  <i class="fa-brands fa-youtube" style="font-size: 24px;"></i>
+                <a
+                  id="youtube-link-btn"
+                  href="#"
+                  target="_blank"
+                  class="yt-btn"
+                  style="display: none; color: #ff0000"
+                  title="YouTubeで見る"
+                >
+                  <i class="fa-brands fa-youtube" style="font-size: 24px"></i>
                 </a>
               </div>
 
@@ -1660,10 +1674,21 @@
                   </div>
                 </div>
                 <!-- ★ 動画統計情報（右寄せ） -->
-                <div class="video-stats" style="margin-left: auto; display: flex; gap: 16px; color: #aaa; font-size: 14px; align-items: center;">
-                    <div title="高評価数">
-                        <i class="fa-regular fa-thumbs-up"></i> <span id="stat-likes"></span>
-                    </div>
+                <div
+                  class="video-stats"
+                  style="
+                    margin-left: auto;
+                    display: flex;
+                    gap: 16px;
+                    color: #aaa;
+                    font-size: 14px;
+                    align-items: center;
+                  "
+                >
+                  <div title="高評価数">
+                    <i class="fa-regular fa-thumbs-up"></i>
+                    <span id="stat-likes"></span>
+                  </div>
                 </div>
               </div>
 
@@ -1675,18 +1700,23 @@
 
               <div class="comment-section">
                 <div class="comment-header">
-                  <div style="display: flex; align-items: center; gap: 20px;">
-                    <div><span id="comment-count-display"></span> 件のコメント</div>
-                    
+                  <div style="display: flex; align-items: center; gap: 20px">
+                    <div>
+                      <span id="comment-count-display"></span> 件のコメント
+                    </div>
+
                     <!-- ★ 並び替えボタン -->
-                    <div class="sort-container" style="position: relative;">
-                        <button id="sort-toggle" class="sort-btn">
-                            <i class="fa-solid fa-arrow-down-short-wide"></i> 並び替え
-                        </button>
-                        <div id="sort-menu" class="sort-menu hidden">
-                            <div class="sort-item" data-sort="popular">人気順</div>
-                            <div class="sort-item active" data-sort="newest">新しい順</div>
+                    <div class="sort-container" style="position: relative">
+                      <button id="sort-toggle" class="sort-btn">
+                        <i class="fa-solid fa-arrow-down-short-wide"></i>
+                        並び替え
+                      </button>
+                      <div id="sort-menu" class="sort-menu hidden">
+                        <div class="sort-item" data-sort="popular">人気順</div>
+                        <div class="sort-item active" data-sort="newest">
+                          新しい順
                         </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1797,7 +1827,6 @@
                   </option>
                 </select>
               </div>
-
 
               <div class="field-row">
                 <div class="field-label">ｺﾒﾝﾄ：</div>
@@ -1910,25 +1939,10 @@
                     >再度同じ動画がダウンロードされないようになります。</small
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <button
-                    id="clearHistoryBtn"
-                    style="
-                      background: #333;
-                      border: 1px solid var(--border);
-                      color: var(--text);
-                      padding: 8px 12px;
-                      border-radius: 8px;
-                      cursor: pointer;
-                    "
-                  >
-                    履歴を削除
-                  </button>
-                  <label class="switch">
-                    <input type="checkbox" id="optHistory" checked />
-                    <span class="slider"></span>
-                  </label>
-                </div>
+                <label class="switch">
+                  <input type="checkbox" id="optHistory" checked />
+                  <span class="slider"></span>
+                </label>
               </div>
               <div class="toggle">
                 <div>
@@ -2016,9 +2030,29 @@
       <div id="page-settings" class="page">
         <div class="card card-layout">
           <div class="card-main">
-            <h2>未実装</h2>
-            <div>
-              <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+            <h2>設定</h2>
+            <div class="options">
+              <div class="toggle">
+                <div>
+                  ダウンロード履歴を削除
+                  <small
+                    >再度同じ動画をダウンロードできるようになります。</small
+                  >
+                </div>
+                <button
+                  id="clearHistoryBtn"
+                  style="
+                    background: #c0392b;
+                    border: 1px solid var(--border);
+                    color: var(--text);
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                  "
+                >
+                  履歴を削除
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3359,16 +3393,16 @@
           // 登録者数
           let subText = "";
           const subCount = info.channel_follower_count;
-          if (typeof subCount === 'number') {
-              if (subCount < 10000) {
-                  subText = `${subCount}人`;
-              } else {
-                  // 1.12万人 -> 1.1万人
-                  const v = Math.floor(subCount / 1000) / 10;
-                  subText = `${v}万人`;
-              }
+          if (typeof subCount === "number") {
+            if (subCount < 10000) {
+              subText = `${subCount}人`;
+            } else {
+              // 1.12万人 -> 1.1万人
+              const v = Math.floor(subCount / 1000) / 10;
+              subText = `${v}万人`;
+            }
           } else {
-              subText = "登録者数不明"; 
+            subText = "登録者数不明";
           }
           channelSubs.textContent = `${subText} 登録`;
 
@@ -3377,16 +3411,19 @@
           // const statViews = document.getElementById("stat-views"); // 削除
           // const statDate = document.getElementById("stat-date");   // 削除
 
-          if (statLikes) statLikes.textContent = info.like_count ? info.like_count.toLocaleString() : "---";
-          
+          if (statLikes)
+            statLikes.textContent = info.like_count
+              ? info.like_count.toLocaleString()
+              : "---";
+
           // ★ 概要欄の冒頭に「視聴回数」「投稿日」を表示するための文字列作成
           let statsHeader = "";
 
           // 視聴回数
           if (info.view_count) {
-             statsHeader += `<b>${info.view_count.toLocaleString()}回視聴</b>`;
+            statsHeader += `<b>${info.view_count.toLocaleString()}回視聴</b>`;
           } else {
-             statsHeader += `<b>視聴回数不明</b>`;
+            statsHeader += `<b>視聴回数不明</b>`;
           }
 
           // 投稿日
@@ -3394,7 +3431,7 @@
             const d = info.upload_date;
             let dateStr = d;
             if (d.length === 8) {
-                dateStr = `${d.substring(0, 4)}/${d.substring(4, 6)}/${d.substring(6, 8)}`;
+              dateStr = `${d.substring(0, 4)}/${d.substring(4, 6)}/${d.substring(6, 8)}`;
             }
             statsHeader += ` • <b>${dateStr}</b>`; // 中黒でつなぐ
           }
@@ -3402,14 +3439,14 @@
           // ★ 概要欄（URLリンク化版）
           const descEl = document.getElementById("video-description");
           let descContent = "";
-          
+
           if (info.description) {
             // URLをリンク化しつつ、改行も保持
             descContent = linkify(info.description);
           } else {
             descContent = "（概要欄なし）";
           }
-          
+
           // 冒頭に結合
           descEl.innerHTML = `${statsHeader}<br><br>${descContent}`;
 
@@ -3437,7 +3474,7 @@
             .map((c) => {
               // 既に整形済みならそのまま返す
               if (c.id && c.text) {
-                if (c.parent === 'root') c.parent = null; // ★ ここでも直す
+                if (c.parent === "root") c.parent = null; // ★ ここでも直す
                 return c;
               }
 
@@ -3451,7 +3488,7 @@
                 parent: (() => {
                   const p = top.parent;
                   // console.log("id:", top.id, "raw parent:", p); // デバッグ用
-                  if (p === 'root') return null;
+                  if (p === "root") return null;
                   return p || null;
                 })(),
                 author: top.author || top.author_name || "不明",
@@ -3465,8 +3502,6 @@
             })
             .filter((c) => c.text && c.text.trim() !== "");
 
-
-
           // ★ 最終的に「確定した配列」で描画
           // ★ 最終的に「確定した配列」で描画
           renderComments(window.currentVideoComments);
@@ -3476,7 +3511,7 @@
         function renderComments(comments) {
           const list = document.getElementById("comment-list");
           const countDisplay = document.getElementById("comment-count-display");
-          
+
           if (!list) return;
 
           list.style.display = "block";
@@ -3585,7 +3620,7 @@
           const avatarLink = document.createElement("a");
           avatarLink.href = "#"; // チャンネルURLがあれば入れるが、現状はないことが多いので#
           avatarLink.className = "comment-avatar-link";
-          
+
           const avatar = document.createElement("img");
           avatar.className = "comment-avatar";
           avatar.loading = "lazy";
@@ -3600,7 +3635,7 @@
             avatar.src =
               "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
           };
-          
+
           avatarLink.appendChild(avatar);
 
           // --- ボディ部分 ---
@@ -3637,22 +3672,22 @@
           const btnLike = document.createElement("button");
           btnLike.className = "action-btn";
           btnLike.title = "高評価";
-          
+
           let likeCountText = "";
           if (comment.like_count > 0) {
-             // 1000以上を 1.2K とかにするのは別途関数が必要だが、一旦そのまま
-             likeCountText = comment.like_count;
+            // 1000以上を 1.2K とかにするのは別途関数が必要だが、一旦そのまま
+            likeCountText = comment.like_count;
           }
-          
+
           btnLike.innerHTML = `<i class="fa-regular fa-thumbs-up"></i> ${likeCountText}`;
-          
+
           // Dislike は削除
 
           // Reply
           const btnReply = document.createElement("button");
           btnReply.className = "action-btn";
           btnReply.textContent = "返信";
-          
+
           actions.appendChild(btnLike);
           // actions.appendChild(btnDislike); // 削除
           actions.appendChild(btnReply);
@@ -3666,7 +3701,7 @@
           moreBtn.textContent = "もっと見る";
           moreBtn.style.display = "none";
           body.appendChild(moreBtn);
-          
+
           body.appendChild(actions);
 
           item.appendChild(avatarLink);
@@ -3683,16 +3718,17 @@
             // 一度クランプを外して正確に測る（重要）
             text.classList.remove("clamped");
 
-            if (text.scrollHeight > maxHeight + 5) { // 誤差許容
-               text.classList.add("clamped"); 
-               moreBtn.style.display = "block"; 
+            if (text.scrollHeight > maxHeight + 5) {
+              // 誤差許容
+              text.classList.add("clamped");
+              moreBtn.style.display = "block";
             }
           });
 
           // ボタンクリックで開閉
           moreBtn.addEventListener("click", () => {
-             const isClamped = text.classList.toggle("clamped");
-             moreBtn.textContent = isClamped ? "もっと見る" : "一部を表示";
+            const isClamped = text.classList.toggle("clamped");
+            moreBtn.textContent = isClamped ? "もっと見る" : "一部を表示";
           });
 
           return item;
@@ -3700,26 +3736,36 @@
 
         // URLをリンク化
         function linkify(text) {
-          const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-          return text.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+          const urlPattern =
+            /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+          return text.replace(
+            urlPattern,
+            '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+          );
         }
 
         // YouTubeチャットメッセージのレンダリング（runs対応）
         function renderChatMessage(message) {
           if (!message) return "";
           if (message.simpleText) return escapeHtml(message.simpleText);
-          
+
           if (message.runs) {
-            return message.runs.map(run => {
-              if (run.text) return escapeHtml(run.text);
-              if (run.emoji) {
-                // 絵文字の場合
-                const url = run.emoji.image.thumbnails[0]?.url;
-                const alt = run.emoji.image.accessibility?.accessibilityData?.label || "emoji";
-                return url ? `<img src="${url}" alt="${alt}" class="chat-emoji" style="width:16px;height:16px;vertical-align:middle;">` : "";
-              }
-              return "";
-            }).join("");
+            return message.runs
+              .map((run) => {
+                if (run.text) return escapeHtml(run.text);
+                if (run.emoji) {
+                  // 絵文字の場合
+                  const url = run.emoji.image.thumbnails[0]?.url;
+                  const alt =
+                    run.emoji.image.accessibility?.accessibilityData?.label ||
+                    "emoji";
+                  return url
+                    ? `<img src="${url}" alt="${alt}" class="chat-emoji" style="width:16px;height:16px;vertical-align:middle;">`
+                    : "";
+                }
+                return "";
+              })
+              .join("");
           }
           return "";
         }
@@ -3842,46 +3888,55 @@
         const sortItems = document.querySelectorAll(".sort-item");
 
         if (sortToggle && sortMenu) {
-            // メニュー開閉
-            sortToggle.addEventListener("click", (e) => {
-                e.stopPropagation();
-                sortMenu.classList.toggle("hidden");
+          // メニュー開閉
+          sortToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sortMenu.classList.toggle("hidden");
+          });
+
+          // 外部クリックで閉じる
+          document.addEventListener("click", (e) => {
+            if (
+              !sortToggle.contains(e.target) &&
+              !sortMenu.contains(e.target)
+            ) {
+              sortMenu.classList.add("hidden");
+            }
+          });
+
+          // 並び替え実行
+          sortItems.forEach((item) => {
+            item.addEventListener("click", () => {
+              const sortType = item.dataset.sort;
+
+              // アクティブ表示の切り替え
+              sortItems.forEach((i) => i.classList.remove("active"));
+              item.classList.add("active");
+
+              sortMenu.classList.add("hidden");
+
+              if (
+                !window.currentVideoComments ||
+                window.currentVideoComments.length === 0
+              )
+                return;
+
+              // 並び替え処理
+              let sorted = [...window.currentVideoComments];
+              if (sortType === "popular") {
+                // いいね数順（降順）
+                sorted.sort(
+                  (a, b) => (b.like_count || 0) - (a.like_count || 0),
+                );
+              } else if (sortType === "newest") {
+                // 新しい順（降順）
+                sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+              }
+
+              // 再描画
+              renderComments(sorted);
             });
-
-            // 外部クリックで閉じる
-            document.addEventListener("click", (e) => {
-                if (!sortToggle.contains(e.target) && !sortMenu.contains(e.target)) {
-                    sortMenu.classList.add("hidden");
-                }
-            });
-
-            // 並び替え実行
-            sortItems.forEach(item => {
-                item.addEventListener("click", () => {
-                    const sortType = item.dataset.sort;
-                    
-                    // アクティブ表示の切り替え
-                    sortItems.forEach(i => i.classList.remove("active"));
-                    item.classList.add("active");
-                    
-                    sortMenu.classList.add("hidden");
-
-                    if (!window.currentVideoComments || window.currentVideoComments.length === 0) return;
-
-                    // 並び替え処理
-                    let sorted = [...window.currentVideoComments];
-                    if (sortType === "popular") {
-                        // いいね数順（降順）
-                        sorted.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
-                    } else if (sortType === "newest") {
-                        // 新しい順（降順）
-                        sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                    }
-
-                    // 再描画
-                    renderComments(sorted);
-                });
-            });
+          });
         }
 
         // === 追加ボタンの動作 ===
