@@ -2622,6 +2622,10 @@
           alert("URLを入力してください。");
           return;
         }
+        if (!urlsInput.value.startsWith("https://")) {
+          alert("有効なURLを入力してください。");
+          return;
+        }
 
         const formData = new FormData();
         formData.append("urls", urlsInput.value);
