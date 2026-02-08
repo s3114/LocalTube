@@ -1518,8 +1518,7 @@
     </style>
     <link
       rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   </head>
 
   <body>
@@ -1534,24 +1533,21 @@
             class="icon-btn"
             id="btn-player"
             data-page="page-player"
-            title="プレイヤー"
-          >
+            title="プレイヤー">
             <i class="fa-solid fa-play"></i>
           </button>
           <button
             class="icon-btn active"
             id="btn-downloader"
             data-page="page-downloader"
-            title="ダウンローダー"
-          >
+            title="ダウンローダー">
             <i class="fa-solid fa-download"></i>
           </button>
           <button
             class="icon-btn"
             id="btn-settings"
             data-page="page-settings"
-            title="設定"
-          >
+            title="設定">
             <i class="fa-solid fa-gear"></i>
           </button>
         </div>
@@ -1575,8 +1571,7 @@
                 <button
                   id="btn-rew5"
                   class="yt-btn yt-skip"
-                  data-tooltip="-5秒"
-                >
+                  data-tooltip="-5秒">
                   <i class="fa-solid fa-backward-step"></i>
                 </button>
 
@@ -1584,8 +1579,7 @@
                 <button
                   id="btn-fwd5"
                   class="yt-btn yt-skip"
-                  data-tooltip="+5秒"
-                >
+                  data-tooltip="+5秒">
                   <i class="fa-solid fa-forward-step"></i>
                 </button>
 
@@ -1598,8 +1592,7 @@
                     min="0"
                     max="1"
                     step="0.05"
-                    value="1"
-                  />
+                    value="1" />
                 </div>
 
                 <input type="range" id="seek-bar" min="0" max="100" value="0" />
@@ -1639,8 +1632,7 @@
                   align-items: center;
                   justify-content: space-between;
                   gap: 10px;
-                "
-              >
+                ">
                 <div id="player-title" class="yt-title">
                   動画を選択してください
                 </div>
@@ -1650,8 +1642,7 @@
                   target="_blank"
                   class="yt-btn"
                   style="display: none; color: #ff0000"
-                  title="YouTubeで見る"
-                >
+                  title="YouTubeで見る">
                   <i class="fa-brands fa-youtube" style="font-size: 24px"></i>
                 </a>
               </div>
@@ -1661,17 +1652,15 @@
                   <img
                     id="channel-avatar"
                     class="channel-avatar"
-                    src=""
-                    alt=""
-                  />
+                    src
+                    alt />
                 </a>
                 <div class="channel-text">
                   <a
                     id="channel-link"
                     href="#"
                     target="_blank"
-                    class="channel-name"
-                  ></a>
+                    class="channel-name"></a>
                   <div class="channel-meta">
                     <span id="channel-handle"></span>
                     <span class="dot">•</span>
@@ -1688,8 +1677,7 @@
                     color: #aaa;
                     font-size: 14px;
                     align-items: center;
-                  "
-                >
+                  ">
                   <div title="高評価数">
                     <i class="fa-regular fa-thumbs-up"></i>
                     <span id="stat-likes"></span>
@@ -1747,8 +1735,7 @@
               </div>
               <div
                 class="sidebar-content chat-content"
-                id="live-chat-container"
-              >
+                id="live-chat-container">
                 <div id="chat-messages"></div>
                 <div class="chat-empty">チャットを選択してください</div>
               </div>
@@ -1776,8 +1763,7 @@
               <div class="url-box">
                 <textarea
                   id="urls"
-                  placeholder="YouTube や ABEMA の URL を入力"
-                ></textarea>
+                  placeholder="YouTube や ABEMA の URL を入力"></textarea>
                 <button id="download-btn" onclick="start()">
                   ダウンロード
                 </button>
@@ -1788,43 +1774,35 @@
                 <div class="field-label">画質：</div>
                 <select id="fmt">
                   <option
-                    value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     4320p（7680 x 4320）
                   </option>
                   <option
-                    value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     2160p（3840 x 2160）
                   </option>
                   <option
-                    value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     1440p（2560 x 1440）
                   </option>
                   <option
-                    value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     1080p（1920 x 1080）
                   </option>
                   <option
-                    value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     720p （1280 x 720 ）
                   </option>
                   <option
-                    value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     480p （720 x 480 ）
                   </option>
                   <option
-                    value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     360p （640 x 360 ）
                   </option>
                   <option
-                    value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]"
-                  >
+                    value="bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
                     240p （ 426 x 240 ）
                   </option>
                   <option value="bv[height=144][ext=mp4]+ba[ext=m4a]">
@@ -1849,8 +1827,7 @@
                   <input
                     type="text"
                     id="savePath"
-                    placeholder="保存先フォルダパス (空白の場合はデフォルト)"
-                  />
+                    placeholder="保存先フォルダパス (空白の場合はデフォルト)" />
                 </div>
               </div>
 
@@ -1869,16 +1846,14 @@
                       padding: 8px 12px;
                       border-radius: 8px;
                       cursor: pointer;
-                    "
-                  >
+                    ">
                     FireFox
                   </button>
                   <input
                     type="file"
                     id="cookiePathSet"
                     accept=".txt"
-                    style="display: none"
-                  />
+                    style="display: none" />
                   <button
                     id="manual-select-btn"
                     style="
@@ -1888,8 +1863,7 @@
                       padding: 8px 12px;
                       border-radius: 8px;
                       cursor: pointer;
-                    "
-                  >
+                    ">
                     手動選択
                   </button>
                   <button
@@ -1901,8 +1875,7 @@
                       padding: 8px 9px;
                       border-radius: 8px;
                       cursor: pointer;
-                    "
-                  >
+                    ">
                     使用しない
                   </button>
                 </div>
@@ -1919,8 +1892,7 @@
                   id="optParallelDownloads"
                   min="1"
                   max="999"
-                  value="3"
-                />
+                  value="3" />
               </div>
               <div class="toggle">
                 <div>
@@ -1933,16 +1905,13 @@
                   id="optConcurrentFragments"
                   min="1"
                   max="16"
-                  value="4"
-                />
+                  value="4" />
               </div>
 
               <div class="toggle">
                 <div>
                   ダウンロード履歴を保存
-                  <small
-                    >再度同じ動画がダウンロードされないようになります。</small
-                  >
+                  <small>再度同じ動画がダウンロードされないようになります。</small>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="optHistory" checked />
@@ -1963,12 +1932,8 @@
                 <div>
                   DRM 保護を回避
                   <div class="warn">
-                    <small
-                      >非推奨（必要なときのみ使用してください。）詳しくは<a
-                        href="https://github.com/yt-dlp/yt-dlp/issues/12563"
-                        >こちら</a
-                      >(英語)</small
-                    >
+                    <small>非推奨（必要なときのみ使用してください。）詳しくは<a
+                        href="https://github.com/yt-dlp/yt-dlp/issues/12563">こちら</a>(英語)</small>
                   </div>
                 </div>
                 <label class="switch">
@@ -2035,53 +2000,41 @@
       <div id="page-settings" class="page">
         <div class="card card-layout">
           <div class="card-main">
-            <h2>設定</h2>
+            <h2>ツール</h2>
             <div class="options">
               <div class="toggle">
                 <div>
-                  ダウンロード履歴を削除
-                  <small
-                    >再度同じ動画をダウンロードできるようになります。</small
-                  >
+                  メン限のプレイリストURLを取得
+                  <small>チャンネルURLから自動的に再生リストURLを生成します。</small>
                 </div>
-                <button
-                  id="clearHistoryBtn"
+                <div
                   style="
-                    background: #c0392b;
-                    border: 1px solid var(--border);
-                    color: var(--text);
-                    padding: 8px 16px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                  "
-                >
-                  履歴を削除
-                </button>
-              </div>
-
-              <div class="toggle">
-                <div>
-                  YouTubeチャンネルプレイリストURL変換
-                  <small
-                    >チャンネルURLから自動的に再生リストURLを生成します。</small
-                  >
-                </div>
-                <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+                    flex: none;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    margin-left: auto;
+                    width: 800px;
+                  ">
                   <input
                     type="text"
                     id="youtubeChannelUrlInput"
-                    placeholder="例: https://www.youtube.com/channel/UCxxxxxxxxxxx"
-                    style="width: 100%;"
-                  />
-                  <div id="channelUrlError" style="color: var(--accent); font-size: 12px; min-height: 1.2em;"></div>
-                  <div style="display: flex; gap: 8px; align-items: center;">
+                    placeholder="YoutubeチャンネルのURLを入力してください"
+                    style="width: 100%" />
+                  <div
+                    id="channelUrlError"
+                    style="
+                      color: var(--accent);
+                      font-size: 12px;
+                      min-height: 1.2em;
+                    "></div>
+                  <div style="display: flex; gap: 8px; align-items: center">
                     <input
                       type="text"
                       id="youtubePlaylistUrlOutput"
                       readonly
                       placeholder="変換された再生リストURL"
-                      style="flex: 1;"
-                    />
+                      style="flex: 1" />
                     <button
                       id="copyPlaylistUrlBtn"
                       style="
@@ -2092,8 +2045,7 @@
                         border-radius: 8px;
                         cursor: pointer;
                         white-space: nowrap;
-                      "
-                    >
+                      ">
                       コピー
                     </button>
                   </div>
@@ -2102,11 +2054,36 @@
             </div>
           </div>
         </div>
-      </div>
-    </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
+        <div class="card card-layout" style="margin-top: 20px;">
+          <div class="card-main">
+            <h2>設定</h2>
+            <div class="options">
+              <div class="toggle">
+                <div>
+                  ダウンロード履歴を削除
+                  <small>再度同じ動画をダウンロードできるようになります。</small>
+                </div>
+                <button
+                  id="clearHistoryBtn"
+                  style="
+                    background: #c0392b;
+                    border: 1px solid var(--border);
+                    color: var(--text);
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                  ">
+                  履歴を削除
+                </button>
+              </div>
+            </div> <!-- Close options div for settings -->
+          </div> <!-- Close card-main for settings -->
+        </div> <!-- Close card card-layout for settings -->
+      </main>
+
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <script>
       let pendingVideoId = null;
 
       // --- Global State ---
@@ -2328,82 +2305,91 @@
         });
 
         // New YouTube Channel Playlist URL Converter
-        const youtubeChannelUrlInput = document.getElementById('youtubeChannelUrlInput');
-        const youtubePlaylistUrlOutput = document.getElementById('youtubePlaylistUrlOutput');
-        const copyPlaylistUrlBtn = document.getElementById('copyPlaylistUrlBtn');
-        const channelUrlError = document.getElementById('channelUrlError');
+        const youtubeChannelUrlInput = document.getElementById(
+          "youtubeChannelUrlInput",
+        );
+        const youtubePlaylistUrlOutput = document.getElementById(
+          "youtubePlaylistUrlOutput",
+        );
+        const copyPlaylistUrlBtn =
+          document.getElementById("copyPlaylistUrlBtn");
+        const channelUrlError = document.getElementById("channelUrlError");
 
         let resolveTimeout;
 
-        youtubeChannelUrlInput.addEventListener('input', () => {
-            clearTimeout(resolveTimeout);
-            const channelUrl = youtubeChannelUrlInput.value.trim();
+        youtubeChannelUrlInput.addEventListener("input", () => {
+          clearTimeout(resolveTimeout);
+          const channelUrl = youtubeChannelUrlInput.value.trim();
 
-            const channelRegex = /^https?:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})$/;
-            const handleRegex = /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)$/;
+          const channelRegex =
+            /^https?:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})$/;
+          const handleRegex =
+            /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)$/;
 
-            const channelMatch = channelUrl.match(channelRegex);
-            const handleMatch = channelUrl.match(handleRegex);
+          const channelMatch = channelUrl.match(channelRegex);
+          const handleMatch = channelUrl.match(handleRegex);
 
-            youtubePlaylistUrlOutput.value = ''; // Clear previous output
-            channelUrlError.textContent = ''; // Clear previous error
+          youtubePlaylistUrlOutput.value = ""; // Clear previous output
+          channelUrlError.textContent = ""; // Clear previous error
 
-            if (channelUrl === '') {
-                return;
-            }
+          if (channelUrl === "") {
+            return;
+          }
 
-            if (channelMatch) {
-                const channelId = channelMatch[1]; // UCxxxxxxxxxxx
-                const playlistId = channelId.substring(2);
-                const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
-                youtubePlaylistUrlOutput.value = playlistUrl;
-            } else if (handleMatch) {
-                channelUrlError.textContent = 'ハンドルを解決中...'; // Loading indicator
-                // Debounce the fetch request
-                resolveTimeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch('/api/resolve-handle', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ url: channelUrl }),
-                        });
+          if (channelMatch) {
+            const channelId = channelMatch[1]; // UCxxxxxxxxxxx
+            const playlistId = channelId.substring(2);
+            const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
+            youtubePlaylistUrlOutput.value = playlistUrl;
+          } else if (handleMatch) {
+            channelUrlError.textContent = "ハンドルを解決中..."; // Loading indicator
+            // Debounce the fetch request
+            resolveTimeout = setTimeout(async () => {
+              try {
+                const response = await fetch("/api/resolve-handle", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ url: channelUrl }),
+                });
 
-                        const data = await response.json();
+                const data = await response.json();
 
-                        if (response.ok) {
-                            const channelId = data.channelId; // UCxxxxxxxxxxx
-                            const playlistId = channelId.substring(2);
-                            const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
-                            youtubePlaylistUrlOutput.value = playlistUrl;
-                            channelUrlError.textContent = ''; // Clear loading message
-                        } else {
-                            channelUrlError.textContent = `エラー: ${data.error || 'チャンネルIDの取得に失敗しました。'}`;
-                        }
-                    } catch (error) {
-                        channelUrlError.textContent = 'ネットワークエラーまたはサーバーの問題が発生しました。';
-                        console.error('Error resolving handle:', error);
-                    }
-                }, 500); // 500ms delay
-            } else {
-                channelUrlError.textContent = '無効なYouTubeチャンネルURLまたはハンドルURLです。';
-            }
+                if (response.ok) {
+                  const channelId = data.channelId; // UCxxxxxxxxxxx
+                  const playlistId = channelId.substring(2);
+                  const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
+                  youtubePlaylistUrlOutput.value = playlistUrl;
+                  channelUrlError.textContent = ""; // Clear loading message
+                } else {
+                  channelUrlError.textContent = `エラー: ${data.error || "チャンネルIDの取得に失敗しました。"}`;
+                }
+              } catch (error) {
+                channelUrlError.textContent =
+                  "ネットワークエラーまたはサーバーの問題が発生しました。";
+                console.error("Error resolving handle:", error);
+              }
+            }, 500); // 500ms delay
+          } else {
+            channelUrlError.textContent =
+              "無効なYouTubeチャンネルURLまたはハンドルURLです。";
+          }
         });
 
-        copyPlaylistUrlBtn.addEventListener('click', async () => {
-            const playlistUrl = youtubePlaylistUrlOutput.value;
-            if (playlistUrl) {
-                try {
-                    await navigator.clipboard.writeText(playlistUrl);
-                    alert('再生リストURLをコピーしました！');
-                } catch (err) {
-                    console.error('Failed to copy: ', err);
-                    alert('コピーに失敗しました。手動でコピーしてください。');
-                }
-            } else {
-                alert('変換された再生リストURLがありません。');
+        copyPlaylistUrlBtn.addEventListener("click", async () => {
+          const playlistUrl = youtubePlaylistUrlOutput.value;
+          if (playlistUrl) {
+            try {
+              await navigator.clipboard.writeText(playlistUrl);
+              alert("再生リストURLをコピーしました！");
+            } catch (err) {
+              console.error("Failed to copy: ", err);
+              alert("コピーに失敗しました。手動でコピーしてください。");
             }
+          } else {
+            alert("変換された再生リストURLがありません。");
+          }
         });
 
         // --- Cookie Settings Management ---
@@ -4276,5 +4262,5 @@
         loadLocalVideos();
       });
     </script>
-  </body>
-</html>
+    </body>
+  </html>
