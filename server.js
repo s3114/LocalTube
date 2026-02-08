@@ -1167,6 +1167,45 @@ app.get("/api/local-videos", async (req, res) => {
   }
 });
 
+// URLのアクセシビリティをチェックするAPI
+app.get("/api/validate-url", async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ isValid: false, error: "URLが指定されていません。" });
+  }
+
+  try {
+    const fetch = await import('node-fetch').then(mod => mod.default); // Import node-fetch dynamically
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒のタイムアウト
+
+    const response = await fetch(url, {
+      method: "HEAD",
+      signal: controller.signal,
+      redirect: "follow", // リダイレクトを追跡
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      // 2xx のステータスコードは成功
+      res.json({ isValid: true });
+    } else {
+      res.json({ isValid: false, error: `HTTPステータス: ${response.status}` });
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      res.json({ isValid: false, error: "URLへの接続がタイムアウトしました。" });
+    } else {
+      console.error(`URL検証エラー (${url}):`, error);
+      res.json({ isValid: false, error: `URLに接続できません: ${error.message}` });
+    }
+  }
+});
+
+
 // ■ サーバーの起動
 // --------------------------------------------------
 app.listen(port, () => {

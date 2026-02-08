@@ -2609,58 +2609,76 @@
       // --- Actions ---
       async function start() {
         const downloadBtn = document.getElementById("download-btn");
+        const urlsInput = document.getElementById("urls");
 
         if (downloadBtn) {
           downloadBtn.disabled = true;
-          setTimeout(() => {
-            downloadBtn.disabled = false;
-          }, 500);
-        }
-
-        const urlsInput = document.getElementById("urls");
-        if (urlsInput.value.trim() === "") {
-          alert("URLを入力してください。");
-          return;
-        }
-        if (!urlsInput.value.startsWith("https://")) {
-          alert("有効なURLを入力してください。");
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append("urls", urlsInput.value);
-        formData.append("format", document.getElementById("fmt").value);
-        formData.append(
-          "saveHistory",
-          document.getElementById("optHistory").checked,
-        );
-        formData.append(
-          "downloadThumb",
-          document.getElementById("optThumb").checked,
-        );
-        formData.append(
-          "drmProtect",
-          document.getElementById("optDrm").checked,
-        );
-        formData.append("savePath", document.getElementById("savePath").value);
-        formData.append(
-          "parallelDownloads",
-          document.getElementById("optParallelDownloads").value,
-        );
-        formData.append(
-          "concurrentFragments",
-          document.getElementById("optConcurrentFragments").value,
-        );
-        formData.append(
-          "commentOptions",
-          document.getElementById("comment-options").value,
-        );
-
-        if (window.selectedCookieFile) {
-          formData.append("cookieFile", window.selectedCookieFile);
         }
 
         try {
+          const rawUrls = urlsInput.value.trim();
+          if (rawUrls === "") {
+            alert("URLを入力してください。");
+            return;
+          }
+
+          const urls = rawUrls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
+
+          if (urls.length === 0) {
+            alert("URLを入力してください。");
+            return;
+          }
+
+          // 各URLをサーバーサイドで検証
+          for (const url of urls) {
+            // URLの基本的なフォーマットチェック (https://から始まるか)
+            if (!url.startsWith("https://")) {
+              alert(`「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`);
+              return;
+            }
+
+            const validationResponse = await fetch(`/api/validate-url?url=${encodeURIComponent(url)}`);
+            const validationResult = await validationResponse.json();
+
+            if (!validationResult.isValid) {
+              alert(`「${url}」はアクセスできません。${validationResult.error ? `エラー: ${validationResult.error}` : ""}`);
+              return;
+            }
+          }
+
+          const formData = new FormData();
+          formData.append("urls", urlsInput.value);
+          formData.append("format", document.getElementById("fmt").value);
+          formData.append(
+            "saveHistory",
+            document.getElementById("optHistory").checked,
+          );
+          formData.append(
+            "downloadThumb",
+            document.getElementById("optThumb").checked,
+          );
+          formData.append(
+            "drmProtect",
+            document.getElementById("optDrm").checked,
+          );
+          formData.append("savePath", document.getElementById("savePath").value);
+          formData.append(
+            "parallelDownloads",
+            document.getElementById("optParallelDownloads").value,
+          );
+          formData.append(
+            "concurrentFragments",
+            document.getElementById("optConcurrentFragments").value,
+          );
+          formData.append(
+            "commentOptions",
+            document.getElementById("comment-options").value,
+          );
+
+          if (window.selectedCookieFile) {
+            formData.append("cookieFile", window.selectedCookieFile);
+          }
+
           const response = await fetch("/download", {
             method: "POST",
             body: formData,
@@ -2673,8 +2691,12 @@
             urlsInput.value = ""; // Clear textarea on success
           }
         } catch (error) {
-          alert(`ネットワークエラー: ${error.message}`);
+          alert(`ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`);
           console.error("Fetch error:", error);
+        } finally {
+          if (downloadBtn) {
+            downloadBtn.disabled = false;
+          }
         }
       }
 
