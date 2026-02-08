@@ -1836,10 +1836,10 @@
               <div class="field-row">
                 <div class="field-label">ｺﾒﾝﾄ：</div>
                 <select id="comment-options">
-                  <option value="none">ダウンロードしない</option>
+                  <option value="both">コメントとチャット</option>
                   <option value="comments">動画のコメント</option>
                   <option value="sub">ライブ中のチャット</option>
-                  <option value="both">コメントとチャット</option>
+                  <option value="none">ダウンロードしない</option>
                 </select>
               </div>
 
@@ -2057,6 +2057,47 @@
                 >
                   履歴を削除
                 </button>
+              </div>
+
+              <div class="toggle">
+                <div>
+                  YouTubeチャンネルプレイリストURL変換
+                  <small
+                    >チャンネルURLから自動的に再生リストURLを生成します。</small
+                  >
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+                  <input
+                    type="text"
+                    id="youtubeChannelUrlInput"
+                    placeholder="例: https://www.youtube.com/channel/UCxxxxxxxxxxx"
+                    style="width: 100%;"
+                  />
+                  <div id="channelUrlError" style="color: var(--accent); font-size: 12px; min-height: 1.2em;"></div>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input
+                      type="text"
+                      id="youtubePlaylistUrlOutput"
+                      readonly
+                      placeholder="変換された再生リストURL"
+                      style="flex: 1;"
+                    />
+                    <button
+                      id="copyPlaylistUrlBtn"
+                      style="
+                        background: var(--blue);
+                        border: none;
+                        color: #fff;
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        white-space: nowrap;
+                      "
+                    >
+                      コピー
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2284,6 +2325,85 @@
             console.error("履歴削除エラー:", error);
             alert("履歴の削除に失敗しました。");
           }
+        });
+
+        // New YouTube Channel Playlist URL Converter
+        const youtubeChannelUrlInput = document.getElementById('youtubeChannelUrlInput');
+        const youtubePlaylistUrlOutput = document.getElementById('youtubePlaylistUrlOutput');
+        const copyPlaylistUrlBtn = document.getElementById('copyPlaylistUrlBtn');
+        const channelUrlError = document.getElementById('channelUrlError');
+
+        let resolveTimeout;
+
+        youtubeChannelUrlInput.addEventListener('input', () => {
+            clearTimeout(resolveTimeout);
+            const channelUrl = youtubeChannelUrlInput.value.trim();
+
+            const channelRegex = /^https?:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})$/;
+            const handleRegex = /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)$/;
+
+            const channelMatch = channelUrl.match(channelRegex);
+            const handleMatch = channelUrl.match(handleRegex);
+
+            youtubePlaylistUrlOutput.value = ''; // Clear previous output
+            channelUrlError.textContent = ''; // Clear previous error
+
+            if (channelUrl === '') {
+                return;
+            }
+
+            if (channelMatch) {
+                const channelId = channelMatch[1]; // UCxxxxxxxxxxx
+                const playlistId = channelId.substring(2);
+                const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
+                youtubePlaylistUrlOutput.value = playlistUrl;
+            } else if (handleMatch) {
+                channelUrlError.textContent = 'ハンドルを解決中...'; // Loading indicator
+                // Debounce the fetch request
+                resolveTimeout = setTimeout(async () => {
+                    try {
+                        const response = await fetch('/api/resolve-handle', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ url: channelUrl }),
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            const channelId = data.channelId; // UCxxxxxxxxxxx
+                            const playlistId = channelId.substring(2);
+                            const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
+                            youtubePlaylistUrlOutput.value = playlistUrl;
+                            channelUrlError.textContent = ''; // Clear loading message
+                        } else {
+                            channelUrlError.textContent = `エラー: ${data.error || 'チャンネルIDの取得に失敗しました。'}`;
+                        }
+                    } catch (error) {
+                        channelUrlError.textContent = 'ネットワークエラーまたはサーバーの問題が発生しました。';
+                        console.error('Error resolving handle:', error);
+                    }
+                }, 500); // 500ms delay
+            } else {
+                channelUrlError.textContent = '無効なYouTubeチャンネルURLまたはハンドルURLです。';
+            }
+        });
+
+        copyPlaylistUrlBtn.addEventListener('click', async () => {
+            const playlistUrl = youtubePlaylistUrlOutput.value;
+            if (playlistUrl) {
+                try {
+                    await navigator.clipboard.writeText(playlistUrl);
+                    alert('再生リストURLをコピーしました！');
+                } catch (err) {
+                    console.error('Failed to copy: ', err);
+                    alert('コピーに失敗しました。手動でコピーしてください。');
+                }
+            } else {
+                alert('変換された再生リストURLがありません。');
+            }
         });
 
         // --- Cookie Settings Management ---
@@ -2622,7 +2742,9 @@
             return;
           }
 
-          const urls = rawUrls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
+          const urls = rawUrls
+            .split(/[\n\s,]+/)
+            .filter((url) => url.trim() !== "");
 
           if (urls.length === 0) {
             alert("URLを入力してください。");
@@ -2633,15 +2755,21 @@
           for (const url of urls) {
             // URLの基本的なフォーマットチェック (https://から始まるか)
             if (!url.startsWith("https://")) {
-              alert(`「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`);
+              alert(
+                `「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`,
+              );
               return;
             }
 
-            const validationResponse = await fetch(`/api/validate-url?url=${encodeURIComponent(url)}`);
+            const validationResponse = await fetch(
+              `/api/validate-url?url=${encodeURIComponent(url)}`,
+            );
             const validationResult = await validationResponse.json();
 
             if (!validationResult.isValid) {
-              alert(`「${url}」はアクセスできません。${validationResult.error ? `エラー: ${validationResult.error}` : ""}`);
+              alert(
+                `「${url}」はアクセスできません。${validationResult.error ? `エラー: ${validationResult.error}` : ""}`,
+              );
               return;
             }
           }
@@ -2661,7 +2789,10 @@
             "drmProtect",
             document.getElementById("optDrm").checked,
           );
-          formData.append("savePath", document.getElementById("savePath").value);
+          formData.append(
+            "savePath",
+            document.getElementById("savePath").value,
+          );
           formData.append(
             "parallelDownloads",
             document.getElementById("optParallelDownloads").value,
@@ -2691,7 +2822,9 @@
             urlsInput.value = ""; // Clear textarea on success
           }
         } catch (error) {
-          alert(`ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`);
+          alert(
+            `ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`,
+          );
           console.error("Fetch error:", error);
         } finally {
           if (downloadBtn) {
