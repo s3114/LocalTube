@@ -261,6 +261,19 @@ app.post("/api/settings", async (req, res) => {
   }
 });
 
+// 履歴を削除するAPI
+app.post("/api/clear-history", async (req, res) => {
+  try {
+    const historyPath = path.join(__dirname, "finished.txt");
+    await fs.promises.writeFile(historyPath, "", "utf-8");
+    console.log("ダウンロード履歴を削除しました。");
+    res.json({ message: "履歴を削除しました。" });
+  } catch (error) {
+    console.error("履歴の削除に失敗しました:", error);
+    res.status(500).json({ error: "履歴の削除に失敗しました。" });
+  }
+});
+
 app.get("/jobs", (req, res) => {
   res.json(Array.from(jobHistory.values()));
 });
