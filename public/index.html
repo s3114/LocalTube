@@ -2077,6 +2077,40 @@
                   履歴を削除
                 </button>
               </div>
+              <div class="toggle">
+                <div>
+                  PC起動時の自動実行
+                  <small>PCを起動したときに、このアプリケーションを自動で起動するように設定します。</small>
+                  <small id="autostart-status"
+                    style="color: var(--blue); margin-top: 4px;"></small>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                  <button
+                    id="btn-create-autostart-task"
+                    style="
+                      background: var(--green);
+                      border: 1px solid var(--border);
+                      color: var(--text);
+                      padding: 8px 16px;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    ">
+                    有効化
+                  </button>
+                  <button
+                    id="btn-delete-autostart-task"
+                    style="
+                      background: #c0392b;
+                      border: 1px solid var(--border);
+                      color: var(--text);
+                      padding: 8px 16px;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    ">
+                    無効化
+                  </button>
+                </div>
+              </div>
             </div> <!-- Close options div for settings -->
           </div> <!-- Close card-main for settings -->
         </div> <!-- Close card card-layout for settings -->
@@ -2303,6 +2337,45 @@
             alert("履歴の削除に失敗しました。");
           }
         });
+
+        // --- Auto-start Task Buttons ---
+        const btnCreateAutostart = document.getElementById('btn-create-autostart-task');
+        const btnDeleteAutostart = document.getElementById('btn-delete-autostart-task');
+        const autostartStatus = document.getElementById('autostart-status');
+
+        async function handleAutostart(endpoint) {
+          try {
+            autostartStatus.textContent = '処理中...';
+            autostartStatus.style.color = 'var(--blue)';
+            const response = await fetch(endpoint, { method: 'POST' });
+            const result = await response.json();
+
+            if (response.ok) {
+              autostartStatus.textContent = result.message;
+              autostartStatus.style.color = 'var(--green)';
+            } else {
+              autostartStatus.textContent = `エラー: ${result.message}`;
+              autostartStatus.style.color = 'var(--accent)';
+            }
+          } catch (error) {
+            console.error('自動起動タスク操作エラー:', error);
+            autostartStatus.textContent = '通信エラーが発生しました。';
+            autostartStatus.style.color = 'var(--accent)';
+          }
+        }
+
+        btnCreateAutostart.addEventListener('click', () => {
+            if (confirm('PC起動時にこのアプリケーションを自動で起動するように設定しますか？')) {
+                handleAutostart('/api/schedule/create');
+            }
+        });
+
+        btnDeleteAutostart.addEventListener('click', () => {
+            if (confirm('PC起動時の自動実行を解除しますか？')) {
+                handleAutostart('/api/schedule/delete');
+            }
+        });
+
 
         // New YouTube Channel Playlist URL Converter
         const youtubeChannelUrlInput = document.getElementById(

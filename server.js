@@ -1272,6 +1272,104 @@ app.post("/api/resolve-handle", async (req, res) => {
   }
 });
 
+// ■ Task Scheduler API
+// --------------------------------------------------
+app.post("/api/schedule/create", (req, res) => {
+  const taskName = "YoutubeDL-AutoStart";
+  const batPath = path.resolve(__dirname, "起動.bat");
+  const psScriptPath = path.resolve(__dirname, "create_autostart_task.ps1");
+  const resultFilePath = path.join(os.tmpdir(), `autostart_result_create_${Date.now()}.txt`);
+
+  // PowerShellスクリプトを呼び出すコマンドを構築
+  const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -BatPath "${batPath}" -ResultFilePath "${resultFilePath}"`;
+  console.log(`Executing PowerShell command: ${command}`);
+
+  exec(command, { shell: "powershell.exe" }, async (error, stdout, stderr) => {
+    // PowerShellスクリプトが結果ファイルのパスをstdoutに出力する
+    // PowerShellスクリプトのstdoutには結果メッセージが直接出力されるようになった
+    const resultContent = stdout.trim(); // stdoutを直接結果内容として使用
+
+    // --- デバッグ用追加 ---
+    console.log(`resultContent: '${resultContent}'`);
+    console.log(`stdout type: ${typeof stdout}`);
+    console.log(`stdout.length: ${stdout.length}`);
+    console.log(`stdout startsWith 'SUCCESS:': ${stdout.startsWith("SUCCESS:")}`);
+    console.log(`stdout[0-8]: '${stdout.substring(0, 8)}'`);
+    // --- デバッグ用追加 ---
+
+    if (resultContent.startsWith("SUCCESS:")) {
+      // 成功メッセージの整形
+      // 日本語の schtasks 出力は不要なので、最初の行のみ抽出して整形する
+      const messageLines = resultContent.split('\n');
+      const cleanMessage = messageLines[0].replace("SUCCESS: ", "").trim();
+      return res.json({ message: cleanMessage });
+    } else if (resultContent.startsWith("ERROR:")) {
+      const messageLines = resultContent.split('\n');
+      const cleanMessage = messageLines[0].replace("ERROR: ", "").trim();
+      
+      return res.status(500).json({
+        message: cleanMessage,
+        error: resultContent.trim(),
+      });
+    } else if (error) { // exec自体がエラーを返した場合
+      return res.status(500).json({
+        message: "コマンド実行に失敗しました。",
+        error: stderr || error.message,
+      });
+    } else { // 予期せぬ出力の場合（UACキャンセルなど）
+      return res.status(500).json({
+        message: "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
+        error: `stdout: ${stdout}, stderr: ${stderr}`
+      });
+    }
+  });
+});
+
+app.post("/api/schedule/delete", (req, res) => {
+  const taskName = "YoutubeDL-AutoStart";
+  const psScriptPath = path.resolve(__dirname, "delete_autostart_task.ps1");
+  const resultFilePath = path.join(os.tmpdir(), `autostart_result_delete_${Date.now()}.txt`);
+
+  const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -ResultFilePath "${resultFilePath}"`;
+  console.log(`Executing PowerShell command: ${command}`);
+
+  exec(command, { shell: "powershell.exe" }, async (error, stdout, stderr) => {
+    // PowerShellスクリプトのstdoutには結果メッセージが直接出力されるようになった
+    const resultContent = stdout.trim(); // stdoutを直接結果内容として使用
+
+    // --- デバッグ用追加 ---
+    console.log(`resultContent: '${resultContent}'`);
+    console.log(`stdout type: ${typeof stdout}`);
+    console.log(`stdout.length: ${stdout.length}`);
+    console.log(`stdout startsWith 'SUCCESS:': ${stdout.startsWith("SUCCESS:")}`);
+    console.log(`stdout[0-8]: '${stdout.substring(0, 8)}'`);
+    // --- デバッグ用追加 ---
+    
+    if (resultContent.startsWith("SUCCESS:")) {
+      const messageLines = resultContent.split('\n');
+      const cleanMessage = messageLines[0].replace("SUCCESS: ", "").trim();
+      return res.json({ message: cleanMessage });
+    } else if (resultContent.startsWith("ERROR:")) {
+      const messageLines = resultContent.split('\n');
+      const cleanMessage = messageLines[0].replace("ERROR: ", "").trim();
+      return res.status(500).json({
+        message: cleanMessage,
+        error: resultContent.trim(),
+      });
+    } else if (error) { // exec自体がエラーを返した場合
+      return res.status(500).json({
+        message: "コマンド実行に失敗しました。",
+        error: stderr || error.message,
+      });
+    } else { // 予期せぬ出力の場合（UACキャンセルなど）
+      return res.status(500).json({
+        message: "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
+        error: `stdout: ${stdout}, stderr: ${stderr}`
+      });
+    }
+  });
+});
+
 // ■ サーバーの起動
 // --------------------------------------------------
 app.listen(port, () => {
