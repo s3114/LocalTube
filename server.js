@@ -818,6 +818,7 @@ async function processDownloadJob(job) {
             },
           });
 
+          resolve(); // ★ 次のダウンロードを開始するためにPromiseを解決
           return;
         }
 
