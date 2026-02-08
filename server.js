@@ -467,7 +467,7 @@ async function startNextDownload() {
 
           if (attempt === maxRetries) {
             job.status = "error";
-            job.progress.eta = "エラー";
+            job.progress.eta = `${error.message}`;
             broadcast("status_update", {
               id: job.id,
               status: "error",

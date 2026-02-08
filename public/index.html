@@ -404,7 +404,12 @@
         font-size: 12px;
         color: var(--subtext);
         margin-top: 4px;
-        height: 1.2em;
+        min-height: 1.2em;
+      }
+
+      .cookie-error-hint {
+        color: var(--accent); /* Red color */
+        font-weight: bold;
       }
 
       /* ==================================================
@@ -2127,12 +2132,17 @@
           progressText = job.progress.eta || "完了";
         } else if (job.status === "error") {
           progressBar.style.width = "100%";
-          progressText = job.progress.eta || "エラー";
+          let errorMessage = job.progress.eta || "エラー";
+          if (errorMessage.includes("Sign in to confirm you’re not a bot")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">Cookieファイルを指定してください</span>';
+          }
+          progressText = errorMessage;
         } else {
           progressBar.style.width = "0%";
           progressText = job.progress.eta || job.status;
         }
-        progressTextElement.textContent = progressText;
+        progressTextElement.innerHTML = progressText; // Use innerHTML because we're adding HTML tags
       }
 
       // --- Main Logic ---
@@ -2474,11 +2484,12 @@
         });
 
         eventSource.addEventListener("status_update", (e) => {
-          const { id, status, progress } = JSON.parse(e.data);
+          const { id, status, progress, error } = JSON.parse(e.data);
           const job = jobStates.get(id);
           if (job) {
             job.status = status;
             if (progress) job.progress = progress;
+            if (error) job.error = error;
             updateJobElement(job);
             updateJobCounts();
           }
