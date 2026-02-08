@@ -2141,7 +2141,9 @@
             errorMessage +=
               '<br><span class="cookie-error-hint">DRM保護の動画のトグルを有効にし再度ダウンロードを実行してください。</span>';
           }
-          if (errorMessage.includes("Join this channel to get access to members")) {
+          if (
+            errorMessage.includes("Join this channel to get access to members")
+          ) {
             errorMessage +=
               '<br><span class="cookie-error-hint">正しいCookieファイルを指定し、再度ダウンロードを実行してください。</span>';
           }
@@ -2152,6 +2154,14 @@
           if (errorMessage.includes("HTTP Error 403: Forbidden")) {
             errorMessage +=
               '<br><span class="cookie-error-hint">情報不足にて確実な対処方法が確立していません。詳しくはサポートサーバーにて質問して下さい。</span>';
+          }
+          if (errorMessage.includes("Unsupported URL: ")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">そのURLはサポートされていません。</span>';
+          }
+          if (errorMessage.includes("' is not a valid URL")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">URLが有効ではありません。</span>';
           }
 
           progressText = errorMessage;
