@@ -2135,8 +2135,25 @@
           let errorMessage = job.progress.eta || "エラー";
           if (errorMessage.includes("Sign in to confirm you’re not a bot")) {
             errorMessage +=
-              '<br><span class="cookie-error-hint">Cookieファイルを指定してください</span>';
+              '<br><span class="cookie-error-hint">Cookieファイルを指定し、再度ダウンロードを実行してください。</span>';
           }
+          if (errorMessage.includes("skipped as they are DRM protected")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">DRM保護の動画のトグルを有効にし再度ダウンロードを実行してください。</span>';
+          }
+          if (errorMessage.includes("Join this channel to get access to members")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">正しいCookieファイルを指定し、再度ダウンロードを実行してください。</span>';
+          }
+          if (errorMessage.includes("Requested format is not available")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">このエラーは様々な理由で発生します。最大の原因はショート動画のDLです。詳しくはサポートサーバーにて質問して下さい。</span>';
+          }
+          if (errorMessage.includes("HTTP Error 403: Forbidden")) {
+            errorMessage +=
+              '<br><span class="cookie-error-hint">情報不足にて確実な対処方法が確立していません。詳しくはサポートサーバーにて質問して下さい。</span>';
+          }
+
           progressText = errorMessage;
         } else {
           progressBar.style.width = "0%";
