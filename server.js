@@ -1206,6 +1206,72 @@ app.get("/api/validate-url", async (req, res) => {
 });
 
 
+// API to resolve a YouTube handle URL to a channel ID
+app.post("/api/resolve-handle", async (req, res) => {
+  const { url } = req.body;
+
+  if (!url || !url.includes("youtube.com/@")) {
+    return res
+      .status(400)
+      .json({ error: "有効なYouTubeハンドルURLを指定してください。" });
+  }
+
+  try {
+    const fetch = await import('node-fetch').then(mod => mod.default); // Ensure node-fetch is available
+
+    // Fetch the YouTube page HTML
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+    let response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error(`Fetch timeout for URL: ${url}`);
+        return res.status(504).json({ error: "YouTubeページへの接続がタイムアウトしました。" });
+      }
+      console.error(`Error fetching YouTube page for URL ${url}:`, fetchError);
+      return res.status(500).json({ error: "YouTubeページの取得に失敗しました。" });
+    }
+
+    if (!response.ok) {
+      console.error(`Failed to fetch YouTube page. Status: ${response.status} for URL: ${url}`);
+      return res.status(response.status).json({ error: `YouTubeページの取得に失敗しました。ステータス: ${response.status}` });
+    }
+
+    const html = await response.text();
+
+    // Regex to find the canonical URL
+    const canonicalRegex = /<link\s+rel="canonical"\s+href="([^"]+)">/;
+    const canonicalMatch = html.match(canonicalRegex);
+
+    if (!canonicalMatch || !canonicalMatch[1]) {
+      console.error(`Canonical URL not found in HTML for URL: ${url}`);
+      return res.status(404).json({ error: "チャンネルの正規URLが見つかりませんでした。" });
+    }
+
+    const canonicalUrl = canonicalMatch[1];
+    // Regex to extract the channel ID from the canonical URL
+    const channelIdRegex = /youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/;
+    const channelIdMatch = canonicalUrl.match(channelIdRegex);
+
+    if (!channelIdMatch || !channelIdMatch[1]) {
+      console.error(`Channel ID not found in canonical URL: ${canonicalUrl} for original URL: ${url}`);
+      return res.status(404).json({ error: "チャンネルIDを抽出できませんでした。" });
+    }
+
+    const channelId = channelIdMatch[1]; // This will be UCxxxxxxxxxxx
+    res.json({ channelId });
+
+  } catch (error) {
+    console.error("Handle resolution error:", error);
+    res.status(500).json({ error: "ハンドルの解決中に予期せぬエラーが発生しました。" });
+  }
+});
+
 // ■ サーバーの起動
 // --------------------------------------------------
 app.listen(port, () => {
