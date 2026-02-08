@@ -1910,10 +1910,25 @@
                     >再度同じ動画がダウンロードされないようになります。</small
                   >
                 </div>
-                <label class="switch">
-                  <input type="checkbox" id="optHistory" checked />
-                  <span class="slider"></span>
-                </label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <button
+                    id="clearHistoryBtn"
+                    style="
+                      background: #333;
+                      border: 1px solid var(--border);
+                      color: var(--text);
+                      padding: 8px 12px;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                  >
+                    履歴を削除
+                  </button>
+                  <label class="switch">
+                    <input type="checkbox" id="optHistory" checked />
+                    <span class="slider"></span>
+                  </label>
+                </div>
               </div>
               <div class="toggle">
                 <div>
@@ -2134,6 +2149,7 @@
           noneSelectBtn: document.getElementById("none-select-btn"),
           cookiePathSet: document.getElementById("cookiePathSet"),
           commentOptions: document.getElementById("comment-options"),
+          clearHistoryBtn: document.getElementById("clearHistoryBtn"),
         };
 
         // Load general settings from localStorage
@@ -2180,6 +2196,24 @@
         elements.commentOptions.addEventListener("change", (e) =>
           saveSetting("commentOptions", e.target.value),
         );
+
+        // --- History Clear Button ---
+        elements.clearHistoryBtn.addEventListener("click", async () => {
+          if (!confirm("ダウンロード履歴を削除しますか？")) return;
+          try {
+            const response = await fetch("/api/clear-history", {
+              method: "POST",
+            });
+            if (response.ok) {
+              alert("履歴を削除しました。");
+            } else {
+              alert("履歴の削除に失敗しました。");
+            }
+          } catch (error) {
+            console.error("履歴削除エラー:", error);
+            alert("履歴の削除に失敗しました。");
+          }
+        });
 
         // --- Cookie Settings Management ---
         function updateCookieButtonStyles(activeButton) {
