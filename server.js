@@ -389,7 +389,9 @@ function getUrlsFromInput(url, cookiePath) {
       return;
     }
 
-    console.log(`[yt-dlp getUrlsFromInput Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`);
+    console.log(
+      `[yt-dlp getUrlsFromInput Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`,
+    );
     const ytDlp = spawn(ytDlpPath, args);
     let videoUrls = "";
     ytDlp.stdout.on("data", (data) => {
@@ -573,7 +575,9 @@ async function processDownloadJob(job) {
       },
       settings,
     );
-    console.log(`[yt-dlp Download Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`);
+    console.log(
+      `[yt-dlp Download Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`,
+    );
     const ytDlp = spawn(ytDlpPath, args);
 
     let stderrOutput = "";
@@ -685,10 +689,13 @@ async function processDownloadJob(job) {
                   const fullCommand = `"${path.join(__dirname, "yt-dlp.exe")}" ${channelArgs
                     .map((a) => `"${a}"`)
                     .join(" ")}`;
-                  console.log(`[yt-dlp Channel Info Command] Command: ${fullCommand}`);
-                  const channelJson = execSync(fullCommand,
-                    { encoding: "utf-8", timeout: 3000 },
+                  console.log(
+                    `[yt-dlp Channel Info Command] Command: ${fullCommand}`,
                   );
+                  const channelJson = execSync(fullCommand, {
+                    encoding: "utf-8",
+                    timeout: 3000,
+                  });
 
                   // ===== ★ チャンネル情報JSONを丸ごと保存 ★ =====
                   try {
@@ -903,7 +910,8 @@ function buildArgs(job, paths, settings) {
     "--newline", // 進捗情報を改行で区切る
   ];
 
-  if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
+  if (options.format && !url.includes("abema.tv"))
+    args.push("-f", options.format);
   if (options.downloadThumb) {
     args.push("--write-thumbnail");
     // サムネイルの保存先を指定
@@ -1172,11 +1180,13 @@ app.get("/api/validate-url", async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
-    return res.status(400).json({ isValid: false, error: "URLが指定されていません。" });
+    return res
+      .status(400)
+      .json({ isValid: false, error: "URLが指定されていません。" });
   }
 
   try {
-    const fetch = await import('node-fetch').then(mod => mod.default); // Import node-fetch dynamically
+    const fetch = await import("node-fetch").then((mod) => mod.default); // Import node-fetch dynamically
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒のタイムアウト
@@ -1196,15 +1206,20 @@ app.get("/api/validate-url", async (req, res) => {
       res.json({ isValid: false, error: `HTTPステータス: ${response.status}` });
     }
   } catch (error) {
-    if (error.name === 'AbortError') {
-      res.json({ isValid: false, error: "URLへの接続がタイムアウトしました。" });
+    if (error.name === "AbortError") {
+      res.json({
+        isValid: false,
+        error: "URLへの接続がタイムアウトしました。",
+      });
     } else {
       console.error(`URL検証エラー (${url}):`, error);
-      res.json({ isValid: false, error: `URLに接続できません: ${error.message}` });
+      res.json({
+        isValid: false,
+        error: `URLに接続できません: ${error.message}`,
+      });
     }
   }
 });
-
 
 // API to resolve a YouTube handle URL to a channel ID
 app.post("/api/resolve-handle", async (req, res) => {
@@ -1217,7 +1232,7 @@ app.post("/api/resolve-handle", async (req, res) => {
   }
 
   try {
-    const fetch = await import('node-fetch').then(mod => mod.default); // Ensure node-fetch is available
+    const fetch = await import("node-fetch").then((mod) => mod.default); // Ensure node-fetch is available
 
     // Fetch the YouTube page HTML
     const controller = new AbortController();
@@ -1229,17 +1244,27 @@ app.post("/api/resolve-handle", async (req, res) => {
       clearTimeout(timeoutId);
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
+      if (fetchError.name === "AbortError") {
         console.error(`Fetch timeout for URL: ${url}`);
-        return res.status(504).json({ error: "YouTubeページへの接続がタイムアウトしました。" });
+        return res
+          .status(504)
+          .json({ error: "YouTubeページへの接続がタイムアウトしました。" });
       }
       console.error(`Error fetching YouTube page for URL ${url}:`, fetchError);
-      return res.status(500).json({ error: "YouTubeページの取得に失敗しました。" });
+      return res
+        .status(500)
+        .json({ error: "YouTubeページの取得に失敗しました。" });
     }
 
     if (!response.ok) {
-      console.error(`Failed to fetch YouTube page. Status: ${response.status} for URL: ${url}`);
-      return res.status(response.status).json({ error: `YouTubeページの取得に失敗しました。ステータス: ${response.status}` });
+      console.error(
+        `Failed to fetch YouTube page. Status: ${response.status} for URL: ${url}`,
+      );
+      return res
+        .status(response.status)
+        .json({
+          error: `YouTubeページの取得に失敗しました。ステータス: ${response.status}`,
+        });
     }
 
     const html = await response.text();
@@ -1250,7 +1275,9 @@ app.post("/api/resolve-handle", async (req, res) => {
 
     if (!canonicalMatch || !canonicalMatch[1]) {
       console.error(`Canonical URL not found in HTML for URL: ${url}`);
-      return res.status(404).json({ error: "チャンネルの正規URLが見つかりませんでした。" });
+      return res
+        .status(404)
+        .json({ error: "チャンネルの正規URLが見つかりませんでした。" });
     }
 
     const canonicalUrl = canonicalMatch[1];
@@ -1259,16 +1286,21 @@ app.post("/api/resolve-handle", async (req, res) => {
     const channelIdMatch = canonicalUrl.match(channelIdRegex);
 
     if (!channelIdMatch || !channelIdMatch[1]) {
-      console.error(`Channel ID not found in canonical URL: ${canonicalUrl} for original URL: ${url}`);
-      return res.status(404).json({ error: "チャンネルIDを抽出できませんでした。" });
+      console.error(
+        `Channel ID not found in canonical URL: ${canonicalUrl} for original URL: ${url}`,
+      );
+      return res
+        .status(404)
+        .json({ error: "チャンネルIDを抽出できませんでした。" });
     }
 
     const channelId = channelIdMatch[1]; // This will be UCxxxxxxxxxxx
     res.json({ channelId });
-
   } catch (error) {
     console.error("Handle resolution error:", error);
-    res.status(500).json({ error: "ハンドルの解決中に予期せぬエラーが発生しました。" });
+    res
+      .status(500)
+      .json({ error: "ハンドルの解決中に予期せぬエラーが発生しました。" });
   }
 });
 
@@ -1278,7 +1310,10 @@ app.post("/api/schedule/create", (req, res) => {
   const taskName = "YoutubeDL-AutoStart";
   const batPath = path.resolve(__dirname, "起動.bat");
   const psScriptPath = path.resolve(__dirname, "create_autostart_task.ps1");
-  const resultFilePath = path.join(os.tmpdir(), `autostart_result_create_${Date.now()}.txt`);
+  const resultFilePath = path.join(
+    os.tmpdir(),
+    `autostart_result_create_${Date.now()}.txt`,
+  );
 
   // PowerShellスクリプトを呼び出すコマンドを構築
   const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -BatPath "${batPath}" -ResultFilePath "${resultFilePath}"`;
@@ -1293,33 +1328,37 @@ app.post("/api/schedule/create", (req, res) => {
     console.log(`resultContent: '${resultContent}'`);
     console.log(`stdout type: ${typeof stdout}`);
     console.log(`stdout.length: ${stdout.length}`);
-    console.log(`stdout startsWith 'SUCCESS:': ${stdout.startsWith("SUCCESS:")}`);
+    console.log(
+      `stdout startsWith 'SUCCESS:': ${stdout.startsWith("SUCCESS:")}`,
+    );
     console.log(`stdout[0-8]: '${stdout.substring(0, 8)}'`);
     // --- デバッグ用追加 ---
 
     if (resultContent.startsWith("SUCCESS:")) {
       // 成功メッセージの整形
       // 日本語の schtasks 出力は不要なので、最初の行のみ抽出して整形する
-      const messageLines = resultContent.split('\n');
+      const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("SUCCESS: ", "").trim();
       return res.json({ message: cleanMessage });
     } else if (resultContent.startsWith("ERROR:")) {
-      const messageLines = resultContent.split('\n');
+      const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("ERROR: ", "").trim();
-      
+
       return res.status(500).json({
         message: cleanMessage,
         error: resultContent.trim(),
       });
-    } else if (error) { // exec自体がエラーを返した場合
+    } else if (error) {
+      // exec自体がエラーを返した場合
       return res.status(500).json({
         message: "コマンド実行に失敗しました。",
         error: stderr || error.message,
       });
-    } else { // 予期せぬ出力の場合（UACキャンセルなど）
+    } else {
+      // 予期せぬ出力の場合（UACキャンセルなど）
       return res.status(500).json({
         message: "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
-        error: `stdout: ${stdout}, stderr: ${stderr}`
+        error: `stdout: ${stdout}, stderr: ${stderr}`,
       });
     }
   });
@@ -1328,7 +1367,10 @@ app.post("/api/schedule/create", (req, res) => {
 app.post("/api/schedule/delete", (req, res) => {
   const taskName = "YoutubeDL-AutoStart";
   const psScriptPath = path.resolve(__dirname, "delete_autostart_task.ps1");
-  const resultFilePath = path.join(os.tmpdir(), `autostart_result_delete_${Date.now()}.txt`);
+  const resultFilePath = path.join(
+    os.tmpdir(),
+    `autostart_result_delete_${Date.now()}.txt`,
+  );
 
   const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -ResultFilePath "${resultFilePath}"`;
   console.log(`Executing PowerShell command: ${command}`);
@@ -1341,30 +1383,34 @@ app.post("/api/schedule/delete", (req, res) => {
     console.log(`resultContent: '${resultContent}'`);
     console.log(`stdout type: ${typeof stdout}`);
     console.log(`stdout.length: ${stdout.length}`);
-    console.log(`stdout startsWith 'SUCCESS:': ${stdout.startsWith("SUCCESS:")}`);
+    console.log(
+      `stdout startsWith 'SUCCESS:': ${stdout.startsWith("SUCCESS:")}`,
+    );
     console.log(`stdout[0-8]: '${stdout.substring(0, 8)}'`);
     // --- デバッグ用追加 ---
-    
+
     if (resultContent.startsWith("SUCCESS:")) {
-      const messageLines = resultContent.split('\n');
+      const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("SUCCESS: ", "").trim();
       return res.json({ message: cleanMessage });
     } else if (resultContent.startsWith("ERROR:")) {
-      const messageLines = resultContent.split('\n');
+      const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("ERROR: ", "").trim();
       return res.status(500).json({
         message: cleanMessage,
         error: resultContent.trim(),
       });
-    } else if (error) { // exec自体がエラーを返した場合
+    } else if (error) {
+      // exec自体がエラーを返した場合
       return res.status(500).json({
         message: "コマンド実行に失敗しました。",
         error: stderr || error.message,
       });
-    } else { // 予期せぬ出力の場合（UACキャンセルなど）
+    } else {
+      // 予期せぬ出力の場合（UACキャンセルなど）
       return res.status(500).json({
         message: "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
-        error: `stdout: ${stdout}, stderr: ${stderr}`
+        error: `stdout: ${stdout}, stderr: ${stderr}`,
       });
     }
   });
