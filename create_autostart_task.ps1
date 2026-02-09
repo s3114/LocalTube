@@ -24,26 +24,28 @@ if (-not $isAdmin) {
         Write-Output "ERROR: Task operation was cancelled or failed to produce a result file."
         exit 1
     }
-    # The non-admin process exits here
 }
 
 # --- Admin-only code starts here ---
 
-# If we are here, we are running with admin rights
 $output = ""
-$exitCode = 1 # Default to error
+$exitCode = 1
 
 try {
-    $command = "schtasks /create /tn `"$TaskName`" /tr `"$BatPath`" /sc onstart /rl highest /f"
-    $schtasksResult = Invoke-Expression $command 2>&1
+    # バッチファイルの親フォルダ（開始ディレクトリ）を取得
+    $workingDir = Split-Path -Parent $BatPath
 
-    if ($LASTEXITCODE -eq 0) {
-        $output = "SUCCESS: Auto-start task created successfully." + "`n" + $schtasksResult
-        $exitCode = 0
-    } else {
-        $output = "ERROR: Failed to create task." + "`n" + $schtasksResult
-        $exitCode = $LASTEXITCODE
-    }
+    # タスクのアクションを作成（開始ディレクトリを指定）
+    $action = New-ScheduledTaskAction -Execute $BatPath -WorkingDirectory $workingDir
+    
+    # トリガーを作成（システム起動時）
+    $trigger = New-ScheduledTaskTrigger -AtStartup
+    
+    # タスクの登録（最上位の特権で実行 / 既存があれば上書き）
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest -Force | Out-Null
+
+    $output = "SUCCESS: Auto-start task created successfully.`nWorking Directory set to: $workingDir"
+    $exitCode = 0
 } catch {
     $output = "ERROR: An exception occurred: $($_.Exception.Message)"
     $exitCode = 1
@@ -52,5 +54,4 @@ try {
 # Write result to the specified file
 Set-Content -Path $ResultFilePath -Value $output
 
-# Admin process exits here
 exit $exitCode
