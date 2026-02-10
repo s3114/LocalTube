@@ -1530,6 +1530,13 @@
         </div>
         <div class="header-buttons">
           <button
+            class="icon-btn active"
+            id="btn-home"
+            data-page="page-home"
+            title="ホーム">
+            <i class="fa-solid fa-home"></i>
+          </button>
+          <button
             class="icon-btn"
             id="btn-player"
             data-page="page-player"
@@ -1556,6 +1563,12 @@
 
     <main>
       <!-- ===== ページ切り替え用コンテナ ===== -->
+      <div id="page-home" class="page active-page">
+        <div class="home-video-grid">
+
+        </div>
+      </div>
+
       <div id="page-player" class="page">
         <div class="player-layout">
           <!-- ===== 左：メインプレイヤー ===== -->
@@ -2114,10 +2127,11 @@
             </div> <!-- Close options div for settings -->
           </div> <!-- Close card-main for settings -->
         </div> <!-- Close card card-layout for settings -->
-      </main>
+      </div>
+    </main>
 
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
       let pendingVideoId = null;
 
       // --- Global State ---
@@ -4335,5 +4349,5 @@
         loadLocalVideos();
       });
     </script>
-    </body>
-  </html>
+  </body>
+</html>
