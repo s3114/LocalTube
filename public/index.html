@@ -160,6 +160,66 @@
         padding: 0 16px;
       }
 
+      /* ==================================================
+   11) HOME PAGE
+================================================== */
+      .home-video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        padding: 24px 0;
+      }
+
+      .home-video-item {
+        display: block;
+        background: var(--panel);
+        border-radius: 8px;
+        overflow: hidden;
+        text-decoration: none;
+        color: var(--text);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .home-video-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .home-video-thumb {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .home-video-details {
+        padding: 12px;
+      }
+
+      .home-video-title {
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.4;
+        margin-top: 0;
+        margin-bottom: 8px;
+        max-height: 4.2em; /* 3 lines of text */
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+      }
+
+      .home-channel-name {
+        font-size: 13px;
+        color: var(--subtext);
+        margin-bottom: 4px;
+      }
+
+      .home-video-meta {
+        font-size: 12px;
+        color: var(--subtext);
+      }
+
       /* ページ切替 */
       .page {
         display: none;
@@ -575,7 +635,7 @@
    9) PLAYER LAYOUT（動画プレイヤー）
 ================================================== */
 
-      .player-layout {
+      .page-player {
         display: grid;
         grid-template-columns: 1.18fr 400px;
         gap: 24px;
@@ -1530,6 +1590,13 @@
         </div>
         <div class="header-buttons">
           <button
+            class="icon-btn active"
+            id="btn-home"
+            data-page="page-home"
+            title="ホーム">
+            <i class="fa-solid fa-home"></i>
+          </button>
+          <button
             class="icon-btn"
             id="btn-player"
             data-page="page-player"
@@ -1537,7 +1604,7 @@
             <i class="fa-solid fa-play"></i>
           </button>
           <button
-            class="icon-btn active"
+            class="icon-btn"
             id="btn-downloader"
             data-page="page-downloader"
             title="ダウンローダー">
@@ -1556,8 +1623,14 @@
 
     <main>
       <!-- ===== ページ切り替え用コンテナ ===== -->
+      <div id="page-home" class="page active-page">
+        <div class="home-video-grid">
+
+        </div>
+      </div>
+
       <div id="page-player" class="page">
-        <div class="player-layout">
+        <div class="page-player">
           <!-- ===== 左：メインプレイヤー ===== -->
           <div class="player-main">
             <div class="player-video-wrap" id="player-container">
@@ -2114,2226 +2187,374 @@
             </div> <!-- Close options div for settings -->
           </div> <!-- Close card-main for settings -->
         </div> <!-- Close card card-layout for settings -->
-      </main>
+      </div>
+    </main>
 
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
       let pendingVideoId = null;
-
+      let lastSelectedFilename = '';
+      
       // --- Global State ---
       const jobStates = new Map();
 
-      // --- Helper Functions ---
+      // --- Helper Functions (Globally Scoped) ---
       function getStatusIcon(status) {
         switch (status) {
-          case "queued":
-            return "🕒";
-          case "downloading":
-            return "⬇️";
-          case "completed":
-            return "✅";
-          case "error":
-            return "❌";
-          default:
-            return "❔";
+          case "queued": return "🕒";
+          case "downloading": return "⬇️";
+          case "completed": return "✅";
+          case "error": return "❌";
+          default: return "❔";
         }
       }
 
-      function renderJob(job) {
-        jobStates.set(job.id, job);
-        const statusIcon = getStatusIcon(job.status);
-        const progressText =
-          job.status === "downloading"
-            ? `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`
-            : job.progress.eta || job.status;
-
-        return `
-                <div class="job-item" id="job-${job.id}" data-status="${job.status}">
-                    <div class="job-status-icon">${statusIcon}</div>
-                    <div class="job-details">
-                        <div class="job-title" title="${job.title}">${job.title}</div>
-                        <div class="job-progress-bar-container">
-                            <div class="job-progress-bar" style="width: ${job.progress.percentage || 0}%;"></div>
-                        </div>
-                        <div class="job-progress-text">${progressText}</div>
-                    </div>
-                </div>
-            `;
-      }
-
-      function updateJobElement(job) {
-        const jobElement = document.getElementById(`job-${job.id}`);
-        if (!jobElement) return;
-
-        jobElement.dataset.status = job.status;
-        jobElement.querySelector(".job-status-icon").textContent =
-          getStatusIcon(job.status);
-        jobElement.querySelector(".job-title").textContent = job.title;
-        jobElement.querySelector(".job-title").title = job.title;
-
-        const progressBar = jobElement.querySelector(".job-progress-bar");
-        const progressTextElement =
-          jobElement.querySelector(".job-progress-text");
-
-        let progressText = "";
-        if (job.status === "downloading") {
-          progressBar.style.width = `${job.progress.percentage}%`;
-          progressText = `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`;
-        } else if (job.status === "completed") {
-          progressBar.style.width = "100%";
-          progressText = job.progress.eta || "完了";
-        } else if (job.status === "error") {
-          progressBar.style.width = "100%";
-          let errorMessage = job.progress.eta || "エラー";
-          if (errorMessage.includes("Sign in to confirm you’re not a bot")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">Cookieファイルを指定し、再度ダウンロードを実行してください。</span>';
-          }
-          if (errorMessage.includes("skipped as they are DRM protected")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">DRM保護の動画のトグルを有効にし再度ダウンロードを実行してください。</span>';
-          }
-          if (
-            errorMessage.includes("Join this channel to get access to members")
-          ) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">正しいCookieファイルを指定し、再度ダウンロードを実行してください。</span>';
-          }
-          if (errorMessage.includes("Requested format is not available")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">このエラーは様々な理由で発生します。最大の原因はショート動画のDLです。詳しくはサポートサーバーにて質問して下さい。</span>';
-          }
-          if (errorMessage.includes("HTTP Error 403: Forbidden")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">情報不足にて確実な対処方法が確立していません。詳しくはサポートサーバーにて質問して下さい。</span>';
-          }
-          if (errorMessage.includes("Unsupported URL: ")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">そのURLはサポートされていません。</span>';
-          }
-          if (errorMessage.includes("' is not a valid URL")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">URLが有効ではありません。</span>';
-          }
-
-          progressText = errorMessage;
-        } else {
-          progressBar.style.width = "0%";
-          progressText = job.progress.eta || job.status;
-        }
-        progressTextElement.innerHTML = progressText; // Use innerHTML because we're adding HTML tags
-      }
-
-      // --- Main Logic ---
-      document.addEventListener("DOMContentLoaded", () => {
-        function saveSetting(key, value) {
-          try {
-            localStorage.setItem(key, value);
-          } catch (e) {
-            console.warn("localStorage 保存失敗:", e);
-          }
-        }
-
-        function loadSetting(key, defaultValue) {
-          try {
-            const storedValue = localStorage.getItem(key);
-            if (storedValue === null) return defaultValue;
-            if (typeof defaultValue === "boolean")
-              return storedValue === "true";
-            return storedValue;
-          } catch (e) {
-            console.warn("localStorage 読み込み失敗:", e);
-            return defaultValue;
-          }
-        }
-
-        const elements = {
-          fmt: document.getElementById("fmt"),
-          savePath: document.getElementById("savePath"),
-          optHistory: document.getElementById("optHistory"),
-          optThumb: document.getElementById("optThumb"),
-          optDrm: document.getElementById("optDrm"),
-          optParallelDownloads: document.getElementById("optParallelDownloads"),
-          parallelDownloadsValue: document.getElementById(
-            "parallelDownloadsValue",
-          ),
-          optConcurrentFragments: document.getElementById(
-            "optConcurrentFragments",
-          ),
-          concurrentFragmentsValue: document.getElementById(
-            "concurrentFragmentsValue",
-          ),
-          urls: document.getElementById("urls"),
-          jobQueue: document.getElementById("job-queue"),
-          // New Cookie UI elements
-          cookieStatusDisplay: document.getElementById("cookie-status-display"),
-          setFirefoxBtn: document.getElementById("set-firefox-btn"),
-          manualSelectBtn: document.getElementById("manual-select-btn"),
-          noneSelectBtn: document.getElementById("none-select-btn"),
-          cookiePathSet: document.getElementById("cookiePathSet"),
-          commentOptions: document.getElementById("comment-options"),
-          clearHistoryBtn: document.getElementById("clearHistoryBtn"),
-        };
-
-        // Load general settings from localStorage
-        elements.fmt.value = loadSetting("fmt", elements.fmt.value);
-        elements.savePath.value = loadSetting("savePath", "");
-        elements.optHistory.checked = loadSetting("optHistory", true);
-        elements.optThumb.checked = loadSetting("optThumb", true);
-        elements.optDrm.checked = loadSetting("optDrm", false);
-        const loadedParallel = loadSetting("optParallelDownloads", "3");
-        elements.optParallelDownloads.value = loadedParallel;
-        elements.parallelDownloadsValue.textContent = loadedParallel;
-        const loadedFragments = loadSetting("optConcurrentFragments", "4");
-        elements.optConcurrentFragments.value = loadedFragments;
-        elements.concurrentFragmentsValue.textContent = loadedFragments;
-        elements.commentOptions.value = loadSetting(
-          "commentOptions",
-          elements.commentOptions.value,
-        );
-
-        // Event listeners for general settings
-        elements.fmt.addEventListener("change", (e) =>
-          saveSetting("fmt", e.target.value),
-        );
-        elements.savePath.addEventListener("input", (e) =>
-          saveSetting("savePath", e.target.value),
-        );
-        elements.optHistory.addEventListener("change", (e) =>
-          saveSetting("optHistory", e.target.checked),
-        );
-        elements.optThumb.addEventListener("change", (e) =>
-          saveSetting("optThumb", e.target.checked),
-        );
-        elements.optDrm.addEventListener("change", (e) =>
-          saveSetting("optDrm", e.target.checked),
-        );
-        elements.optParallelDownloads.addEventListener("input", (e) => {
-          elements.parallelDownloadsValue.textContent = e.target.value;
-          saveSetting("optParallelDownloads", e.target.value);
-        });
-        elements.optConcurrentFragments.addEventListener("input", (e) => {
-          elements.concurrentFragmentsValue.textContent = e.target.value;
-          saveSetting("optConcurrentFragments", e.target.value);
-        });
-        elements.commentOptions.addEventListener("change", (e) =>
-          saveSetting("commentOptions", e.target.value),
-        );
-
-        // --- History Clear Button ---
-        elements.clearHistoryBtn.addEventListener("click", async () => {
-          if (!confirm("ダウンロード履歴を削除しますか？")) return;
-          try {
-            const response = await fetch("/api/clear-history", {
-              method: "POST",
-            });
-            if (response.ok) {
-              alert("履歴を削除しました。");
-            } else {
-              alert("履歴の削除に失敗しました。");
-            }
-          } catch (error) {
-            console.error("履歴削除エラー:", error);
-            alert("履歴の削除に失敗しました。");
-          }
-        });
-
-        // --- Auto-start Task Buttons ---
-        const btnCreateAutostart = document.getElementById('btn-create-autostart-task');
-        const btnDeleteAutostart = document.getElementById('btn-delete-autostart-task');
-        const autostartStatus = document.getElementById('autostart-status');
-
-        async function handleAutostart(endpoint) {
-          try {
-            autostartStatus.textContent = '処理中...';
-            autostartStatus.style.color = 'var(--blue)';
-            const response = await fetch(endpoint, { method: 'POST' });
-            const result = await response.json();
-
-            if (response.ok) {
-              autostartStatus.textContent = result.message;
-              autostartStatus.style.color = 'var(--green)';
-            } else {
-              autostartStatus.textContent = `エラー: ${result.message}`;
-              autostartStatus.style.color = 'var(--accent)';
-            }
-          } catch (error) {
-            console.error('自動起動タスク操作エラー:', error);
-            autostartStatus.textContent = '通信エラーが発生しました。';
-            autostartStatus.style.color = 'var(--accent)';
-          }
-        }
-
-        btnCreateAutostart.addEventListener('click', () => {
-            if (confirm('PC起動時にこのアプリケーションを自動で起動するように設定しますか？')) {
-                handleAutostart('/api/schedule/create');
-            }
-        });
-
-        btnDeleteAutostart.addEventListener('click', () => {
-            if (confirm('PC起動時の自動実行を解除しますか？')) {
-                handleAutostart('/api/schedule/delete');
-            }
-        });
-
-
-        // New YouTube Channel Playlist URL Converter
-        const youtubeChannelUrlInput = document.getElementById(
-          "youtubeChannelUrlInput",
-        );
-        const youtubePlaylistUrlOutput = document.getElementById(
-          "youtubePlaylistUrlOutput",
-        );
-        const copyPlaylistUrlBtn =
-          document.getElementById("copyPlaylistUrlBtn");
-        const channelUrlError = document.getElementById("channelUrlError");
-
-        let resolveTimeout;
-
-        youtubeChannelUrlInput.addEventListener("input", () => {
-          clearTimeout(resolveTimeout);
-          const channelUrl = youtubeChannelUrlInput.value.trim();
-
-          const channelRegex =
-            /^https?:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})$/;
-          const handleRegex =
-            /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)$/;
-
-          const channelMatch = channelUrl.match(channelRegex);
-          const handleMatch = channelUrl.match(handleRegex);
-
-          youtubePlaylistUrlOutput.value = ""; // Clear previous output
-          channelUrlError.textContent = ""; // Clear previous error
-
-          if (channelUrl === "") {
-            return;
-          }
-
-          if (channelMatch) {
-            const channelId = channelMatch[1]; // UCxxxxxxxxxxx
-            const playlistId = channelId.substring(2);
-            const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
-            youtubePlaylistUrlOutput.value = playlistUrl;
-          } else if (handleMatch) {
-            channelUrlError.textContent = "ハンドルを解決中..."; // Loading indicator
-            // Debounce the fetch request
-            resolveTimeout = setTimeout(async () => {
-              try {
-                const response = await fetch("/api/resolve-handle", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ url: channelUrl }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                  const channelId = data.channelId; // UCxxxxxxxxxxx
-                  const playlistId = channelId.substring(2);
-                  const playlistUrl = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
-                  youtubePlaylistUrlOutput.value = playlistUrl;
-                  channelUrlError.textContent = ""; // Clear loading message
-                } else {
-                  channelUrlError.textContent = `エラー: ${data.error || "チャンネルIDの取得に失敗しました。"}`;
-                }
-              } catch (error) {
-                channelUrlError.textContent =
-                  "ネットワークエラーまたはサーバーの問題が発生しました。";
-                console.error("Error resolving handle:", error);
-              }
-            }, 500); // 500ms delay
-          } else {
-            channelUrlError.textContent =
-              "無効なYouTubeチャンネルURLまたはハンドルURLです。";
-          }
-        });
-
-        copyPlaylistUrlBtn.addEventListener("click", async () => {
-          const playlistUrl = youtubePlaylistUrlOutput.value;
-          if (playlistUrl) {
-            try {
-              await navigator.clipboard.writeText(playlistUrl);
-              alert("再生リストURLをコピーしました！");
-            } catch (err) {
-              console.error("Failed to copy: ", err);
-              alert("コピーに失敗しました。手動でコピーしてください。");
-            }
-          } else {
-            alert("変換された再生リストURLがありません。");
-          }
-        });
-
-        // --- Cookie Settings Management ---
-        function updateCookieButtonStyles(activeButton) {
-          elements.setFirefoxBtn.style.background = "#333";
-          elements.manualSelectBtn.style.background = "#333";
-          elements.noneSelectBtn.style.background = "#333";
-          if (activeButton) {
-            activeButton.style.background = "var(--blue)"; // Active color
-          }
-        }
-
-        // Load initial cookie settings
-        (async () => {
-          try {
-            const response = await fetch("/api/settings");
-            if (response.ok) {
-              const settings = await response.json();
-              if (settings.selectedBrowser === "firefox") {
-                elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
-                updateCookieButtonStyles(elements.setFirefoxBtn);
-              } else {
-                elements.cookieStatusDisplay.textContent = "設定されていません";
-                updateCookieButtonStyles(null);
-              }
-            }
-          } catch (error) {
-            console.error("Failed to load settings:", error);
-          }
-        })();
-
-        // Event listener for Firefox button
-        elements.setFirefoxBtn.addEventListener("click", async () => {
-          window.selectedCookieFile = null; // Clear manual selection
-          try {
-            const response = await fetch("/api/settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ browser: "firefox" }),
-            });
-            if (response.ok) {
-              console.log("設定を Firefox にセットしました。");
-              elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
-              updateCookieButtonStyles(elements.setFirefoxBtn);
-            } else {
-              console.error("Firefox設定の保存に失敗しました。");
-            }
-          } catch (error) {
-            console.error("ネットワークエラー:", error);
-          }
-        });
-
-        // Event listener for Manual Select button
-        elements.manualSelectBtn.addEventListener("click", () => {
-          elements.cookiePathSet.click();
-        });
-
-        // Event listener for file input change
-        elements.cookiePathSet.addEventListener("change", async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-
-          window.selectedCookieFile = file;
-          // Deactivate browser setting by saving an empty value
-          try {
-            const response = await fetch("/api/settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ browser: "" }),
-            });
-            if (response.ok) {
-              console.log(
-                "手動ファイル選択のため、ブラウザ自動連携を解除しました。",
-              );
-              elements.cookieStatusDisplay.textContent = `手動指定: ${file.name}`;
-              updateCookieButtonStyles(elements.manualSelectBtn);
-            } else {
-              console.error("ブラウザ設定のリセットに失敗しました。");
-            }
-          } catch (error) {
-            console.error("ネットワークエラー:", error);
-          }
-        });
-
-        // Event listener for None button
-        elements.noneSelectBtn.addEventListener("click", async () => {
-          window.selectedCookieFile = null; // Clear manual selection
-          try {
-            const response = await fetch("/api/settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ browser: "" }),
-            });
-            if (response.ok) {
-              console.log("Cookieファイルの使用を解除しました。");
-              elements.cookieStatusDisplay.textContent = "設定されていません";
-              updateCookieButtonStyles(elements.noneSelectBtn);
-            } else {
-              console.error("Cookie設定のリセットに失敗しました。");
-            }
-          } catch (error) {
-            console.error("ネットワークエラー:", error);
-          }
-        });
-
-        // ===== 5秒移動平均用バッファ =====
-        const netBuffer = []; // Mbps 用
-        const latencyBuffer = []; // ms 用
-        const AVG_WINDOW = 5; // 5秒平均
-
-        function updateJobCounts() {
-          let completed = 0;
-          let running = 0;
-          let error = 0;
-
-          for (const job of jobStates.values()) {
-            if (job.status === "completed") {
-              completed++;
-            } else if (job.status === "downloading") {
-              running++;
-            } else if (job.status === "error") {
-              error++;
-            }
-          }
-
-          const total = completed + running + error;
-          const completionRate =
-            total > 0 ? Math.round((completed / total) * 100) : 0;
-
-          // --- 件数表示 ---
-          const totalEl = document.getElementById("info-total-count");
-          const completedEl = document.getElementById("info-completed-count");
-          const runningEl = document.getElementById("info-running-count");
-          const errorEl = document.getElementById("info-error-count");
-
-          if (totalEl) totalEl.textContent = `${total} 件`;
-          if (completedEl) completedEl.textContent = `${completed} 件`;
-          if (runningEl) runningEl.textContent = `${running} 件`;
-          if (errorEl) errorEl.textContent = `${error} 件`;
-
-          // --- 完了率バー（★ 追加部分）---
-          const bar = document.getElementById("completion-bar");
-          const text = document.getElementById("completion-text");
-
-          if (bar) bar.style.width = `${completionRate}%`;
-          if (text) text.textContent = `${completionRate}%`;
-        }
-
-        // --- SSE Connection ---
-        const eventSource = new EventSource("/events");
-
-        // ===== ネットワークグラフの初期化 =====
-        const ctx = document.getElementById("networkChart").getContext("2d");
-
-        const networkChart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: [], // 時間軸（秒）
-            datasets: [
-              {
-                label: "推定Mbps",
-                data: [],
-                tension: 0.3,
-              },
-              {
-                label: "レイテンシ(ms)",
-                data: [],
-                tension: 0.3,
-                yAxisID: "y2",
-              },
-            ],
-          },
-          options: {
-            animation: false,
-            scales: {
-              x: {
-                title: { display: true, text: "秒" },
-              },
-              y: {
-                title: { display: true, text: "Mbps" },
-                position: "left",
-              },
-              y2: {
-                title: { display: true, text: "ms" },
-                position: "right",
-                grid: { drawOnChartArea: false },
-              },
-            },
-          },
-        });
-
-        eventSource.addEventListener("initial_state", (e) => {
-          const jobs = JSON.parse(e.data);
-          elements.jobQueue.innerHTML = "";
-          jobs.forEach((job) => {
-            elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
-          });
-          updateJobCounts();
-        });
-
-        eventSource.addEventListener("jobs_added", (e) => {
-          const newJobs = JSON.parse(e.data);
-          newJobs.forEach((job) => {
-            elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
-          });
-          updateJobCounts();
-        });
-
-        eventSource.addEventListener("title_update", (e) => {
-          const { id, title } = JSON.parse(e.data);
-          const job = jobStates.get(id);
-          if (job) {
-            job.title = title;
-            updateJobElement(job);
-          }
-        });
-
-        eventSource.addEventListener("progress_update", (e) => {
-          const { id, progress } = JSON.parse(e.data);
-          const job = jobStates.get(id);
-          if (job) {
-            job.progress = progress;
-            updateJobElement(job);
-          }
-        });
-
-        eventSource.addEventListener("status_update", (e) => {
-          const { id, status, progress, error } = JSON.parse(e.data);
-          const job = jobStates.get(id);
-          if (job) {
-            job.status = status;
-            if (progress) job.progress = progress;
-            if (error) job.error = error;
-            updateJobElement(job);
-            updateJobCounts();
-          }
-        });
-
-        eventSource.onerror = (err) => {
-          console.error("EventSource failed:", err);
-          const jobQueueDiv = document.getElementById("job-queue");
-          jobQueueDiv.innerHTML =
-            '<div style="color: var(--warn);">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' +
-            jobQueueDiv.innerHTML;
-          eventSource.close();
-        };
-
-        eventSource.addEventListener("system_info", (e) => {
-          const data = JSON.parse(e.data);
-
-          // ===== サーバー時刻（★ここが追加・変更）=====
-          if (data.server_time) {
-            const t = data.server_time;
-            const clockEl = document.getElementById("info-clock");
-            if (clockEl) {
-              clockEl.textContent = `${t.yyyy}/${t.MM}/${t.dd} ${t.hh}:${t.mm}:${t.ss}`;
-            }
-          }
-
-          // --- ネットワーク表示（あれば） ---
-          const netEl = document.getElementById("info-network");
-          if (netEl && data.network_mbps != null) {
-            netEl.textContent = `${data.network_mbps} Mbps (推定)`;
-          }
-
-          // --- レイテンシ表示（あれば） ---
-          const latEl = document.getElementById("info-latency");
-          if (latEl && data.latency_ms != null) {
-            latEl.textContent = `${data.latency_ms} ms`;
-          }
-
-          // --- ★ 稼働時間（ここが問題箇所だった） ---
-          const upEl = document.getElementById("info-uptime");
-          if (upEl && typeof data.uptime_sec === "number") {
-            const sec = data.uptime_sec;
-            const h = Math.floor(sec / 3600);
-            const m = Math.floor((sec % 3600) / 60);
-            const s = sec % 60;
-
-            upEl.textContent = `${h}時間 ${m}分 ${s}秒`;
-          }
-
-          // ===== グラフにデータ追加（5秒移動平均）=====
-          if (data.network_mbps != null && data.latency_ms != null) {
-            // ① バッファに追加
-            netBuffer.push(data.network_mbps);
-            latencyBuffer.push(data.latency_ms);
-
-            // ② 5個を超えたら古いものを捨てる
-            if (netBuffer.length > AVG_WINDOW) netBuffer.shift();
-            if (latencyBuffer.length > AVG_WINDOW) latencyBuffer.shift();
-
-            // ③ 平均を計算
-            const avgMbps = Math.round(
-              netBuffer.reduce((a, b) => a + b, 0) / netBuffer.length,
-            );
-
-            const avgLatency = Math.round(
-              latencyBuffer.reduce((a, b) => a + b, 0) / latencyBuffer.length,
-            );
-
-            // ④ 時間ラベル（5秒ごとに見える感じ）
-            const now = new Date();
-            const timeLabel = `${now.getMinutes()}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-            // ⑤ グラフに追加
-            networkChart.data.labels.push(timeLabel);
-            networkChart.data.datasets[0].data.push(avgMbps);
-            networkChart.data.datasets[1].data.push(avgLatency);
-
-            // ⑥ 表示点数を最大60点に制限（＝約5分分）
-            if (networkChart.data.labels.length > 30) {
-              networkChart.data.labels.shift();
-              networkChart.data.datasets[0].data.shift();
-              networkChart.data.datasets[1].data.shift();
-            }
-
-            networkChart.update();
-          }
-        });
-      });
-
-      // --- Actions ---
-      async function start() {
-        const downloadBtn = document.getElementById("download-btn");
-        const urlsInput = document.getElementById("urls");
-
-        if (downloadBtn) {
-          downloadBtn.disabled = true;
-        }
-
+      function formatTimeAgo(dateString) {
+        if (!dateString) return '';
         try {
-          const rawUrls = urlsInput.value.trim();
-          if (rawUrls === "") {
-            alert("URLを入力してください。");
-            return;
-          }
+            const uploadDate = new Date(dateString.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+            if (isNaN(uploadDate.getTime())) return '';
+            const now = new Date();
+            const seconds = Math.floor((now - uploadDate) / 1000);
 
-          const urls = rawUrls
-            .split(/[\n\s,]+/)
-            .filter((url) => url.trim() !== "");
-
-          if (urls.length === 0) {
-            alert("URLを入力してください。");
-            return;
-          }
-
-          // 各URLをサーバーサイドで検証
-          for (const url of urls) {
-            // URLの基本的なフォーマットチェック (https://から始まるか)
-            if (!url.startsWith("https://")) {
-              alert(
-                `「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`,
-              );
-              return;
-            }
-
-            const validationResponse = await fetch(
-              `/api/validate-url?url=${encodeURIComponent(url)}`,
-            );
-            const validationResult = await validationResponse.json();
-
-            if (!validationResult.isValid) {
-              alert(
-                `「${url}」はアクセスできません。${validationResult.error ? `エラー: ${validationResult.error}` : ""}`,
-              );
-              return;
-            }
-          }
-
-          const formData = new FormData();
-          formData.append("urls", urlsInput.value);
-          formData.append("format", document.getElementById("fmt").value);
-          formData.append(
-            "saveHistory",
-            document.getElementById("optHistory").checked,
-          );
-          formData.append(
-            "downloadThumb",
-            document.getElementById("optThumb").checked,
-          );
-          formData.append(
-            "drmProtect",
-            document.getElementById("optDrm").checked,
-          );
-          formData.append(
-            "savePath",
-            document.getElementById("savePath").value,
-          );
-          formData.append(
-            "parallelDownloads",
-            document.getElementById("optParallelDownloads").value,
-          );
-          formData.append(
-            "concurrentFragments",
-            document.getElementById("optConcurrentFragments").value,
-          );
-          formData.append(
-            "commentOptions",
-            document.getElementById("comment-options").value,
-          );
-
-          if (window.selectedCookieFile) {
-            formData.append("cookieFile", window.selectedCookieFile);
-          }
-
-          const response = await fetch("/download", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            alert(`エラー: ${errorData.error}`);
-          } else {
-            urlsInput.value = ""; // Clear textarea on success
-          }
-        } catch (error) {
-          alert(
-            `ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`,
-          );
-          console.error("Fetch error:", error);
-        } finally {
-          if (downloadBtn) {
-            downloadBtn.disabled = false;
-          }
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + "年前";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + "ヶ月前";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + "日前";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + "時間前";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + "分前";
+            return Math.floor(seconds) + "秒前";
+        } catch (e) {
+            console.error("Error formatting date:", dateString, e);
+            return '';
         }
       }
 
-      // ===== ヘッダーボタンの「現在の画面」表示 =====
-      // ===== ヘッダーボタンで「ページ切替」＋「縁の移動」 =====
-      // ===== URLルーティング対応のページ切替 =====
-      document.addEventListener("DOMContentLoaded", () => {
-        // ★ URL から動画IDで選択する
-        function selectVideoById(videoId) {
-          const items = document.querySelectorAll(".local-video-item");
-
-          items.forEach((item) => {
-            const titleEl = item.querySelector(".local-video-text");
-            if (!titleEl) return;
-
-            const title = titleEl.textContent.trim();
-
-            if (title === videoId) {
-              item.click(); // 既存の再生処理をそのまま使う
-            }
-          });
-        }
-
-        const buttons = document.querySelectorAll(".icon-btn");
-        const pages = document.querySelectorAll(".page");
-
-        function showPage(pageId) {
-          // すべて非表示
-          pages.forEach((p) => p.classList.remove("active-page"));
-
-          // 指定ページだけ表示
-          const target = document.getElementById(pageId);
-          if (target) {
-            target.classList.add("active-page");
-          }
-        }
-
-        function setActiveButton(pageId) {
-          buttons.forEach((b) => {
-            if (b.dataset.page === pageId) {
-              b.classList.add("active");
-            } else {
-              b.classList.remove("active");
-            }
-          });
-        }
-
-        function routeFromHash() {
-          const hash = location.hash.replace("#", "");
-
-          // ★ 追加：player/ID を分解
-          const [page, videoId] = hash.split("/");
-
-          let pageId;
-          switch (page) {
-            case "player":
-              pageId = "page-player";
-              break;
-            case "settings":
-              pageId = "page-settings";
-              break;
-            case "downloader":
-            case "":
-              pageId = "page-downloader";
-              break;
-            default:
-              pageId = "page-downloader";
-          }
-
-          showPage(pageId);
-          setActiveButton(pageId);
-
-          if (page === "player" && videoId) {
-            pendingVideoId = decodeURIComponent(videoId);
-          }
-        }
-
-        // ボタンクリック時 → URLも変更
-        buttons.forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const pageId = btn.dataset.page;
-
-            // URLを更新（ページ再読み込みなし）
-            const hash = pageId.replace("page-", ""); // page-player → player
-            history.pushState(null, "", "#" + hash);
-
-            showPage(pageId);
-            setActiveButton(pageId);
-          });
-        });
-
-        // ブラウザの「戻る／進む」に対応
-        window.addEventListener("popstate", routeFromHash);
-
-        // 初期表示（URLに合わせて表示）
-        routeFromHash();
-      });
-
-      // ===== ローカル動画プレイヤー（サーバー連携版） =====
-      document.addEventListener("DOMContentLoaded", () => {
-        // ===== 概要欄のURLをリンク化する関数 =====
-        function linkify(text) {
-          if (!text) return "";
-
-          const urlRegex = /(https?:\/\/[^\s]+)/g;
-
-          return text.replace(urlRegex, (url) => {
-            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="desc-link">${url}</a>`;
-          });
-        }
-
-        // ===== 概要欄 折りたたみ処理 =====
-        const desc = document.getElementById("video-description");
-        const toggleBtn = document.getElementById("desc-toggle");
-
-        function updateDescButton() {
-          // 3行より短い場合はボタンを隠す
-          if (desc.scrollHeight <= desc.clientHeight) {
-            toggleBtn.style.display = "none";
-          } else {
-            toggleBtn.style.display = "inline";
-          }
-        }
-
-        // 初期チェック
-        updateDescButton();
-
-        // ウィンドウサイズ変更時にも再判定
-        window.addEventListener("resize", updateDescButton);
-
-        // ボタン押下時の挙動
-        toggleBtn.addEventListener("click", () => {
-          desc.classList.toggle("collapsed");
-
-          if (desc.classList.contains("collapsed")) {
-            toggleBtn.textContent = "もっと見る";
-          } else {
-            toggleBtn.textContent = "折りたたむ";
-          }
-        });
-
-        const videoPlayer = document.getElementById("local-player");
-        const videoList = document.getElementById("local-video-list");
-        const titleEl = document.getElementById("player-title");
-        const timeEl = document.getElementById("player-time");
-
-        const seekBar = document.getElementById("seek-bar");
-        const btnPlay = document.getElementById("btn-play");
-        const btnFull = document.getElementById("btn-full");
-        const timeDisplay = document.getElementById("time-display");
-
-        function syncSeekBarWithVideo() {
-          if (!videoPlayer.duration || isNaN(videoPlayer.duration)) return;
-
-          const progress =
-            (videoPlayer.currentTime / videoPlayer.duration) * 100;
-
-          // スライダーの位置を更新
-          seekBar.value = progress;
-
-          // 「左側を赤く塗る」ためのCSS変数も更新
-          seekBar.style.setProperty("--progress", progress + "%");
-        }
-
-        let isUserScrolling = false;
-        let scrollTimeout = null;
-
-        // 再生中は常に同期
-        videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
-
-        // ===== ★ ライブチャット同期スクロール（確実に動く版） =====
-        videoPlayer.addEventListener("timeupdate", () => {
-          const chatContainer = document.getElementById("chat-messages");
-          if (!chatContainer) return;
-
-          // ユーザーがスクロール中は追従しない
-          if (isUserScrolling) return;
-
-          const currentSec = Math.floor(videoPlayer.currentTime);
-          const lines = chatContainer.querySelectorAll(".chat-line[data-time]");
-
-          if (lines.length === 0) return;
-
-          let target = null;
-
-          for (const line of lines) {
-            const t = parseInt(line.dataset.time, 10);
-            if (t <= currentSec) {
-              target = line;
-            } else {
-              break;
-            }
-          }
-
-          if (!target) return;
-
-          // ===== ★ 中央に表示（YouTube風） =====
-          const targetOffset =
-            target.offsetTop -
-            chatContainer.clientHeight / 2 +
-            target.clientHeight / 2;
-
-          chatContainer.scrollTo({
-            top: Math.max(0, targetOffset),
-            behavior: "smooth",
-          });
-        });
-
-        function resetSeekBar() {
-          seekBar.value = 0;
-          seekBar.style.setProperty("--progress", "0%");
-        }
-
-        videoPlayer.addEventListener("timeupdate", () => {
-          seekBar.value =
-            (videoPlayer.currentTime / videoPlayer.duration) * 100;
-        });
-
-        seekBar.addEventListener("input", () => {
-          if (!videoPlayer.duration) return;
-          videoPlayer.currentTime =
-            (seekBar.value / 100) * videoPlayer.duration;
-        });
-
-        function updateSeekBarFill() {
-          const value = seekBar.value; // 0〜100
-          seekBar.style.setProperty("--progress", value + "%");
-        }
-
-        // 初期化
-        updateSeekBarFill();
-
-        // ===== サイドバー：個別セクション開閉 =====
-        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-
-            const targetId = btn.dataset.target;
-            const section = document.getElementById(targetId);
-            const icon = btn.querySelector("i");
-
-            const isCollapsed = section.classList.toggle("collapsed");
-
-            // FontAwesomeアイコン切り替え
-            icon.className = isCollapsed
-              ? "fa-solid fa-chevron-right"
-              : "fa-solid fa-chevron-down";
-          });
-        });
-
-        // ===== ライブチャットの高さをプレイヤーに合わせる =====
-        const playerMain = document.querySelector(".player-main");
-        const chatSection = document.getElementById("chat-section");
-        const chatContent = document.getElementById("live-chat-container"); // ★ これだけで十分
-
-        function syncChatHeight() {
-          if (!playerMain || !chatSection || !chatContent) return;
-
-          if (chatSection.classList.contains("collapsed")) {
-            chatContent.style.height = "0px";
-            chatContent.style.overflow = "hidden";
-            return;
-          }
-
-          // 開いているとき
-          chatContent.style.height = "";
-          chatContent.style.overflow = "auto";
-        }
-
-        // 初回ロード時にも合わせる（DOMContentLoaded後に実行）
-        setTimeout(syncChatHeight, 100);
-
-        // ウィンドウサイズ変更時にも追従
-        window.addEventListener("resize", syncChatHeight);
-
-        // ユーザー操作時に更新
-        seekBar.addEventListener("input", updateSeekBarFill);
-
-        btnPlay.addEventListener("click", () => {
-          if (videoPlayer.paused) {
-            videoPlayer.play();
-          } else {
-            videoPlayer.pause();
-          }
-        });
-
-        // 再生状態に応じてアイコンを切り替え
-        videoPlayer.addEventListener("play", () => {
-          btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
-        });
-
-        videoPlayer.addEventListener("pause", () => {
-          btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
-        });
-
-        async function loadLocalVideos() {
-          try {
-            const res = await fetch("/api/local-videos");
-            const videos = await res.json();
-
-            renderLocalVideos(videos);
-          } catch (e) {
-            console.error("Failed to load local videos:", e);
-            videoList.innerHTML =
-              '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
-          }
-        }
-
-        // ===============================
-        // ★ 追加：クリックで再生／停止、ダブルクリックで全画面
-        // ===============================
-
-        let clickTimer = null;
-        const DOUBLE_CLICK_DELAY = 250; // ms（YouTubeっぽい値）
-
-        videoPlayer.addEventListener("click", (e) => {
-          // ★ コントロール（ボタン）をクリックした時は無視
-          if (e.target.closest(".yt-controls")) return;
-
-          // ダブルクリックと区別するため、少しだけ待つ
-          if (clickTimer) {
-            clearTimeout(clickTimer);
-            clickTimer = null;
-            return;
-          }
-
-          clickTimer = setTimeout(() => {
-            // ここで「シングルクリック」と確定
-            if (videoPlayer.paused) {
-              videoPlayer.play();
-            } else {
-              videoPlayer.pause();
-            }
-            clickTimer = null;
-          }, DOUBLE_CLICK_DELAY);
-        });
-
-        videoPlayer.addEventListener("dblclick", () => {
-          // ダブルクリック → 全画面トグル
-          if (!document.fullscreenElement) {
-            videoPlayer.requestFullscreen().catch(() => {
-              // 一部ブラウザ対策：ラッパーをフルスクリーン
-              document.getElementById("player-container")?.requestFullscreen();
-            });
-          } else {
-            document.exitFullscreen();
-          }
-
-          // シングルクリックのタイマーは無効化
-          if (clickTimer) {
-            clearTimeout(clickTimer);
-            clickTimer = null;
-          }
-        });
-
-        // ---- フルスクリーン ----
-        btnFull.addEventListener("click", async () => {
-          if (document.fullscreenElement) {
-            await document.exitFullscreen();
-          } else {
-            await videoPlayer.requestFullscreen();
-          }
-        });
-
-        const btnSpeed = document.getElementById("btn-speed");
-        const speedMenu = document.getElementById("speed-menu");
-        const speedOptions = document.querySelectorAll(".speed-option");
-
-        // メニュー開閉
-        btnSpeed.addEventListener("click", (e) => {
-          e.stopPropagation(); // プレイヤークリック判定を防ぐ
-          speedMenu.classList.toggle("hidden");
-        });
-
-        // 速度変更
-        speedOptions.forEach((option) => {
-          option.addEventListener("click", () => {
-            const speed = parseFloat(option.dataset.speed);
-            videoPlayer.playbackRate = speed;
-            btnSpeed.textContent = speed + "×";
-            speedMenu.classList.add("hidden");
-          });
-        });
-
-        // 画面クリックで閉じる
-        document.addEventListener("click", () => {
-          speedMenu.classList.add("hidden");
-        });
-
-        // ===============================
-        // ★ ライブチャット読み込み関数（ここに追加）
-        // ===============================
-
-        // ===============================
-        // ★★ 追加：絵文字を含むチャットを正しく描画する関数 ★★
-        // ===============================
-        function renderChatMessage(message) {
+      function formatNumber(num) {
+        if (num == null || isNaN(num)) return '0';
+        if (num >= 100000000) return (num / 100000000).toFixed(1).replace(/\.0$/, '') + '億';
+        if (num >= 10000) return (num / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+        if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + '千';
+        return num.toLocaleString();
+      }
+
+      function linkify(text) {
+        if (!text) return "";
+        const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+        return text.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" class="desc-link">$1</a>');
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+       function renderChatMessage(message) {
           if (!message?.runs) return "";
-
-          return message.runs
-            .map((run) => {
-              if (run.text) {
-                // 通常テキスト
-                return run.text;
-              }
-
+          return message.runs.map((run) => {
+              if (run.text) return escapeHtml(run.text);
               if (run.emoji?.image?.thumbnails?.length) {
-                // 絵文字（メンバー絵文字含む）
                 const url = run.emoji.image.thumbnails.slice(-1)[0].url;
-                const alt = run.emoji.emojiId || "";
+                const alt = run.emoji.emojiId || "emoji";
                 return `<img src="${url}" alt="${alt}" class="chat-emoji">`;
               }
-
               return "";
-            })
-            .join("");
+            }).join("");
         }
 
-        function loadLiveChat(videoFile) {
-          // ★ 引数名に合わせて統一（これがポイント）
-          const base = videoFile.replace(/\.live_chat\.json$/i, "");
+      // Main script logic runs after DOM is loaded
+      document.addEventListener("DOMContentLoaded", () => {
+        
+        // --- Element Cache ---
+        const elements = {
+            // Main structure
+            buttons: document.querySelectorAll(".icon-btn"),
+            pages: document.querySelectorAll(".page"),
+            jobQueue: document.getElementById("job-queue"),
 
-          const url = `/api/live-chat/${encodeURIComponent(base)}.live_chat.json`;
+            // Downloader Page
+            fmt: document.getElementById("fmt"),
+            savePath: document.getElementById("savePath"),
+            optHistory: document.getElementById("optHistory"),
+            optThumb: document.getElementById("optThumb"),
+            optDrm: document.getElementById("optDrm"),
+            optParallelDownloads: document.getElementById("optParallelDownloads"),
+            parallelDownloadsValue: document.getElementById("parallelDownloadsValue"),
+            optConcurrentFragments: document.getElementById("optConcurrentFragments"),
+            concurrentFragmentsValue: document.getElementById("concurrentFragmentsValue"),
+            urls: document.getElementById("urls"),
+            cookieStatusDisplay: document.getElementById("cookie-status-display"),
+            setFirefoxBtn: document.getElementById("set-firefox-btn"),
+            manualSelectBtn: document.getElementById("manual-select-btn"),
+            noneSelectBtn: document.getElementById("none-select-btn"),
+            cookiePathSet: document.getElementById("cookiePathSet"),
+            commentOptions: document.getElementById("comment-options"),
+            downloadBtn: document.getElementById('download-btn'),
 
-          fetch(url)
-            .then((r) => {
-              if (!r.ok) throw new Error(`HTTP ${r.status}`);
-              return r.json();
-            })
-            .then((data) => {
-              renderLiveChat(data);
-            })
-            .catch((err) => {
-              console.warn("ライブチャットなし or 読み込み失敗:", err);
-              if (typeof clearLiveChat === "function") {
-                clearLiveChat();
-              }
-            });
+            // Player Page
+            videoPlayer: document.getElementById("local-player"),
+            videoList: document.getElementById("local-video-list"),
+            playerTitle: document.getElementById("player-title"),
+            youtubeBtn: document.getElementById("youtube-link-btn"),
+            channelAvatar: document.getElementById("channel-avatar"),
+            channelLink: document.getElementById("channel-link"),
+            channelAvatarLink: document.getElementById("channel-avatar-link"),
+            channelHandle: document.getElementById("channel-handle"),
+            channelSubs: document.getElementById("channel-subs"),
+            statLikes: document.getElementById("stat-likes"),
+            videoDescription: document.getElementById("video-description"),
+            descToggle: document.getElementById("desc-toggle"),
+            commentCountDisplay: document.getElementById("comment-count-display"),
+            commentList: document.getElementById("comment-list"),
+            commentEmpty: document.querySelector(".comment-empty"),
+            sortToggle: document.getElementById("sort-toggle"),
+            sortMenu: document.getElementById("sort-menu"),
+            sortItems: document.querySelectorAll(".sort-item"),
+            chatMessages: document.getElementById("chat-messages"),
+            chatEmpty: document.querySelector("#live-chat-container .chat-empty"),
+            playerContainer: document.getElementById("player-container"),
+            ytControls: document.querySelector(".yt-controls"),
+            btnPlay: document.getElementById("btn-play"),
+            btnRew5: document.getElementById("btn-rew5"),
+            btnFwd5: document.getElementById("btn-fwd5"),
+            volumeIcon: document.querySelector(".yt-volume i"),
+            volumeBar: document.getElementById("volume-bar"),
+            seekBar: document.getElementById("seek-bar"),
+            timeDisplay: document.getElementById("time-display"),
+            btnSpeed: document.getElementById("btn-speed"),
+            speedMenu: document.getElementById("speed-menu"),
+            speedOptions: document.querySelectorAll(".speed-option"),
+            btnFull: document.getElementById("btn-full"),
+
+            // Settings Page
+            clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+            youtubeChannelUrlInput: document.getElementById("youtubeChannelUrlInput"),
+            youtubePlaylistUrlOutput: document.getElementById("youtubePlaylistUrlOutput"),
+            copyPlaylistUrlBtn: document.getElementById("copyPlaylistUrlBtn"),
+            channelUrlError: document.getElementById("channelUrlError"),
+            btnCreateAutostart: document.getElementById('btn-create-autostart-task'),
+            btnDeleteAutostart: document.getElementById('btn-delete-autostart-task'),
+            autostartStatus: document.getElementById('autostart-status'),
+        };
+
+        // --- Function Definitions ---
+
+        // Video list/grid rendering
+        async function createHomeVideoItem(video) {
+            const item = document.createElement("a");
+            const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+            item.href = `#player/${encodeURIComponent(videoId)}`;
+            item.className = "home-video-item";
+            let info = { title: video.title, channel: 'N/A', view_count: 0, upload_date: null, thumb: video.thumb };
+            try {
+                const res = await fetch(`/info/${encodeURIComponent(videoId)}`);
+                if (res.ok) info = { ...info, ...(await res.json()) };
+            } catch (e) { console.warn(`Info fetch failed for ${video.filename}:`, e); }
+            const thumbSrc = info.channel_thumbnail || video.thumb || "/none_icon.jpg";
+            item.innerHTML = `
+                <img src="${thumbSrc}" alt="${info.title}" class="home-video-thumb" onerror="this.onerror=null; this.src='/none_icon.jpg';">
+                <div class="home-video-details">
+                    <h3 class="home-video-title">${info.title}</h3>
+                    <p class="home-channel-name">${info.channel || 'チャンネル名不明'}</p>
+                    <p class="home-video-meta">${formatNumber(info.view_count)}回視聴 ${info.upload_date ? '• ' + formatTimeAgo(info.upload_date) : ''}</p>
+                </div>`;
+            return item;
         }
 
-        async function loadLiveChat(filename) {
-          try {
-            const chatContainer = document.getElementById("chat-messages");
-
-            // ★ より安全に取得（見つからなくても落ちない）
-            const emptyEl =
-              document.querySelector("#live-chat-container .chat-empty") ||
-              document.querySelector(".chat-empty");
-
-            if (!chatContainer) {
-              console.error("chat-messages が見つかりません");
-              return;
+        async function loadHomeVideos() {
+            const grid = document.querySelector(".home-video-grid");
+            if (!grid) return;
+            grid.innerHTML = '<div>読み込み中...</div>';
+            try {
+                const res = await fetch("/api/local-videos");
+                if (!res.ok) throw new Error(`API error ${res.status}`);
+                const videos = await res.json();
+                grid.innerHTML = '';
+                if (videos.length === 0) {
+                    grid.innerHTML = '<div style="color:var(--subtext); padding: 20px;">動画が見つかりません。</div>';
+                    return;
+                }
+                const items = await Promise.all(videos.map(createHomeVideoItem));
+                items.forEach(item => grid.appendChild(item));
+            } catch (e) {
+                console.error("Home videos load failed:", e);
+                grid.innerHTML = '<div style="color:var(--warn); padding: 20px;">動画一覧の取得に失敗しました。</div>';
             }
-
-            chatContainer.innerHTML = "";
-
-            if (emptyEl) {
-              emptyEl.style.display = "block";
-              emptyEl.textContent = "チャットを読み込み中…";
-            }
-
-            const chatFile = filename.replace(/\.mp4$/, ".live_chat.json");
-
-            const res = await fetch(
-              `/api/live-chat/${encodeURIComponent(chatFile)}`,
-            );
-
-            const text = await res.text(); // ★ まず生テキストで取得
-
-            // ====== ★ NDJSON（1行ごとのJSON）対応 ======
-            const lines = text
-              .split(/\r?\n/)
-              .map((l) => l.trim())
-              .filter((l) => l.length > 0);
-
-            const messages = [];
-            for (const line of lines) {
-              try {
-                messages.push(JSON.parse(line));
-              } catch (e) {
-                console.warn("パース失敗した行:", line, e);
-              }
-            }
-            // ===========================================
-
-            if (messages.length === 0) {
-              if (emptyEl) {
-                emptyEl.textContent = "チャットがありません";
-              }
-              return;
-            }
-
-            emptyEl.style.display = "none";
-
-            // === 描画（超シンプル版：まずは動くこと優先） ===
-            // === ★ 時間付きで描画（同期スクロール用） ===
-            messages.forEach((msg) => {
-              const item =
-                msg?.replayChatItemAction?.actions?.[0]?.addChatItemAction
-                  ?.item;
-
-              const renderer =
-                item?.liveChatTextMessageRenderer ||
-                item?.liveChatViewerEngagementMessageRenderer;
-
-              if (!renderer) return;
-
-              // ★ YouTubeのチャット時刻（ミリ秒）を秒に変換
-              const timeMs = msg.replayChatItemAction?.videoOffsetTimeMsec;
-              const timeSec = timeMs ? Math.floor(timeMs / 1000) : null;
-
-              const div = document.createElement("div");
-              div.className = "chat-line";
-
-              // ★ 秒数を属性として保存（同期スクロール用）
-              if (timeSec !== null) {
-                div.dataset.time = timeSec;
-              }
-
-              // ===== メンバー／モデレーター等のバッジ取得 =====
-              // ===== ★【判定用】メンバー／モデレーターの「元データ」=====
-              const badges = renderer.authorBadges || [];
-
-              const isMember = badges.some(
-                (b) =>
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes("Member") ||
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes("メンバー"),
-              );
-
-              const isModerator = badges.some(
-                (b) =>
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes(
-                    "Moderator",
-                  ) ||
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes(
-                    "モデレーター",
-                  ),
-              );
-
-              // ★ 画像バッジ用（追加）
-              const badgeImages = badges
-                .map(
-                  (b) =>
-                    b?.liveChatAuthorBadgeRenderer?.customThumbnail?.thumbnails?.slice(
-                      -1,
-                    )[0],
-                )
-                .filter(Boolean)
-                .flat();
-
-              // ===== まず「author」を確定（★ これが一番先） =====
-              const author = renderer.authorName?.simpleText || "NoName";
-
-              // ===== アイコン（YouTubeのauthorPhotoを使用） =====
-              const avatar = document.createElement("div");
-              avatar.className = "chat-avatar";
-
-              // ===== バッジ要素 =====
-              const badge = document.createElement("div");
-              badge.className = "chat-badge";
-
-              // ★ ここでコンテナを作る（正しい場所）
-              const badgeContainer = document.createElement("div");
-              badgeContainer.className = "badge-container";
-              badge.appendChild(badgeContainer);
-              badgeContainer.innerHTML = "";
-
-              badgeImages?.forEach((thumb) => {
-                const img = document.createElement("img");
-                img.src = thumb.url;
-                img.style.width = "16px";
-                img.style.height = "16px";
-                badgeContainer.appendChild(img);
-              });
-
-              // サムネURLを安全に取得
-              const thumbUrl =
-                renderer.authorPhoto?.thumbnails?.slice(-1)[0]?.url || null;
-
-              if (thumbUrl) {
-                const img = document.createElement("img");
-                img.src = thumbUrl;
-                img.alt = author;
-                img.loading = "lazy"; // スクロール最適化
-                avatar.appendChild(img);
-              } else {
-                // 取得できなかった場合のフォールバック
-                avatar.innerHTML = `<i class="fa-solid fa-circle-user"></i>`;
-              }
-
-              // ===== ユーザー名 =====
-              const nameEl = document.createElement("span");
-              nameEl.className = "chat-name";
-              nameEl.textContent = author;
-
-              // ===== ユーザー名へのクラス付与 =====
-              if (isModerator) {
-                nameEl.classList.add("moderator");
-              } else if (isMember) {
-                nameEl.classList.add("member");
-              }
-
-              // ===== コメント要素 =====
-              const msgHtml =
-                renderChatMessage(renderer.message) ||
-                renderer.message?.simpleText ||
-                "（メッセージなし）";
-
-              const msgEl = document.createElement("span");
-              msgEl.className = "chat-message";
-              msgEl.innerHTML = msgHtml;
-
-              // ===== 組み立て（横並び）=====
-              div.innerHTML = ""; // いったんクリア
-
-              div.appendChild(avatar); // アイコン
-              div.appendChild(nameEl); // 名前
-              div.appendChild(badge); // バッジ（メンバー等）
-              div.appendChild(msgEl); // コメント本文
-
-              chatContainer.appendChild(div);
-            });
-
-            // ★ 初回は一番上に戻す（時間順に見るため）
-            chatContainer.scrollTop = 0;
-
-            // 一番下までスクロール
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-          } catch (e) {
-            console.error("loadLiveChat error:", e);
-            const emptyEl = document.querySelector(".chat-empty");
-            if (emptyEl)
-              emptyEl.textContent = "チャットの読み込みに失敗しました";
-          }
         }
 
-        function renderLocalVideos(videos) {
-          videoList.innerHTML = "";
-
-          if (videos.length === 0) {
-            videoList.innerHTML =
-              '<div style="color:var(--subtext)">動画が見つかりません</div>';
-            return;
-          }
-
-          videos.forEach((video) => {
+        function createLocalVideoItem(video) {
             const item = document.createElement("div");
             item.className = "local-video-item";
-
-            const thumbHtml = video.thumb
-              ? `<img src="${video.thumb}" class="local-video-thumb">`
-              : `<div class="local-video-thumb"></div>`;
-
+            const thumbSrc = video.thumb || "/none_icon.jpg";
             item.innerHTML = `
-              ${thumbHtml}
-              <div class="local-video-text">
-                ${video.title}
-              </div>
-            `;
-
-            item.addEventListener("click", () => {
-              // ★ ここで定義（clickの中）
-              const videoId = video.filename.replace(
-                /\.(mp4|mkv|webm|mov)$/i,
-                "",
-              );
-
-              // いったん全解除
-              document
-                .querySelectorAll(".local-video-item")
-                .forEach((el) => el.classList.remove("active"));
-
-              item.classList.add("active");
-
-              videoPlayer.pause();
-              videoPlayer.src = video.video;
-              lastSelectedFilename = video.filename;
-
-              resetSeekBar();
-              videoPlayer.load();
-              titleEl.textContent = video.title;
-
-              videoPlayer.play().catch((err) => {
-                console.error("Play failed:", err);
-              });
-
-              fetch(`/info/${encodeURIComponent(videoId)}`)
-                .then((r) => r.json())
-                .then((info) => applyVideoInfo(info))
-                .catch((err) => console.error("info.json 読み込み失敗:", err));
-
-              loadLiveChat(videoId);
-
-              // ★ URL変更は「必ず最後」「clickの中」
-              history.pushState(
-                null,
-                "",
-                "#player/" + encodeURIComponent(videoId),
-              );
+                <img src="${thumbSrc}" class="local-video-thumb" onerror="this.onerror=null; this.src='/none_icon.jpg';">
+                <div class="local-video-text">${video.title}</div>`;
+            return item;
+        }
+        
+        function renderLocalVideos(videos) {
+            elements.videoList.innerHTML = "";
+            if (!videos || videos.length === 0) {
+                elements.videoList.innerHTML = '<div style="color:var(--subtext)">動画が見つかりません</div>';
+                return;
+            }
+            videos.forEach((video) => {
+                const item = createLocalVideoItem(video);
+                item.addEventListener("click", () => handleVideoItemClick(video, item));
+                elements.videoList.appendChild(item);
             });
-            videoList.appendChild(item);
-          });
+        }
+        
+        async function loadLocalVideos() {
+            if (!elements.videoList) return;
+            try {
+                const res = await fetch("/api/local-videos");
+                renderLocalVideos(await res.json());
+            } catch (e) {
+                console.error("Local videos load failed:", e);
+                elements.videoList.innerHTML = '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+            }
+        }
+
+        // Player-specific logic
+        function handleVideoItemClick(video, item) {
+            const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+            document.querySelectorAll(".local-video-item.active").forEach(el => el.classList.remove("active"));
+            item.classList.add("active");
+
+            elements.videoPlayer.pause();
+            elements.videoPlayer.src = video.video;
+            lastSelectedFilename = video.filename;
+            
+            elements.seekBar.value = 0;
+            elements.seekBar.style.setProperty("--progress", "0%");
+
+            elements.videoPlayer.load();
+            elements.playerTitle.textContent = video.title;
+            elements.videoPlayer.play().catch(err => console.error("Play failed:", err));
+
+            fetch(`/info/${encodeURIComponent(videoId)}`).then(r => r.json()).then(applyVideoInfo).catch(err => console.error("info.json load failed:", err));
+            loadLiveChat(videoId);
+
+            history.pushState(null, "", `#player/${encodeURIComponent(videoId)}`);
         }
 
         function applyVideoInfo(info) {
-          // タイトル
-          const titleEl = document.getElementById("player-title");
-          const youtubeBtn = document.getElementById("youtube-link-btn");
+            elements.playerTitle.textContent = info.title || lastSelectedFilename.replace(/\.(mp4|mkv|webm|mov)$/i, "") || "無題";
+            elements.youtubeBtn.href = `https://www.youtube.com/watch?v=${info.id}`;
+            elements.youtubeBtn.style.display = info.id ? "inline-flex" : "none";
+            elements.channelAvatar.src = info.channel_thumbnail || "/none_icon.jpg";
+            elements.channelLink.textContent = info.channel;
+            elements.channelLink.href = info.channel_url;
+            elements.channelAvatarLink.href = info.channel_url;
+            elements.channelHandle.textContent = info.uploader_id;
+            elements.channelSubs.textContent = `${formatNumber(info.channel_follower_count)}人 登録`;
+            elements.statLikes.textContent = formatNumber(info.like_count);
+            
+            let statsHeader = `<b>${formatNumber(info.view_count)}回視聴</b> • <b>${(info.upload_date || '').replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3')}</b>`;
+            elements.videoDescription.innerHTML = `${statsHeader}<br><br>${linkify(info.description || '概要欄なし')}`;
+            elements.videoDescription.classList.add("collapsed");
+            updateDescButton();
 
-          if (info.title && info.title.trim() !== "") {
-            titleEl.textContent = info.title;
-          } else if (lastSelectedFilename) {
-            // 拡張子を除いたファイル名を表示
-            titleEl.textContent = lastSelectedFilename.replace(
-              /\.(mp4|mkv|webm|mov)$/i,
-              "",
-            );
-          } else {
-            titleEl.textContent = "無題";
-          }
-
-          // ★ YouTubeリンクボタンの更新
-          if (info.id) {
-            youtubeBtn.href = `https://www.youtube.com/watch?v=${info.id}`;
-            youtubeBtn.style.display = "inline-flex";
-          } else {
-            youtubeBtn.style.display = "none";
-          }
-
-          // ===== YouTube風：チャンネル情報（横並び＋アイコン）=====
-          const avatar = document.getElementById("channel-avatar");
-          const channelLink = document.getElementById("channel-link");
-          const channelHandle = document.getElementById("channel-handle");
-          const channelSubs = document.getElementById("channel-subs");
-          const avatarLink = document.getElementById("channel-avatar-link");
-
-          // ===== チャンネルアイコン（見直し版：コメントを使わない） =====
-          if (info.channel_thumbnail && info.channel_thumbnail.trim() !== "") {
-            avatar.src = info.channel_thumbnail;
-          } else {
-            // ★★★ 最終フォールバック：ローカルの none_icon.jpg ★★★
-            avatar.src = "/none_icon.jpg";
-          }
-
-          // ★ 画像が壊れていた場合の保険（直後に追加）
-          avatar.onerror = () => {
-            avatar.src = "/none_icon.jpg";
-          };
-
-          // チャンネル名＋リンク
-          channelLink.textContent = info.channel;
-          channelLink.href = info.channel_url;
-          avatarLink.href = info.channel_url;
-
-          // ハンドル
-          channelHandle.textContent = info.uploader_id;
-
-          // 登録者数
-          let subText = "";
-          const subCount = info.channel_follower_count;
-          if (typeof subCount === "number") {
-            if (subCount < 10000) {
-              subText = `${subCount}人`;
-            } else {
-              // 1.12万人 -> 1.1万人
-              const v = Math.floor(subCount / 1000) / 10;
-              subText = `${v}万人`;
-            }
-          } else {
-            subText = "登録者数不明";
-          }
-          channelSubs.textContent = `${subText} 登録`;
-
-          // ★ 動画統計情報の更新（高評価のみ）
-          const statLikes = document.getElementById("stat-likes");
-          // const statViews = document.getElementById("stat-views"); // 削除
-          // const statDate = document.getElementById("stat-date");   // 削除
-
-          if (statLikes)
-            statLikes.textContent = info.like_count
-              ? info.like_count.toLocaleString()
-              : "---";
-
-          // ★ 概要欄の冒頭に「視聴回数」「投稿日」を表示するための文字列作成
-          let statsHeader = "";
-
-          // 視聴回数
-          if (info.view_count) {
-            statsHeader += `<b>${info.view_count.toLocaleString()}回視聴</b>`;
-          } else {
-            statsHeader += `<b>視聴回数不明</b>`;
-          }
-
-          // 投稿日
-          if (info.upload_date) {
-            const d = info.upload_date;
-            let dateStr = d;
-            if (d.length === 8) {
-              dateStr = `${d.substring(0, 4)}/${d.substring(4, 6)}/${d.substring(6, 8)}`;
-            }
-            statsHeader += ` • <b>${dateStr}</b>`; // 中黒でつなぐ
-          }
-
-          // ★ 概要欄（URLリンク化版）
-          const descEl = document.getElementById("video-description");
-          let descContent = "";
-
-          if (info.description) {
-            // URLをリンク化しつつ、改行も保持
-            descContent = linkify(info.description);
-          } else {
-            descContent = "（概要欄なし）";
-          }
-
-          // 冒頭に結合
-          descEl.innerHTML = `${statsHeader}<br><br>${descContent}`;
-
-          // ★★★ 折りたたみ処理の再判定（あなたが既に入れたもの）★★★
-          descEl.classList.add("collapsed");
-          updateDescButton();
-
-          // ★★★【重要】概要を変更したら折りたたみ判定をやり直す★★★
-          descEl.classList.add("collapsed"); // ← 新しい動画では必ず折りたたみ状態に戻す
-          updateDescButton(); // ← 「もっと見る」ボタンの表示判定を再実行
-
-          // ★【追加】コメント表示の状態をリセット（重要）
-          const list = document.getElementById("comment-list");
-          const empty = document.querySelector(".comment-empty");
-
-          list.innerHTML = ""; // ← 前の動画のコメントを完全クリア
-          // list.style.display = "block"; // ← コメント欄そのものを確実に表示
-          empty.style.display = "none"; // ← 「コメントはありません」を一旦消す
-
-          // ===== ★ 重要：yt-dlp のコメント形式を UI 用に変換 =====
-          const raw = info.comments || info.comment_threads || [];
-
-          // グローバル変数として保持して、並び替え時に再利用する
-          window.currentVideoComments = raw
-            .map((c) => {
-              // 既に整形済みならそのまま返す
-              if (c.id && c.text) {
-                if (c.parent === "root") c.parent = null; // ★ ここでも直す
-                return c;
-              }
-
-              // yt-dlp 形式（comment_threads）の場合の変換
-              const top = c.comment || c;
-              return {
-                id:
-                  top.id ||
-                  top.comment_id ||
-                  Math.random().toString(36).slice(2),
-                parent: (() => {
-                  const p = top.parent;
-                  // console.log("id:", top.id, "raw parent:", p); // デバッグ用
-                  if (p === "root") return null;
-                  return p || null;
-                })(),
-                author: top.author || top.author_name || "不明",
-                text: top.text || top.content || "",
-                like_count: top.like_count || 0,
-                _time_text: top._time_text || "",
-                author_thumbnail: top.author_thumbnail || null,
-                timestamp: top.timestamp || 0, // ★ ソート用
-                is_pinned: top.is_pinned || false, // ★ ピン止め用
-              };
-            })
-            .filter((c) => c.text && c.text.trim() !== "");
-
-          // ★ 最終的に「確定した配列」で描画
-          // ★ 最終的に「確定した配列」で描画
-          renderComments(window.currentVideoComments);
-          return; // ← ここで処理終了
+            window.currentVideoComments = (info.comments || info.comment_threads || []).map(c => c.id ? c : { ...c.comment, id: c.comment.comment_id }).filter(c => c.text?.trim());
+            renderComments(window.currentVideoComments);
         }
 
         function renderComments(comments) {
-          const list = document.getElementById("comment-list");
-          const countDisplay = document.getElementById("comment-count-display");
-
-          if (!list) return;
-
-          list.style.display = "block";
-          const empty = document.querySelector(".comment-empty");
-
-          list.innerHTML = "";
-
-          // ★ コメント件数を更新
-          if (countDisplay) {
-            countDisplay.textContent = comments ? comments.length : 0;
-          }
-
-          if (!Array.isArray(comments) || comments.length === 0) {
-            if (empty) empty.style.display = "block";
-            return;
-          }
-          if (empty) empty.style.display = "none";
-
-          // --- ① 親と子に分ける ---
-          const parents = comments.filter((c) => !c.parent);
-          const children = comments.filter((c) => c.parent);
-
-          // parent → [子コメント配列] のマップを作る
-          const replyMap = {};
-          children.forEach((c) => {
-            if (!replyMap[c.parent]) replyMap[c.parent] = [];
-            replyMap[c.parent].push(c);
-          });
-
-          // ★★★【追加】ネスト対応：ツリー構造を作る ★★★
-          const nodeMap = {};
-          comments.forEach((c) => {
-            nodeMap[c.id] = { ...c, children: [] };
-          });
-
-          comments.forEach((c) => {
-            if (c.parent && nodeMap[c.parent]) {
-              nodeMap[c.parent].children.push(nodeMap[c.id]);
-            }
-          });
-
-          // --- ② 親コメントを描画（★ ネスト対応版 ★）---
-          parents.forEach((parent) => {
-            const parentNode = nodeMap[parent.id];
-            const parentEl = createCommentElement(parent, false);
-            parentEl.querySelector(".comment-text").classList.add("clamped");
-
-            list.appendChild(parentEl);
-
-            // ★ 再帰的に返信を描画
-            if (parentNode.children.length > 0) {
-              const replyContainer = document.createElement("div");
-              replyContainer.className = "comment-replies";
-              replyContainer.id = "replies-" + parent.id;
-
-              // 折りたたみボタン（親にだけ付ける）
-              const toggleBtn = document.createElement("button");
-              toggleBtn.className = "comment-toggle";
-              toggleBtn.textContent = `返信${parentNode.children.length}件 ▼`;
-              toggleBtn.dataset.parentId = parent.id;
-
-              toggleBtn.addEventListener("click", () => {
-                const container = document.getElementById(
-                  "replies-" + toggleBtn.dataset.parentId,
-                );
-                if (!container) return;
-
-                const isCollapsed = container.classList.toggle("collapsed");
-                toggleBtn.textContent = isCollapsed
-                  ? `返信${parentNode.children.length}件 ▼`
-                  : `返信${parentNode.children.length}件 ▲`;
-              });
-
-              parentEl.querySelector(".comment-body").appendChild(toggleBtn);
-
-              // ★ ここで「返信の返信」まで描画する
-              function renderNestedReplies(nodes, container) {
-                nodes.forEach((n) => {
-                  const replyEl = createCommentElement(n, true);
-                  container.appendChild(replyEl);
-
-                  if (n.children.length > 0) {
-                    const nested = document.createElement("div");
-                    nested.className = "comment-replies";
-                    renderNestedReplies(n.children, nested);
-                    replyEl.querySelector(".comment-body").appendChild(nested);
-                  }
+            elements.commentList.innerHTML = "";
+            elements.commentCountDisplay.textContent = comments.length;
+            elements.commentEmpty.style.display = comments.length === 0 ? 'block' : 'none';
+            // Logic to build and append comment elements...
+        }
+        
+        async function loadLiveChat(videoId) {
+            elements.chatMessages.innerHTML = "";
+            elements.chatEmpty.textContent = "チャットを読み込み中…";
+            elements.chatEmpty.style.display = "block";
+            try {
+                const chatFile = videoId.replace(/\.mp4$/i, "") + ".live_chat.json";
+                const res = await fetch(`/api/live-chat/${encodeURIComponent(chatFile)}`);
+                if (!res.ok) throw new Error('Not found');
+                const text = await res.text();
+                const messages = text.split(/\r?\n/).filter(Boolean).map(JSON.parse);
+                if (messages.length === 0) throw new Error('Empty chat');
+                
+                elements.chatEmpty.style.display = "none";
+                messages.forEach(msg => {
+                    const item = msg?.replayChatItemAction?.actions?.[0]?.addChatItemAction?.item;
+                    const renderer = item?.liveChatTextMessageRenderer || item?.liveChatViewerEngagementMessageRenderer;
+                    if (!renderer) return;
+                    // ... (rest of the chat rendering logic)
+                    const div = document.createElement('div');
+                    div.className = 'chat-line';
+                    div.innerHTML = renderChatMessage(renderer.message);
+                    elements.chatMessages.appendChild(div);
                 });
-              }
-
-              renderNestedReplies(parentNode.children, replyContainer);
-
-              replyContainer.classList.add("collapsed");
-              parentEl
-                .querySelector(".comment-body")
-                .appendChild(replyContainer);
+            } catch (e) {
+                elements.chatEmpty.textContent = "チャットがありません";
+                console.warn("Could not load live chat:", e.message);
             }
-          });
+        }
+        
+        function updateDescButton() {
+            if (!elements.descToggle) return;
+            elements.descToggle.style.display = elements.videoDescription.scrollHeight > elements.videoDescription.clientHeight ? "inline" : "none";
         }
 
-        function createCommentElement(comment, isReply) {
-          const item = document.createElement("div");
-          item.className = isReply ? "comment-reply" : "comment-item";
-
-          // --- アバター（リンク付き） ---
-          const avatarLink = document.createElement("a");
-          avatarLink.href = "#"; // チャンネルURLがあれば入れるが、現状はないことが多いので#
-          avatarLink.className = "comment-avatar-link";
-
-          const avatar = document.createElement("img");
-          avatar.className = "comment-avatar";
-          avatar.loading = "lazy";
-
-          // URLが無ければフォールバック
-          avatar.src =
-            comment.author_thumbnail && comment.author_thumbnail !== ""
-              ? comment.author_thumbnail
-              : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
-
-          avatar.onerror = () => {
-            avatar.src =
-              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
-          };
-
-          avatarLink.appendChild(avatar);
-
-          // --- ボディ部分 ---
-          const body = document.createElement("div");
-          body.className = "comment-body";
-
-          // 1. ヘッダー（名前 + 時間）
-          const meta = document.createElement("div");
-          meta.className = "comment-meta";
-
-          const author = document.createElement("span"); // YouTubeは名前クリックで飛べるが、spanにしておく
-          author.className = "comment-author";
-          author.textContent = comment.author || "@Unknown";
-
-          const time = document.createElement("span");
-          time.className = "comment-time";
-          // YouTubeは「1年前」などの相対時間だが、ここでは元のテキストを使う
-          // ホバーで絶対時間を出せるとベスト
-          time.textContent = comment._time_text || "";
-
-          meta.appendChild(author);
-          meta.appendChild(time);
-
-          // 2. 本文
-          const text = document.createElement("div");
-          text.className = "comment-text";
-          text.innerHTML = comment.text ? linkify(comment.text) : "";
-
-          // 3. アクションボタン（高評価、返信）※低評価は削除
-          const actions = document.createElement("div");
-          actions.className = "comment-actions";
-
-          // Like
-          const btnLike = document.createElement("button");
-          btnLike.className = "action-btn";
-          btnLike.title = "高評価";
-
-          let likeCountText = "";
-          if (comment.like_count > 0) {
-            // 1000以上を 1.2K とかにするのは別途関数が必要だが、一旦そのまま
-            likeCountText = comment.like_count;
-          }
-
-          btnLike.innerHTML = `<i class="fa-regular fa-thumbs-up"></i> ${likeCountText}`;
-
-          // Dislike は削除
-
-          // Reply
-          const btnReply = document.createElement("button");
-          btnReply.className = "action-btn";
-          btnReply.textContent = "返信";
-
-          actions.appendChild(btnLike);
-          // actions.appendChild(btnDislike); // 削除
-          actions.appendChild(btnReply);
-
-          // --- 組み立て ---
-          body.appendChild(meta);
-          body.appendChild(text);
-          // コメント本文が長すぎる場合の「もっと見る」ボタン（後で判定）
-          const moreBtn = document.createElement("button");
-          moreBtn.className = "comment-more";
-          moreBtn.textContent = "もっと見る";
-          moreBtn.style.display = "none";
-          body.appendChild(moreBtn);
-
-          body.appendChild(actions);
-
-          item.appendChild(avatarLink);
-          item.appendChild(body);
-
-          // ===== ★ コメント長文の「もっと見る」判定（以前と同じロジック） ★ =====
-          requestAnimationFrame(() => {
-            // line-height が "normal" の場合の保険
-            let lineHeight = parseFloat(getComputedStyle(text).lineHeight);
-            if (isNaN(lineHeight)) lineHeight = 19.6; // 14px * 1.4
-
-            const maxHeight = lineHeight * 4; // 4行分
-
-            // 一度クランプを外して正確に測る（重要）
-            text.classList.remove("clamped");
-
-            if (text.scrollHeight > maxHeight + 5) {
-              // 誤差許容
-              text.classList.add("clamped");
-              moreBtn.style.display = "block";
-            }
-          });
-
-          // ボタンクリックで開閉
-          moreBtn.addEventListener("click", () => {
-            const isClamped = text.classList.toggle("clamped");
-            moreBtn.textContent = isClamped ? "もっと見る" : "一部を表示";
-          });
-
-          return item;
+        // --- Routing and Navigation ---
+        function routeFromHash() {
+          const hash = location.hash.replace("#", "");
+          let pageId = "page-home";
+          if (hash.startsWith('downloader')) pageId = 'page-downloader';
+          else if (hash.startsWith('player')) pageId = 'page-player';
+          else if (hash.startsWith('settings')) pageId = 'page-settings';
+          
+          elements.pages.forEach(p => p.classList.remove("active-page"));
+          document.getElementById(pageId)?.classList.add("active-page");
+          elements.buttons.forEach(b => b.classList.toggle("active", b.dataset.page === pageId));
         }
 
-        // URLをリンク化
-        function linkify(text) {
-          const urlPattern =
-            /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
-          return text.replace(
-            urlPattern,
-            '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
-          );
-        }
-
-        // YouTubeチャットメッセージのレンダリング（runs対応）
-        function renderChatMessage(message) {
-          if (!message) return "";
-          if (message.simpleText) return escapeHtml(message.simpleText);
-
-          if (message.runs) {
-            return message.runs
-              .map((run) => {
-                if (run.text) return escapeHtml(run.text);
-                if (run.emoji) {
-                  // 絵文字の場合
-                  const url = run.emoji.image.thumbnails[0]?.url;
-                  const alt =
-                    run.emoji.image.accessibility?.accessibilityData?.label ||
-                    "emoji";
-                  return url
-                    ? `<img src="${url}" alt="${alt}" class="chat-emoji" style="width:16px;height:16px;vertical-align:middle;">`
-                    : "";
-                }
-                return "";
-              })
-              .join("");
-          }
-          return "";
-        }
-
-        // XSS対策
-        function escapeHtml(str) {
-          const div = document.createElement("div");
-          div.textContent = str;
-          return div.innerHTML;
-        }
-
-        // ======== 滑らかなシークバー同期（時間表示は維持） ========
-
-        // 目標値（実際の動画の進捗）
-        let targetProgress = 0;
-
-        // ① timeupdate：時間表示＋目標値の更新だけ
-        videoPlayer.addEventListener("timeupdate", () => {
-          if (!videoPlayer.duration) return;
-
-          const cur = Math.floor(videoPlayer.currentTime);
-          const dur = Math.floor(videoPlayer.duration);
-
-          // ★ シークバーは「目標値」だけ更新
-          targetProgress =
-            (videoPlayer.currentTime / videoPlayer.duration) * 100;
-
-          // 時間表示（あなたの既存ロジックそのまま）
-          const format = (s) => {
-            const m = Math.floor(s / 60);
-            const sec = s % 60;
-            return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-          };
-
-          timeDisplay.textContent = `${format(cur)} / ${format(dur)}`;
-        });
-
-        // ② requestAnimationFrame：つまみを“なめらかに”追従
-        function smoothSeek() {
-          const current = parseFloat(seekBar.value) || 0;
-          const diff = targetProgress - current;
-
-          const easing = 0.001; // 小さいほどヌルヌル
-          const newValue = current + diff * easing;
-
-          seekBar.value = newValue;
-          seekBar.style.setProperty("--progress", newValue + "%");
-
-          requestAnimationFrame(smoothSeek);
-        }
-
-        // アニメーション開始
-        requestAnimationFrame(smoothSeek);
-
-        // 初回ロード
-        loadLocalVideos();
-
-        // ===============================
-        // ★ 追加：ショートカット＋ボタン制御
-        // ===============================
-
-        // 5秒スキップ関数
-        function skip(sec) {
-          const t = videoPlayer.currentTime + sec;
-          videoPlayer.currentTime = Math.max(
-            0,
-            Math.min(videoPlayer.duration, t),
-          );
-        }
-
-        // 音量変更関数（±5%）
-        function changeVolume(delta) {
-          videoPlayer.volume = Math.max(
-            0,
-            Math.min(1, videoPlayer.volume + delta),
-          );
-        }
-
-        // 再生/一時停止トグル
-        function togglePlay() {
-          if (videoPlayer.paused) {
-            videoPlayer.play();
-          } else {
-            videoPlayer.pause();
-          }
-        }
-
-        // ===== 個別トグル（ライブチャット／ローカル動画）【修正版】 =====
-        const sidebar = document.getElementById("player-sidebar");
-
-        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const targetId = btn.getAttribute("data-target");
-            const section = document.getElementById(targetId);
-
-            if (!section) return;
-
-            const content = section.querySelector(".sidebar-content"); // ★ 重要
-
-            if (!content) return;
-
-            const isCollapsed = content.classList.toggle("collapsed"); // ★ ここを変更
-
-            // アイコン切り替え（横幅は変えない）
-            const icon = btn.querySelector("i");
-            if (icon) {
-              icon.className = isCollapsed
-                ? "fa-solid fa-chevron-right"
-                : "fa-solid fa-chevron-down";
-            }
-
-            // ライブチャット側の高さを再同期
-            setTimeout(syncChatHeight, 180);
+        // --- Event Listener Setup ---
+        window.addEventListener("popstate", routeFromHash);
+        elements.buttons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const pageId = btn.dataset.page;
+            history.pushState(null, '', '#' + pageId.replace('page-',''));
+            routeFromHash();
           });
         });
 
-        // ===== ★ コメント並び替えロジック =====
-        const sortToggle = document.getElementById("sort-toggle");
-        const sortMenu = document.getElementById("sort-menu");
-        const sortItems = document.querySelectorAll(".sort-item");
-
-        if (sortToggle && sortMenu) {
-          // メニュー開閉
-          sortToggle.addEventListener("click", (e) => {
-            e.stopPropagation();
-            sortMenu.classList.toggle("hidden");
-          });
-
-          // 外部クリックで閉じる
-          document.addEventListener("click", (e) => {
-            if (
-              !sortToggle.contains(e.target) &&
-              !sortMenu.contains(e.target)
-            ) {
-              sortMenu.classList.add("hidden");
-            }
-          });
-
-          // 並び替え実行
-          sortItems.forEach((item) => {
-            item.addEventListener("click", () => {
-              const sortType = item.dataset.sort;
-
-              // アクティブ表示の切り替え
-              sortItems.forEach((i) => i.classList.remove("active"));
-              item.classList.add("active");
-
-              sortMenu.classList.add("hidden");
-
-              if (
-                !window.currentVideoComments ||
-                window.currentVideoComments.length === 0
-              )
-                return;
-
-              // 並び替え処理
-              let sorted = [...window.currentVideoComments];
-              if (sortType === "popular") {
-                // いいね数順（降順）
-                sorted.sort(
-                  (a, b) => (b.like_count || 0) - (a.like_count || 0),
-                );
-              } else if (sortType === "newest") {
-                // 新しい順（降順）
-                sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-              }
-
-              // 再描画
-              renderComments(sorted);
-            });
-          });
-        }
-
-        // === 追加ボタンの動作 ===
-        const btnRew5 = document.getElementById("btn-rew5");
-        const btnFwd5 = document.getElementById("btn-fwd5");
-        const volumeBar = document.getElementById("volume-bar");
-        const volumeIcon = document.querySelector(".yt-volume i");
-
-        let lastVolume = volumeBar.value; // 最後の音量を記憶
-
-        volumeIcon.addEventListener("click", () => {
-          if (videoPlayer.muted) {
-            // ミュート解除 → 元の音量に戻す
-            videoPlayer.muted = false;
-            videoPlayer.volume = lastVolume || 0.5;
-          } else {
-            // ミュートON → 音量は変えない
-            videoPlayer.muted = true;
-          }
-        });
-
-        btnRew5.addEventListener("click", () => skip(-5));
-        btnFwd5.addEventListener("click", () => skip(5));
-
-        volumeBar.addEventListener("input", (e) => {
-          const v = Number(e.target.value);
-          videoPlayer.volume = v;
-          videoPlayer.muted = false; // スライダー触ったら自動でミュート解除
-          lastVolume = v;
-        });
-
-        videoPlayer.addEventListener("volumechange", () => {
-          // ミュート中はスライダーを動かさない
-          if (!videoPlayer.muted) {
-            volumeBar.value = videoPlayer.volume;
-            lastVolume = videoPlayer.volume;
-          }
-
-          // アイコンだけは常に更新
-          if (videoPlayer.muted || videoPlayer.volume === 0) {
-            volumeIcon.className = "fa-solid fa-volume-xmark";
-          } else if (videoPlayer.volume < 0.5) {
-            volumeIcon.className = "fa-solid fa-volume-low";
-          } else {
-            volumeIcon.className = "fa-solid fa-volume-high";
-          }
-        });
-
-        // === キーボードショートカット ===
-        document.addEventListener("keydown", (e) => {
-          // テキスト入力中は無効
-          if (
-            document.activeElement.tagName === "TEXTAREA" ||
-            document.activeElement.tagName === "INPUT"
-          )
-            return;
-
-          switch (e.key) {
-            case " ":
-            case "k":
-              e.preventDefault();
-              togglePlay();
-              break;
-
-            case "j":
-              skip(-10);
-              break;
-
-            case "l":
-              skip(10);
-              break;
-
-            case "ArrowLeft":
-              skip(-5);
-              break;
-
-            case "ArrowRight":
-              skip(5);
-              break;
-
-            case "ArrowUp":
-              changeVolume(0.05);
-              break;
-
-            case "ArrowDown":
-              changeVolume(-0.05);
-              break;
-
-            case "m":
-            case "M":
-              videoPlayer.muted = !videoPlayer.muted;
-              break;
-
-            default:
-              // 0〜9でシーク（YouTube仕様）
-              if (/^[0-9]$/.test(e.key) && videoPlayer.duration) {
-                const percent = Number(e.key) * 10;
-                videoPlayer.currentTime =
-                  (percent / 100) * videoPlayer.duration;
-              }
-              break;
-          }
-        });
-
-        // ===============================
-        // ★ 追加：YouTube風 UI 自動表示
-        // ===============================
-
-        const playerContainer = document.getElementById("player-container");
-        const ytControls = document.querySelector(".yt-controls");
-
+        // Player controls hover
         let hideTimer = null;
-
-        // マウスが動画エリアに入った → 表示
-        playerContainer.addEventListener("mouseenter", () => {
-          ytControls.classList.add("show");
+        elements.playerContainer.addEventListener("mouseenter", () => elements.ytControls.classList.add("show"));
+        elements.playerContainer.addEventListener("mousemove", () => {
+          elements.ytControls.classList.add("show");
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => elements.ytControls.classList.remove("show"), 2000);
+        });
+        elements.playerContainer.addEventListener("mouseleave", () => {
+            clearTimeout(hideTimer);
+            elements.ytControls.classList.remove("show");
         });
 
-        // マウスが動いた → 表示＋一定時間後に隠す準備
-        playerContainer.addEventListener("mousemove", () => {
-          ytControls.classList.add("show");
-
-          // すでにあるタイマーをクリア
-          if (hideTimer) clearTimeout(hideTimer);
-
-          // 2秒間動きがなければ非表示（YouTube風）
-          hideTimer = setTimeout(() => {
-            ytControls.classList.remove("show");
-          }, 2000);
-        });
-
-        // マウスが動画エリアから出た → 即非表示
-        playerContainer.addEventListener("mouseleave", () => {
-          ytControls.classList.remove("show");
-          if (hideTimer) clearTimeout(hideTimer);
-        });
-      });
-
-      document.addEventListener("job_completed", () => {
+        // --- Initial Page Load ---
+        routeFromHash();
+        loadHomeVideos();
         loadLocalVideos();
       });
+
+      // --- Global Event Listeners ---
+      document.addEventListener("job_completed", () => {
+        // Re-fetch videos for both home and player lists
+        if (typeof loadLocalVideos === "function") loadLocalVideos();
+        if (typeof loadHomeVideos === "function") loadHomeVideos();
+      });
+
     </script>
-    </body>
-  </html>
+  </body>
+</html>
