@@ -3330,6 +3330,8 @@
         const btnPlay = document.getElementById("btn-play");
         const btnFull = document.getElementById("btn-full");
         const timeDisplay = document.getElementById("time-display");
+        seekBar.value = 0;
+        seekBar.style.setProperty("--progress", "0%");
 
         function syncSeekBarWithVideo() {
           if (!videoPlayer.duration || isNaN(videoPlayer.duration)) return;
@@ -4468,6 +4470,14 @@
 
         // ② requestAnimationFrame：つまみを“なめらかに”追従
         function smoothSeek() {
+          if (!videoPlayer.duration || isNaN(videoPlayer.duration)) {
+            targetProgress = 0;
+            seekBar.value = 0;
+            seekBar.style.setProperty("--progress", "0%");
+            requestAnimationFrame(smoothSeek);
+            return;
+          }
+
           const current = parseFloat(seekBar.value) || 0;
           const diff = targetProgress - current;
 
