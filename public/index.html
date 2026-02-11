@@ -1109,6 +1109,49 @@
         font-size: 13px;
       }
 
+      /* ホーム：ローカル動画グリッド */
+      .home-video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 18px;
+        padding: 18px;
+      }
+
+      .home-video-card {
+        cursor: pointer;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.15s ease;
+      }
+
+      .home-video-card:hover {
+        transform: translateY(-2px);
+      }
+
+      .home-video-card-thumb {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 12px;
+        background: var(--black-panel);
+        object-fit: cover;
+      }
+
+      .home-video-card-title {
+        margin-top: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+        color: var(--text);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .home-video-empty {
+        color: var(--subtext);
+        padding: 8px;
+      }
+
       /* ==================================================
    10) PLAYER CONTROLS（YouTube風）
 ================================================== */
@@ -2958,6 +3001,9 @@
 
           let pageId;
           switch (page) {
+            case "home":
+              pageId = "page-home";
+              break;
             case "player":
               pageId = "page-player";
               break;
@@ -3046,6 +3092,7 @@
 
         const videoPlayer = document.getElementById("local-player");
         const videoList = document.getElementById("local-video-list");
+        const homeVideoGrid = document.querySelector(".home-video-grid");
         const titleEl = document.getElementById("player-title");
         const timeEl = document.getElementById("player-time");
 
@@ -3198,17 +3245,137 @@
           btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
         });
 
+        function findVideoById(videos, videoId) {
+          if (!videoId) return null;
+
+          const normalizedVideoId = String(videoId).trim();
+
+          return videos.find((videoItem) => {
+            if (!videoItem || !videoItem.filename) return false;
+
+            const idFromFilename = videoItem.filename.replace(
+              /\.(mp4|mkv|webm|mov)$/i,
+              "",
+            );
+            const titleText = String(videoItem.title || "").trim();
+
+            // 旧URL互換: #player/タイトル でも再選択できるようにする
+            return (
+              idFromFilename === normalizedVideoId ||
+              titleText === normalizedVideoId
+            );
+          });
+        }
+
+        function playPendingVideoIfNeeded(videos) {
+          if (!pendingVideoId) return;
+
+          const matchedVideo = findVideoById(videos, pendingVideoId);
+          if (!matchedVideo) return;
+
+          const matchedItem = Array.from(
+            videoList.querySelectorAll(".local-video-item"),
+          ).find((item) => item.dataset.filename === matchedVideo.filename);
+
+          playLocalVideo(matchedVideo, matchedItem || null);
+          pendingVideoId = null;
+        }
+
         async function loadLocalVideos() {
           try {
             const res = await fetch("/api/local-videos");
             const videos = await res.json();
 
             renderLocalVideos(videos);
+            renderHomeLocalVideos(videos);
+            playPendingVideoIfNeeded(videos);
           } catch (e) {
             console.error("Failed to load local videos:", e);
             videoList.innerHTML =
               '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+            if (homeVideoGrid) {
+              homeVideoGrid.innerHTML =
+                '<div class="home-video-empty" style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+            }
           }
+        }
+
+        function playLocalVideo(video, activeItem = null) {
+          const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+
+          if (activeItem) {
+            document
+              .querySelectorAll(".local-video-item")
+              .forEach((el) => el.classList.remove("active"));
+            activeItem.classList.add("active");
+          }
+
+          videoPlayer.pause();
+          videoPlayer.src = video.video;
+          lastSelectedFilename = video.filename;
+
+          resetSeekBar();
+          videoPlayer.load();
+          titleEl.textContent = video.title;
+
+          videoPlayer.play().catch((err) => {
+            console.error("Play failed:", err);
+          });
+
+          fetch(`/info/${encodeURIComponent(videoId)}`)
+            .then((r) => r.json())
+            .then((info) => applyVideoInfo(info))
+            .catch((err) => console.error("info.json 読み込み失敗:", err));
+
+          loadLiveChat(videoId);
+
+          history.pushState(null, "", "#player/" + encodeURIComponent(videoId));
+
+          // pushState だけでは表示は切り替わらないため、明示的にプレイヤーページへ遷移
+          document
+            .querySelectorAll(".page")
+            .forEach((page) => page.classList.remove("active-page"));
+          document.getElementById("page-player")?.classList.add("active-page");
+
+          document.querySelectorAll(".icon-btn").forEach((button) => {
+            if (button.dataset.page === "page-player") {
+              button.classList.add("active");
+            } else {
+              button.classList.remove("active");
+            }
+          });
+        }
+
+        function renderHomeLocalVideos(videos) {
+          if (!homeVideoGrid) return;
+
+          homeVideoGrid.innerHTML = "";
+
+          if (videos.length === 0) {
+            homeVideoGrid.innerHTML =
+              '<div class="home-video-empty">動画が見つかりません</div>';
+            return;
+          }
+
+          videos.forEach((video) => {
+            const item = document.createElement("div");
+            item.className = "home-video-card";
+
+            const thumbHtml = video.thumb
+              ? `<img src="${video.thumb}" class="home-video-card-thumb">`
+              : `<div class="home-video-card-thumb"></div>`;
+
+            item.innerHTML = `
+              ${thumbHtml}
+              <div class="home-video-card-title">${video.title}</div>
+            `;
+
+            item.addEventListener("click", () => {
+              playLocalVideo(video);
+            });
+
+            homeVideoGrid.appendChild(item);
+          });
         }
 
         // ===============================
@@ -3551,6 +3718,7 @@
           videos.forEach((video) => {
             const item = document.createElement("div");
             item.className = "local-video-item";
+            item.dataset.filename = video.filename;
 
             const thumbHtml = video.thumb
               ? `<img src="${video.thumb}" class="local-video-thumb">`
@@ -3564,44 +3732,7 @@
             `;
 
             item.addEventListener("click", () => {
-              // ★ ここで定義（clickの中）
-              const videoId = video.filename.replace(
-                /\.(mp4|mkv|webm|mov)$/i,
-                "",
-              );
-
-              // いったん全解除
-              document
-                .querySelectorAll(".local-video-item")
-                .forEach((el) => el.classList.remove("active"));
-
-              item.classList.add("active");
-
-              videoPlayer.pause();
-              videoPlayer.src = video.video;
-              lastSelectedFilename = video.filename;
-
-              resetSeekBar();
-              videoPlayer.load();
-              titleEl.textContent = video.title;
-
-              videoPlayer.play().catch((err) => {
-                console.error("Play failed:", err);
-              });
-
-              fetch(`/info/${encodeURIComponent(videoId)}`)
-                .then((r) => r.json())
-                .then((info) => applyVideoInfo(info))
-                .catch((err) => console.error("info.json 読み込み失敗:", err));
-
-              loadLiveChat(videoId);
-
-              // ★ URL変更は「必ず最後」「clickの中」
-              history.pushState(
-                null,
-                "",
-                "#player/" + encodeURIComponent(videoId),
-              );
+              playLocalVideo(video, item);
             });
             videoList.appendChild(item);
           });
