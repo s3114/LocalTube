@@ -2177,11 +2177,13 @@
               <div class="toggle" style="align-items: flex-start; gap: 16px;">
                 <div>
                   ローカル動画フォルダー
-                  <small>ローカル動画として認識するフォルダーを1行ずつ入力してください。</small>
+                  <small>ローカル動画として認識するフォルダーを設定します。改行してパスを入力してください。</small>
                   <small>例: D:\Videos や E:\Archive\LocalTube</small>
-                  <small id="local-video-dirs-status" style="color: var(--blue); margin-top: 4px;"></small>
+                  <small id="local-video-dirs-status"
+                    style="color: var(--blue); margin-top: 4px;"></small>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 8px; min-width: 460px; max-width: 700px; width: 100%;">
+                <div
+                  style="display: flex; flex-direction: column; gap: 8px; min-width: 460px; max-width: 700px; width: 100%;">
                   <textarea
                     id="local-video-dirs-input"
                     placeholder="追加したいフォルダを1行ずつ入力"
@@ -2204,9 +2206,10 @@
               </div>
               <div class="toggle">
                 <div>
-                  仮サムネイル生成
-                  <small>通常サムネイルが見つからないときに動画から仮サムネイルを作成します。</small>
-                  <small id="fallback-thumb-status" style="color: var(--blue); margin-top: 4px;"></small>
+                  一時サムネイルの作成
+                  <small>サムネイルフォルダに該当のサムネが見つからないときに動画からffmpegを用いて仮のサムネイルを生成します。</small>
+                  <small id="fallback-thumb-status"
+                    style="color: var(--blue); margin-top: 4px;"></small>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="opt-fallback-thumbnails" checked />
@@ -2419,7 +2422,6 @@
           optFallbackThumbnails: document.getElementById(
             "opt-fallback-thumbnails",
           ),
-          fallbackThumbStatus: document.getElementById("fallback-thumb-status"),
         };
 
         // Load general settings from localStorage
@@ -2649,9 +2651,6 @@
             const fallbackEnabled =
               settings.enableFallbackThumbnails !== false;
             elements.optFallbackThumbnails.checked = fallbackEnabled;
-            elements.fallbackThumbStatus.textContent = fallbackEnabled
-              ? "現在: 有効"
-              : "現在: 無効";
             return settings;
           } catch (error) {
             console.error("Failed to load settings:", error);
@@ -2838,17 +2837,12 @@
               }
             }
 
-            elements.fallbackThumbStatus.textContent = enabled
-              ? "現在: 有効"
-              : "現在: 無効";
             await loadLocalVideos();
           } catch (error) {
             console.error("仮サムネイル設定の保存に失敗:", error);
             const refreshed = await loadServerSettings();
             if (!refreshed) {
               elements.optFallbackThumbnails.checked = !enabled;
-              elements.fallbackThumbStatus.textContent =
-                "保存に失敗しました。再試行してください。";
             }
           }
         });
