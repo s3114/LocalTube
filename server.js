@@ -530,6 +530,7 @@ async function readVideoMetadataTags(videoPath) {
 
     const parsed = JSON.parse(output);
     const lowerTags = {};
+    const duration = Number(parsed?.format?.duration);
 
     const addTags = (obj) => {
       if (!obj || typeof obj !== "object") return;
@@ -548,17 +549,25 @@ async function readVideoMetadataTags(videoPath) {
       }
     }
 
-    return lowerTags;
+    return {
+      tags: lowerTags,
+      duration: Number.isFinite(duration) ? duration : null,
+    };
   } catch (error) {
     console.warn("ffprobe metadata read failed:", error.message);
-    return {};
+    return { tags: {}, duration: null };
   }
 }
 
 async function createProvisionalInfoFromVideo(videoPath, videoId) {
   const stats = await fs.promises.stat(videoPath);
   const base = path.parse(videoPath).name;
-  const tags = await readVideoMetadataTags(videoPath);
+  const metadata = await readVideoMetadataTags(videoPath);
+  const tags = metadata.tags || {};
+  const durationSec = Number(metadata.duration);
+  const normalizedDuration = Number.isFinite(durationSec)
+    ? Math.max(0, Math.round(durationSec))
+    : null;
   const commentText = getTagValue(tags, ["comment"]);
   const metaTitle = getTagValue(tags, ["title"]);
   const metaDescription = getTagValue(tags, [
@@ -603,9 +612,10 @@ async function createProvisionalInfoFromVideo(videoPath, videoId) {
     channel_follower_count: null,
     like_count: null,
     view_count: null,
+    duration: normalizedDuration,
     comments: [],
     _provisional_info: true,
-    _provisional_info_version: 2,
+    _provisional_info_version: 3,
     _generated_at: new Date().toISOString(),
     _source_video: videoPath,
     _source_mtime_ms: stats.mtimeMs,
@@ -616,6 +626,7 @@ async function createProvisionalInfoFromVideo(videoPath, videoId) {
       channel: metaChannel || null,
       upload_date: metaUploadDate || null,
       comment: commentText || null,
+      duration: normalizedDuration,
     },
   };
 }
@@ -1607,7 +1618,7 @@ app.get("/info/:videoId", async (req, res) => {
         try {
           const cachedRaw = await fs.promises.readFile(provisionalPath, "utf-8");
           const cached = JSON.parse(cachedRaw);
-          if (cached?._provisional_info_version >= 2) {
+          if (cached?._provisional_info_version >= 3) {
             res.type("application/json; charset=utf-8");
             return res.sendFile(provisionalPath);
           }

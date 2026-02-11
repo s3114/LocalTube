@@ -141,6 +141,97 @@
         font-size: 14px;
       }
 
+      .header-filter-container {
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .header-filter-btn {
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .home-filter-panel {
+        position: absolute;
+        top: 38px;
+        right: 0;
+        width: min(92vw, 420px);
+        background: #121212;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+        z-index: 50;
+      }
+
+      .home-filter-row {
+        margin-bottom: 10px;
+      }
+
+      .home-filter-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .home-filter-label {
+        font-size: 12px;
+        color: var(--subtext);
+        margin-bottom: 6px;
+      }
+
+      .home-filter-inline {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .home-filter-inline input,
+      .home-filter-inline select {
+        background: #1b1b1b;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        height: 30px;
+        padding: 0 8px;
+        min-width: 0;
+      }
+
+      .home-filter-inline input[type="date"] {
+        user-select: none;
+        -webkit-user-select: none;
+        caret-color: transparent;
+      }
+
+      .home-filter-inline input[type="date"]::-webkit-datetime-edit {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .home-filter-ymd {
+        width: 120px;
+      }
+
+      .home-filter-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .home-filter-clear-btn {
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 12px;
+        cursor: pointer;
+      }
+
       .header-search::placeholder {
         color: #777;
       }
@@ -1645,8 +1736,71 @@
             id="home-search-input"
             class="header-search"
             type="search"
-            placeholder="ホーム動画を検索"
+            placeholder="ホーム動画を検索（全項目）"
             autocomplete="off" />
+          <div class="header-filter-container">
+            <button id="home-filter-btn" class="header-filter-btn" type="button">
+              フィルタ
+            </button>
+            <div id="home-filter-panel" class="home-filter-panel hidden">
+              <div class="home-filter-row">
+                <div class="home-filter-label">アップロード日</div>
+                <div class="home-filter-inline">
+                  <input id="filter-date-from" type="date" />
+                  <input
+                    id="filter-date-from-text"
+                    class="home-filter-ymd"
+                    type="text"
+                    placeholder="YYYYMMDD" />
+                  <span>～</span>
+                  <input id="filter-date-to" type="date" />
+                  <input
+                    id="filter-date-to-text"
+                    class="home-filter-ymd"
+                    type="text"
+                    placeholder="YYYYMMDD" />
+                </div>
+              </div>
+              <div class="home-filter-row">
+                <div class="home-filter-label">動画時間</div>
+                <div class="home-filter-inline">
+                  <select id="filter-duration-range">
+                    <option value="all">指定なし</option>
+                    <option value="lt3">3分未満</option>
+                    <option value="3to20">3〜20分</option>
+                    <option value="ge20">20分以上</option>
+                    <option value="custom">カスタム</option>
+                  </select>
+                  <input
+                    id="filter-duration-min"
+                    type="text"
+                    placeholder="カスタム最小(秒/MM:SS)" />
+                  <span>～</span>
+                  <input
+                    id="filter-duration-max"
+                    type="text"
+                    placeholder="カスタム最大(秒/MM:SS)" />
+                </div>
+              </div>
+              <div class="home-filter-row">
+                <div class="home-filter-label">チャンネル</div>
+                <div class="home-filter-inline">
+                  <input
+                    id="filter-channel"
+                    type="text"
+                    placeholder="チャンネル名で絞り込み" />
+                </div>
+              </div>
+              <div class="home-filter-actions">
+                <button
+                  id="filter-clear-btn"
+                  class="home-filter-clear-btn"
+                  type="button">
+                  クリア
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="header-buttons">
           <button
@@ -3360,10 +3514,22 @@
         const videoList = document.getElementById("local-video-list");
         const homeVideoGrid = document.querySelector(".home-video-grid");
         const homeSearchInput = document.getElementById("home-search-input");
+        const homeFilterBtn = document.getElementById("home-filter-btn");
+        const homeFilterPanel = document.getElementById("home-filter-panel");
+        const filterDateFrom = document.getElementById("filter-date-from");
+        const filterDateFromText = document.getElementById("filter-date-from-text");
+        const filterDateTo = document.getElementById("filter-date-to");
+        const filterDateToText = document.getElementById("filter-date-to-text");
+        const filterDurationRange = document.getElementById("filter-duration-range");
+        const filterDurationMin = document.getElementById("filter-duration-min");
+        const filterDurationMax = document.getElementById("filter-duration-max");
+        const filterChannel = document.getElementById("filter-channel");
+        const filterClearBtn = document.getElementById("filter-clear-btn");
         const titleEl = document.getElementById("player-title");
         const timeEl = document.getElementById("player-time");
         let allLocalVideos = [];
         const homeInfoCache = new Map();
+        const homeInfoData = new Map();
 
         const seekBar = document.getElementById("seek-bar");
         const btnPlay = document.getElementById("btn-play");
@@ -3560,6 +3726,7 @@
 
             renderLocalVideos(allLocalVideos);
             renderHomeLocalVideos(allLocalVideos);
+            prefetchHomeInfos(allLocalVideos);
             playPendingVideoIfNeeded(allLocalVideos);
           } catch (e) {
             console.error("Failed to load local videos:", e);
@@ -3637,13 +3804,14 @@
           const keyword = String(homeSearchInput?.value || "")
             .trim()
             .toLowerCase();
-          const filteredVideos = keyword
-            ? videos.filter((video) =>
-                String(video.title || "")
-                  .toLowerCase()
-                  .includes(keyword),
-              )
-            : videos;
+          const terms = keyword.length > 0 ? keyword.split(/\s+/).filter(Boolean) : [];
+          const filteredVideos = videos.filter((video) => {
+            const source = buildHomeSearchSource(video);
+            const keywordMatched =
+              terms.length === 0 || terms.every((term) => source.includes(term));
+            if (!keywordMatched) return false;
+            return matchesAdvancedFilters(video);
+          });
 
           if (videos.length === 0) {
             homeVideoGrid.innerHTML =
@@ -3724,9 +3892,246 @@
         homeSearchInput?.addEventListener("input", () => {
           renderHomeLocalVideos(allLocalVideos);
         });
+        bindHomeFilterEvents();
 
         function getVideoIdFromFilename(filename) {
           return String(filename || "").replace(/\.(mp4|mkv|webm|mov)$/i, "");
+        }
+
+        function buildDateVariants(yyyymmdd) {
+          const value = String(yyyymmdd || "").replace(/\D/g, "");
+          if (value.length !== 8) return [];
+          return [
+            value,
+            `${value.slice(0, 4)}/${value.slice(4, 6)}/${value.slice(6, 8)}`,
+            `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`,
+            `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}`,
+          ];
+        }
+
+        function buildDurationVariants(durationSec) {
+          const sec = Number(durationSec);
+          if (!Number.isFinite(sec) || sec < 0) return [];
+
+          const total = Math.floor(sec);
+          const h = Math.floor(total / 3600);
+          const m = Math.floor((total % 3600) / 60);
+          const s = total % 60;
+
+          const mOnly = h * 60 + m;
+          const mmss = `${String(mOnly).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+          const hms = `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+          const ms = `${m}:${String(s).padStart(2, "0")}`;
+          const jp =
+            h > 0 ? `${h}時間${m}分${s}秒` : `${m}分${s}秒`;
+
+          return [String(total), ms, mmss, hms, jp, `${mOnly}分`];
+        }
+
+        function buildHomeSearchSource(video) {
+          const parts = [];
+          parts.push(String(video.title || ""));
+          parts.push(String(video.filename || ""));
+
+          const mtimeDate = new Date(Number(video.mtime || 0));
+          if (!isNaN(mtimeDate.getTime())) {
+            const y = mtimeDate.getFullYear();
+            const m = String(mtimeDate.getMonth() + 1).padStart(2, "0");
+            const d = String(mtimeDate.getDate()).padStart(2, "0");
+            parts.push(`${y}${m}${d}`);
+            parts.push(`${y}/${m}/${d}`);
+            parts.push(`${y}-${m}-${d}`);
+            parts.push(`${y}年${m}月${d}日`);
+          }
+
+          const videoId = getVideoIdFromFilename(video.filename);
+          const info = homeInfoData.get(videoId);
+          if (info) {
+            parts.push(String(info.title || ""));
+            parts.push(String(info.channel || ""));
+            parts.push(String(info.uploader || ""));
+            buildDateVariants(info.upload_date).forEach((v) => parts.push(v));
+            buildDurationVariants(info.duration).forEach((v) => parts.push(v));
+          }
+
+          return parts.join(" ").toLowerCase();
+        }
+
+        function normalizeYyyymmdd(value) {
+          const digits = String(value || "").replace(/\D/g, "");
+          if (digits.length < 8) return "";
+          return digits.slice(0, 8);
+        }
+
+        function yyyymmddToDateInput(value) {
+          const ymd = normalizeYyyymmdd(value);
+          if (ymd.length !== 8) return "";
+          return `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
+        }
+
+        function dateInputToYyyymmdd(value) {
+          return normalizeYyyymmdd(value);
+        }
+
+        function parseDurationInput(value) {
+          const source = String(value || "").trim();
+          if (!source) return null;
+
+          if (/^\d+$/.test(source)) {
+            return Number(source);
+          }
+
+          const parts = source.split(":").map((v) => v.trim());
+          if (parts.length >= 2 && parts.every((p) => /^\d+$/.test(p))) {
+            if (parts.length === 2) {
+              const mm = Number(parts[0]);
+              const ss = Number(parts[1]);
+              return mm * 60 + ss;
+            }
+            if (parts.length === 3) {
+              const hh = Number(parts[0]);
+              const mm = Number(parts[1]);
+              const ss = Number(parts[2]);
+              return hh * 3600 + mm * 60 + ss;
+            }
+          }
+
+          return null;
+        }
+
+        function getVideoUploadDateForFilter(video, info) {
+          const fromInfo = normalizeYyyymmdd(info?.upload_date);
+          if (fromInfo) return fromInfo;
+
+          const dt = new Date(Number(video.mtime || 0));
+          if (isNaN(dt.getTime())) return "";
+          const y = dt.getFullYear();
+          const m = String(dt.getMonth() + 1).padStart(2, "0");
+          const d = String(dt.getDate()).padStart(2, "0");
+          return `${y}${m}${d}`;
+        }
+
+        function matchesAdvancedFilters(video) {
+          const videoId = getVideoIdFromFilename(video.filename);
+          const info = homeInfoData.get(videoId) || null;
+
+          const channelKeyword = String(filterChannel?.value || "")
+            .trim()
+            .toLowerCase();
+          if (channelKeyword) {
+            const channelSource = `${info?.channel || ""} ${info?.uploader || ""}`.toLowerCase();
+            if (!channelSource.includes(channelKeyword)) return false;
+          }
+
+          const fromYmd = normalizeYyyymmdd(filterDateFromText?.value || filterDateFrom?.value);
+          const toYmd = normalizeYyyymmdd(filterDateToText?.value || filterDateTo?.value);
+          if (fromYmd || toYmd) {
+            const uploadYmd = getVideoUploadDateForFilter(video, info);
+            if (!uploadYmd) return false;
+            const n = Number(uploadYmd);
+            if (fromYmd && n < Number(fromYmd)) return false;
+            if (toYmd && n > Number(toYmd)) return false;
+          }
+
+          const durationMode = String(filterDurationRange?.value || "all");
+          const durationSec = Number(info?.duration);
+          if (durationMode !== "all") {
+            if (!Number.isFinite(durationSec)) return false;
+
+            if (durationMode === "lt3" && !(durationSec < 180)) return false;
+            if (durationMode === "3to20" && !(durationSec >= 180 && durationSec < 1200))
+              return false;
+            if (durationMode === "ge20" && !(durationSec >= 1200)) return false;
+            if (durationMode === "custom") {
+              const minSec = parseDurationInput(filterDurationMin?.value);
+              const maxSec = parseDurationInput(filterDurationMax?.value);
+              if (minSec !== null && durationSec < minSec) return false;
+              if (maxSec !== null && durationSec > maxSec) return false;
+            }
+          }
+
+          return true;
+        }
+
+        function setDurationCustomInputState() {
+          const isCustom = String(filterDurationRange?.value || "all") === "custom";
+          if (filterDurationMin) filterDurationMin.disabled = !isCustom;
+          if (filterDurationMax) filterDurationMax.disabled = !isCustom;
+        }
+
+        function bindDatePair(dateEl, textEl) {
+          dateEl?.addEventListener("mousedown", (e) => {
+            // 文字列選択ではなくカレンダーピッカーを開く
+            e.preventDefault();
+            if (typeof dateEl.showPicker === "function") {
+              dateEl.showPicker();
+            } else {
+              dateEl.focus();
+            }
+          });
+          dateEl?.addEventListener("keydown", (e) => {
+            // yyyy/mm/dd の直接編集を無効化
+            e.preventDefault();
+          });
+
+          dateEl?.addEventListener("change", () => {
+            textEl.value = dateInputToYyyymmdd(dateEl.value);
+            renderHomeLocalVideos(allLocalVideos);
+          });
+          textEl?.addEventListener("input", () => {
+            const ymd = normalizeYyyymmdd(textEl.value);
+            if (ymd.length === 8) {
+              dateEl.value = yyyymmddToDateInput(ymd);
+            }
+            renderHomeLocalVideos(allLocalVideos);
+          });
+        }
+
+        function bindHomeFilterEvents() {
+          homeFilterBtn?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            homeFilterPanel?.classList.toggle("hidden");
+          });
+
+          document.addEventListener("click", (e) => {
+            if (!homeFilterPanel || homeFilterPanel.classList.contains("hidden")) return;
+            if (homeFilterPanel.contains(e.target) || homeFilterBtn?.contains(e.target)) {
+              return;
+            }
+            homeFilterPanel.classList.add("hidden");
+          });
+
+          bindDatePair(filterDateFrom, filterDateFromText);
+          bindDatePair(filterDateTo, filterDateToText);
+
+          filterDurationRange?.addEventListener("change", () => {
+            setDurationCustomInputState();
+            renderHomeLocalVideos(allLocalVideos);
+          });
+          filterDurationMin?.addEventListener("input", () =>
+            renderHomeLocalVideos(allLocalVideos),
+          );
+          filterDurationMax?.addEventListener("input", () =>
+            renderHomeLocalVideos(allLocalVideos),
+          );
+          filterChannel?.addEventListener("input", () =>
+            renderHomeLocalVideos(allLocalVideos),
+          );
+
+          filterClearBtn?.addEventListener("click", () => {
+            if (filterDateFrom) filterDateFrom.value = "";
+            if (filterDateFromText) filterDateFromText.value = "";
+            if (filterDateTo) filterDateTo.value = "";
+            if (filterDateToText) filterDateToText.value = "";
+            if (filterDurationRange) filterDurationRange.value = "all";
+            if (filterDurationMin) filterDurationMin.value = "";
+            if (filterDurationMax) filterDurationMax.value = "";
+            if (filterChannel) filterChannel.value = "";
+            setDurationCustomInputState();
+            renderHomeLocalVideos(allLocalVideos);
+          });
+
+          setDurationCustomInputState();
         }
 
         function formatUploadDateText(uploadDate) {
@@ -3746,16 +4151,30 @@
           const videoId = getVideoIdFromFilename(video.filename);
           if (!videoId) return null;
 
+          if (homeInfoData.has(videoId)) {
+            return homeInfoData.get(videoId);
+          }
+
           if (!homeInfoCache.has(videoId)) {
-            homeInfoCache.set(
-              videoId,
-              fetch(`/info/${encodeURIComponent(videoId)}`)
-                .then((r) => (r.ok ? r.json() : null))
-                .catch(() => null),
-            );
+            const request = fetch(`/info/${encodeURIComponent(videoId)}`)
+              .then((r) => (r.ok ? r.json() : null))
+              .then((info) => {
+                if (info) {
+                  homeInfoData.set(videoId, info);
+                }
+                return info;
+              })
+              .catch(() => null);
+            homeInfoCache.set(videoId, request);
           }
 
           return homeInfoCache.get(videoId);
+        }
+
+        async function prefetchHomeInfos(videos) {
+          const requests = videos.map((video) => getHomeInfo(video));
+          await Promise.allSettled(requests);
+          renderHomeLocalVideos(allLocalVideos);
         }
 
         async function enrichHomeCardInfo(video, refs) {
