@@ -3277,7 +3277,7 @@
             videoList.querySelectorAll(".local-video-item"),
           ).find((item) => item.dataset.filename === matchedVideo.filename);
 
-          playLocalVideo(matchedVideo, matchedItem || null, false);
+          playLocalVideo(matchedVideo, matchedItem || null);
           pendingVideoId = null;
         }
 
@@ -3300,7 +3300,7 @@
           }
         }
 
-        function playLocalVideo(video, activeItem = null, shouldAutoplay = true) {
+        function playLocalVideo(video, activeItem = null) {
           const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
 
           if (activeItem) {
@@ -3318,14 +3318,9 @@
           videoPlayer.load();
           titleEl.textContent = video.title;
 
-          if (shouldAutoplay) {
-            videoPlayer.play().catch((err) => {
-              // ユーザー操作前は自動再生が拒否されることがある
-              if (err?.name !== "NotAllowedError") {
-                console.error("Play failed:", err);
-              }
-            });
-          }
+          videoPlayer.play().catch((err) => {
+            console.error("Play failed:", err);
+          });
 
           fetch(`/info/${encodeURIComponent(videoId)}`)
             .then((r) => r.json())
