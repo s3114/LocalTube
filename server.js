@@ -14,10 +14,11 @@ const { exec } = require("child_process");
 // Expressアプリケーションのインスタンスを作成します。
 const app = express();
 const port = 3000; // サーバーがリッスンするポート番号
+const publicDir = path.join(__dirname, "public");
 
 // ■ ミドルウェアの設定
 // --------------------------------------------------
-app.use(express.static(path.join(__dirname, "public"))); // 'public' ディレクトリ内の静的ファイルを提供
+app.use(express.static(publicDir)); // 'public' ディレクトリ内の静的ファイルを提供
 app.use(express.json()); // JSONリクエストボディをパースするためのミドルウェアを追加
 app.use("/downloads", express.static(path.join(__dirname, "downloads")));
 
@@ -233,6 +234,8 @@ async function loadConfig() {
         selectedBrowser: "",
         localVideoDirs: [],
         enableFallbackThumbnails: true,
+        wallpaperBlur: 2,
+        wallpaperBrightness: 50,
       };
     }
 
@@ -248,6 +251,14 @@ async function loadConfig() {
         typeof parsed.enableFallbackThumbnails === "boolean"
           ? parsed.enableFallbackThumbnails
           : true,
+      wallpaperBlur:
+        Number.isFinite(Number(parsed.wallpaperBlur))
+          ? Math.max(0, Math.min(30, Number(parsed.wallpaperBlur)))
+          : 2,
+      wallpaperBrightness:
+        Number.isFinite(Number(parsed.wallpaperBrightness))
+          ? Math.max(30, Math.min(200, Number(parsed.wallpaperBrightness)))
+          : 50,
     };
   } catch (error) {
     console.error("設定ファイル読み込みエラー:", error);
@@ -255,6 +266,8 @@ async function loadConfig() {
       selectedBrowser: "",
       localVideoDirs: [],
       enableFallbackThumbnails: true,
+      wallpaperBlur: 2,
+      wallpaperBrightness: 50,
     };
   }
 }
@@ -269,6 +282,14 @@ async function saveConfig(config) {
       typeof config.enableFallbackThumbnails === "boolean"
         ? config.enableFallbackThumbnails
         : true,
+    wallpaperBlur:
+      Number.isFinite(Number(config.wallpaperBlur))
+        ? Math.max(0, Math.min(30, Number(config.wallpaperBlur)))
+        : 2,
+    wallpaperBrightness:
+      Number.isFinite(Number(config.wallpaperBrightness))
+        ? Math.max(30, Math.min(200, Number(config.wallpaperBrightness)))
+        : 50,
   };
 
   await fs.promises.writeFile(CONFIG_PATH, JSON.stringify(normalized, null, 2));
@@ -299,6 +320,24 @@ async function getLocalVideoDirs() {
   return [movieDir, ...extraDirs].filter(
     (dir, idx, arr) => arr.indexOf(dir) === idx,
   );
+}
+
+const WALLPAPER_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"];
+
+function findWallpaperFilePath() {
+  for (const ext of WALLPAPER_EXTS) {
+    const candidate = path.join(publicDir, `wallpaper${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function getWallpaperPublicUrl() {
+  const filePath = findWallpaperFilePath();
+  if (!filePath) return null;
+  const ext = path.extname(filePath).toLowerCase();
+  const mtime = fs.statSync(filePath).mtimeMs;
+  return `/wallpaper${ext}?v=${Math.floor(mtime)}`;
 }
 
 function runCommand(command, args) {
@@ -727,14 +766,108 @@ app.get("/api/settings", async (req, res) => {
   }
 });
 
+app.get("/api/wallpaper-meta", async (req, res) => {
+  try {
+    const settings = await loadConfig();
+    const url = getWallpaperPublicUrl();
+    res.json({
+      exists: Boolean(url),
+      url,
+      wallpaperBlur: settings.wallpaperBlur ?? 2,
+      wallpaperBrightness: settings.wallpaperBrightness ?? 50,
+    });
+  } catch (error) {
+    console.error("壁紙メタ情報の取得に失敗しました:", error);
+    res.status(500).json({ error: "壁紙メタ情報の取得に失敗しました。" });
+  }
+});
+
+app.post("/api/wallpaper", upload.single("wallpaper"), async (req, res) => {
+  const tempPath = req.file?.path;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "壁紙ファイルが指定されていません。" });
+    }
+
+    const ext = path.extname(req.file.originalname || "").toLowerCase();
+    if (!WALLPAPER_EXTS.includes(ext)) {
+      return res.status(400).json({ error: "対応していない画像形式です。" });
+    }
+
+    for (const oldExt of WALLPAPER_EXTS) {
+      const oldPath = path.join(publicDir, `wallpaper${oldExt}`);
+      if (fs.existsSync(oldPath)) {
+        await fs.promises.unlink(oldPath);
+      }
+    }
+
+    const finalPath = path.join(publicDir, `wallpaper${ext}`);
+    await fs.promises.rename(req.file.path, finalPath);
+
+    const config = await loadConfig();
+    if (typeof req.body?.wallpaperBlur !== "undefined") {
+      config.wallpaperBlur = Number(req.body.wallpaperBlur);
+    }
+    if (typeof req.body?.wallpaperBrightness !== "undefined") {
+      config.wallpaperBrightness = Number(req.body.wallpaperBrightness);
+    }
+    await saveConfig(config);
+
+    res.json({
+      message: "壁紙を保存しました。",
+      url: getWallpaperPublicUrl(),
+      wallpaperBlur: config.wallpaperBlur ?? 2,
+      wallpaperBrightness: config.wallpaperBrightness ?? 50,
+    });
+  } catch (error) {
+    console.error("壁紙の保存に失敗しました:", error);
+    res.status(500).json({ error: "壁紙の保存に失敗しました。" });
+  } finally {
+    if (tempPath && fs.existsSync(tempPath)) {
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch (_error) {
+        // noop
+      }
+    }
+  }
+});
+
+app.post("/api/wallpaper/clear", async (_req, res) => {
+  try {
+    for (const ext of WALLPAPER_EXTS) {
+      const target = path.join(publicDir, `wallpaper${ext}`);
+      if (fs.existsSync(target)) {
+        await fs.promises.unlink(target);
+      }
+    }
+
+    res.json({
+      message: "壁紙をクリアしました。",
+      url: null,
+    });
+  } catch (error) {
+    console.error("壁紙クリアに失敗しました:", error);
+    res.status(500).json({ error: "壁紙クリアに失敗しました。" });
+  }
+});
+
 // 設定を保存するAPI
 app.post("/api/settings", async (req, res) => {
   try {
-    const { browser, localVideoDirs, enableFallbackThumbnails } = req.body || {};
+    const {
+      browser,
+      localVideoDirs,
+      enableFallbackThumbnails,
+      wallpaperBlur,
+      wallpaperBrightness,
+    } = req.body || {};
     if (
       typeof browser === "undefined" &&
       typeof localVideoDirs === "undefined" &&
-      typeof enableFallbackThumbnails === "undefined"
+      typeof enableFallbackThumbnails === "undefined" &&
+      typeof wallpaperBlur === "undefined" &&
+      typeof wallpaperBrightness === "undefined"
     ) {
       return res.status(400).json({ error: "無効なリクエストです。" });
     }
@@ -751,6 +884,13 @@ app.post("/api/settings", async (req, res) => {
 
     if (typeof enableFallbackThumbnails !== "undefined") {
       currentConfig.enableFallbackThumbnails = Boolean(enableFallbackThumbnails);
+    }
+
+    if (typeof wallpaperBlur !== "undefined") {
+      currentConfig.wallpaperBlur = Number(wallpaperBlur);
+    }
+    if (typeof wallpaperBrightness !== "undefined") {
+      currentConfig.wallpaperBrightness = Number(wallpaperBrightness);
     }
 
     const savedConfig = await saveConfig(currentConfig);
