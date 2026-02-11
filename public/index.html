@@ -4025,29 +4025,87 @@
           });
         }
 
-        function renderHomeLocalVideos(videos) {
-          if (!homeVideoGrid) return;
-
-          homeVideoGrid.innerHTML = "";
-
+        function getHomeSearchTerms() {
           const keyword = String(homeSearchInput?.value || "")
             .trim()
             .toLowerCase();
-          const terms = keyword.length > 0 ? keyword.split(/\s+/).filter(Boolean) : [];
-          const filteredVideos = videos.filter((video) => {
+          return keyword.length > 0 ? keyword.split(/\s+/).filter(Boolean) : [];
+        }
+
+        function filterHomeVideos(videos, terms) {
+          return videos.filter((video) => {
             const source = buildHomeSearchSource(video);
             const keywordMatched =
               terms.length === 0 || terms.every((term) => source.includes(term));
             if (!keywordMatched) return false;
             return matchesAdvancedFilters(video);
           });
+        }
 
+        function createHomeVideoCard(video) {
+          const item = document.createElement("div");
+          item.className = "home-video-card";
+
+          const thumbEl = video.thumb
+            ? document.createElement("img")
+            : document.createElement("div");
+          thumbEl.className = "home-video-card-thumb";
+          if (video.thumb) {
+            thumbEl.src = video.thumb;
+            thumbEl.loading = "lazy";
+          }
+
+          const metaEl = document.createElement("div");
+          metaEl.className = "home-video-card-meta";
+
+          const iconEl = document.createElement("img");
+          iconEl.className = "home-video-channel-icon";
+          iconEl.src = "/none_icon.jpg";
+          iconEl.alt = "channel icon";
+          iconEl.loading = "lazy";
+          iconEl.onerror = () => {
+            iconEl.src = "/none_icon.jpg";
+          };
+
+          const textsEl = document.createElement("div");
+          textsEl.className = "home-video-card-texts";
+
+          const titleEl = document.createElement("div");
+          titleEl.className = "home-video-card-title";
+          titleEl.textContent = video.title;
+
+          const channelEl = document.createElement("div");
+          channelEl.className = "home-video-card-channel";
+          channelEl.textContent = "ローカル動画";
+
+          const statsEl = document.createElement("div");
+          statsEl.className = "home-video-card-stats";
+          statsEl.textContent = "視聴回数不明 ・ 投稿日不明";
+
+          textsEl.appendChild(titleEl);
+          textsEl.appendChild(channelEl);
+          textsEl.appendChild(statsEl);
+          metaEl.appendChild(iconEl);
+          metaEl.appendChild(textsEl);
+
+          item.appendChild(thumbEl);
+          item.appendChild(metaEl);
+          item.addEventListener("click", () => playLocalVideo(video));
+
+          return { item, refs: { titleEl, channelEl, statsEl, iconEl } };
+        }
+
+        function renderHomeLocalVideos(videos) {
+          if (!homeVideoGrid) return;
+
+          homeVideoGrid.innerHTML = "";
           if (videos.length === 0) {
             homeVideoGrid.innerHTML =
               '<div class="home-video-empty">動画が見つかりません</div>';
             return;
           }
 
+          const filteredVideos = filterHomeVideos(videos, getHomeSearchTerms());
           if (filteredVideos.length === 0) {
             homeVideoGrid.innerHTML =
               '<div class="home-video-empty">検索条件に一致する動画がありません</div>';
@@ -4055,66 +4113,9 @@
           }
 
           filteredVideos.forEach((video) => {
-            const item = document.createElement("div");
-            item.className = "home-video-card";
-
-            const thumbEl = video.thumb
-              ? document.createElement("img")
-              : document.createElement("div");
-            thumbEl.className = "home-video-card-thumb";
-            if (video.thumb) {
-              thumbEl.src = video.thumb;
-              thumbEl.loading = "lazy";
-            }
-
-            const metaEl = document.createElement("div");
-            metaEl.className = "home-video-card-meta";
-
-            const iconEl = document.createElement("img");
-            iconEl.className = "home-video-channel-icon";
-            iconEl.src = "/none_icon.jpg";
-            iconEl.alt = "channel icon";
-            iconEl.loading = "lazy";
-            iconEl.onerror = () => {
-              iconEl.src = "/none_icon.jpg";
-            };
-
-            const textsEl = document.createElement("div");
-            textsEl.className = "home-video-card-texts";
-
-            const cardTitleEl = document.createElement("div");
-            cardTitleEl.className = "home-video-card-title";
-            cardTitleEl.textContent = video.title;
-
-            const channelEl = document.createElement("div");
-            channelEl.className = "home-video-card-channel";
-            channelEl.textContent = "ローカル動画";
-
-            const statsEl = document.createElement("div");
-            statsEl.className = "home-video-card-stats";
-            statsEl.textContent = "視聴回数不明 ・ 投稿日不明";
-
-            textsEl.appendChild(cardTitleEl);
-            textsEl.appendChild(channelEl);
-            textsEl.appendChild(statsEl);
-            metaEl.appendChild(iconEl);
-            metaEl.appendChild(textsEl);
-
-            item.appendChild(thumbEl);
-            item.appendChild(metaEl);
-
-            item.addEventListener("click", () => {
-              playLocalVideo(video);
-            });
-
+            const { item, refs } = createHomeVideoCard(video);
             homeVideoGrid.appendChild(item);
-
-            enrichHomeCardInfo(video, {
-              titleEl: cardTitleEl,
-              channelEl,
-              statsEl,
-              iconEl,
-            });
+            enrichHomeCardInfo(video, refs);
           });
         }
 
@@ -4922,23 +4923,100 @@
             .filter((c) => c.text && c.text.trim() !== "");
 
           // ★ 最終的に「確定した配列」で描画
-          // ★ 最終的に「確定した配列」で描画
           renderComments(window.currentVideoComments);
           return; // ← ここで処理終了
+        }
+
+        function buildCommentTree(comments) {
+          const nodeMap = {};
+          comments.forEach((comment) => {
+            nodeMap[comment.id] = { ...comment, children: [] };
+          });
+
+          comments.forEach((comment) => {
+            if (comment.parent && nodeMap[comment.parent]) {
+              nodeMap[comment.parent].children.push(nodeMap[comment.id]);
+            }
+          });
+
+          const roots = comments
+            .filter((comment) => !comment.parent)
+            .map((comment) => nodeMap[comment.id]);
+
+          return roots;
+        }
+
+        function renderNestedReplyTree(nodes, container) {
+          nodes.forEach((node) => {
+            const replyEl = createCommentElement(node, true);
+            container.appendChild(replyEl);
+
+            if (node.children.length > 0) {
+              const nested = document.createElement("div");
+              nested.className = "comment-replies";
+              renderNestedReplyTree(node.children, nested);
+              replyEl.querySelector(".comment-body").appendChild(nested);
+            }
+          });
+        }
+
+        function createReplyControls(parentNode, parentEl) {
+          const replyContainer = document.createElement("div");
+          replyContainer.className = "comment-replies";
+          replyContainer.id = `replies-${parentNode.id}`;
+
+          const toggleBtn = document.createElement("button");
+          toggleBtn.className = "comment-toggle";
+          toggleBtn.dataset.parentId = parentNode.id;
+
+          const updateToggleText = (isCollapsed) => {
+            toggleBtn.textContent = isCollapsed
+              ? `返信${parentNode.children.length}件 ▼`
+              : `返信${parentNode.children.length}件 ▲`;
+          };
+          updateToggleText(true);
+
+          const toggleReplies = () => {
+            const container = document.getElementById(
+              `replies-${toggleBtn.dataset.parentId}`,
+            );
+            if (!container) return;
+            const isCollapsed = container.classList.toggle("collapsed");
+            updateToggleText(isCollapsed);
+          };
+
+          toggleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleReplies();
+          });
+
+          renderNestedReplyTree(parentNode.children, replyContainer);
+          replyContainer.classList.add("collapsed");
+
+          const bodyEl = parentEl.querySelector(".comment-body");
+          bodyEl.appendChild(toggleBtn);
+          bodyEl.appendChild(replyContainer);
+
+          const threadHitbox = document.createElement("div");
+          threadHitbox.className = "thread-hitbox";
+          threadHitbox.title = "返信を開閉";
+          threadHitbox.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleReplies();
+          });
+          parentEl.appendChild(threadHitbox);
         }
 
         function renderComments(comments) {
           const list = document.getElementById("comment-list");
           const countDisplay = document.getElementById("comment-count-display");
+          const empty = document.querySelector(".comment-empty");
 
           if (!list) return;
 
           list.style.display = "block";
-          const empty = document.querySelector(".comment-empty");
-
           list.innerHTML = "";
-
-          // ★ コメント件数を更新
           if (countDisplay) {
             countDisplay.textContent = comments ? comments.length : 0;
           }
@@ -4949,99 +5027,14 @@
           }
           if (empty) empty.style.display = "none";
 
-          // --- ① 親と子に分ける ---
-          const parents = comments.filter((c) => !c.parent);
-          const children = comments.filter((c) => c.parent);
-
-          // parent → [子コメント配列] のマップを作る
-          const replyMap = {};
-          children.forEach((c) => {
-            if (!replyMap[c.parent]) replyMap[c.parent] = [];
-            replyMap[c.parent].push(c);
-          });
-
-          // ★★★【追加】ネスト対応：ツリー構造を作る ★★★
-          const nodeMap = {};
-          comments.forEach((c) => {
-            nodeMap[c.id] = { ...c, children: [] };
-          });
-
-          comments.forEach((c) => {
-            if (c.parent && nodeMap[c.parent]) {
-              nodeMap[c.parent].children.push(nodeMap[c.id]);
-            }
-          });
-
-          // --- ② 親コメントを描画（★ ネスト対応版 ★）---
-          parents.forEach((parent) => {
-            const parentNode = nodeMap[parent.id];
-            const parentEl = createCommentElement(parent, false);
+          const roots = buildCommentTree(comments);
+          roots.forEach((parentNode) => {
+            const parentEl = createCommentElement(parentNode, false);
             parentEl.querySelector(".comment-text").classList.add("clamped");
-
             list.appendChild(parentEl);
 
-            // ★ 再帰的に返信を描画
             if (parentNode.children.length > 0) {
-              const replyContainer = document.createElement("div");
-              replyContainer.className = "comment-replies";
-              replyContainer.id = "replies-" + parent.id;
-
-              // 折りたたみボタン（親にだけ付ける）
-              const toggleBtn = document.createElement("button");
-              toggleBtn.className = "comment-toggle";
-              toggleBtn.textContent = `返信${parentNode.children.length}件 ▼`;
-              toggleBtn.dataset.parentId = parent.id;
-
-              function toggleReplies() {
-                const container = document.getElementById(
-                  "replies-" + toggleBtn.dataset.parentId,
-                );
-                if (!container) return;
-
-                const isCollapsed = container.classList.toggle("collapsed");
-                toggleBtn.textContent = isCollapsed
-                  ? `返信${parentNode.children.length}件 ▼`
-                  : `返信${parentNode.children.length}件 ▲`;
-              }
-
-              toggleBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                toggleReplies();
-              });
-
-              parentEl.querySelector(".comment-body").appendChild(toggleBtn);
-
-              // ★ ここで「返信の返信」まで描画する
-              function renderNestedReplies(nodes, container) {
-                nodes.forEach((n) => {
-                  const replyEl = createCommentElement(n, true);
-                  container.appendChild(replyEl);
-
-                  if (n.children.length > 0) {
-                    const nested = document.createElement("div");
-                    nested.className = "comment-replies";
-                    renderNestedReplies(n.children, nested);
-                    replyEl.querySelector(".comment-body").appendChild(nested);
-                  }
-                });
-              }
-
-              renderNestedReplies(parentNode.children, replyContainer);
-
-              replyContainer.classList.add("collapsed");
-              parentEl
-                .querySelector(".comment-body")
-                .appendChild(replyContainer);
-
-              const threadHitbox = document.createElement("div");
-              threadHitbox.className = "thread-hitbox";
-              threadHitbox.title = "返信を開閉";
-              threadHitbox.addEventListener("click", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toggleReplies();
-              });
-              parentEl.appendChild(threadHitbox);
+              createReplyControls(parentNode, parentEl);
             }
           });
         }
