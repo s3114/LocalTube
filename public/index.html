@@ -5039,125 +5039,110 @@
           });
         }
 
-        function createCommentElement(comment, isReply) {
-          const item = document.createElement("div");
-          item.className = isReply ? "comment-reply" : "comment-item";
+        const defaultCommentAvatar =
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
 
-          // --- アバター（リンク付き） ---
+        function createCommentAvatarLink(comment) {
           const avatarLink = document.createElement("a");
-          avatarLink.href = "#"; // チャンネルURLがあれば入れるが、現状はないことが多いので#
+          avatarLink.href = "#";
           avatarLink.className = "comment-avatar-link";
 
           const avatar = document.createElement("img");
           avatar.className = "comment-avatar";
           avatar.loading = "lazy";
-
-          // URLが無ければフォールバック
           avatar.src =
             comment.author_thumbnail && comment.author_thumbnail !== ""
               ? comment.author_thumbnail
-              : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
-
+              : defaultCommentAvatar;
           avatar.onerror = () => {
-            avatar.src =
-              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
+            avatar.src = defaultCommentAvatar;
           };
 
           avatarLink.appendChild(avatar);
+          return avatarLink;
+        }
 
-          // --- ボディ部分 ---
-          const body = document.createElement("div");
-          body.className = "comment-body";
-
-          // 1. ヘッダー（名前 + 時間）
+        function createCommentMeta(comment) {
           const meta = document.createElement("div");
           meta.className = "comment-meta";
 
-          const author = document.createElement("span"); // YouTubeは名前クリックで飛べるが、spanにしておく
+          const author = document.createElement("span");
           author.className = "comment-author";
           author.textContent = comment.author || "@Unknown";
 
           const time = document.createElement("span");
           time.className = "comment-time";
-          // YouTubeは「1年前」などの相対時間だが、ここでは元のテキストを使う
-          // ホバーで絶対時間を出せるとベスト
           time.textContent = comment._time_text || "";
 
           meta.appendChild(author);
           meta.appendChild(time);
+          return meta;
+        }
 
-          // 2. 本文
-          const text = document.createElement("div");
-          text.className = "comment-text";
-          text.innerHTML = comment.text ? linkify(comment.text) : "";
-
-          // 3. アクションボタン（高評価、返信）※低評価は削除
+        function createCommentActions(comment) {
           const actions = document.createElement("div");
           actions.className = "comment-actions";
 
-          // Like
           const btnLike = document.createElement("button");
           btnLike.className = "action-btn";
           btnLike.title = "高評価";
-
-          let likeCountText = "";
-          if (comment.like_count > 0) {
-            // 1000以上を 1.2K とかにするのは別途関数が必要だが、一旦そのまま
-            likeCountText = comment.like_count;
-          }
-
+          const likeCountText = comment.like_count > 0 ? comment.like_count : "";
           btnLike.innerHTML = `<i class="fa-regular fa-thumbs-up"></i> ${likeCountText}`;
 
-          // Dislike は削除
-
-          // Reply
           const btnReply = document.createElement("button");
           btnReply.className = "action-btn";
           btnReply.textContent = "返信";
 
           actions.appendChild(btnLike);
-          // actions.appendChild(btnDislike); // 削除
           actions.appendChild(btnReply);
+          return actions;
+        }
 
-          // --- 組み立て ---
-          body.appendChild(meta);
-          body.appendChild(text);
-          // コメント本文が長すぎる場合の「もっと見る」ボタン（後で判定）
-          const moreBtn = document.createElement("button");
-          moreBtn.className = "comment-more";
-          moreBtn.textContent = "もっと見る";
-          moreBtn.style.display = "none";
-          body.appendChild(moreBtn);
-
-          body.appendChild(actions);
-
-          item.appendChild(avatarLink);
-          item.appendChild(body);
-
-          // ===== ★ コメント長文の「もっと見る」判定（以前と同じロジック） ★ =====
+        function attachCommentExpandBehavior(textEl, moreBtn) {
           requestAnimationFrame(() => {
-            // line-height が "normal" の場合の保険
-            let lineHeight = parseFloat(getComputedStyle(text).lineHeight);
-            if (isNaN(lineHeight)) lineHeight = 19.6; // 14px * 1.4
+            let lineHeight = parseFloat(getComputedStyle(textEl).lineHeight);
+            if (isNaN(lineHeight)) lineHeight = 19.6;
 
-            const maxHeight = lineHeight * 4; // 4行分
+            const maxHeight = lineHeight * 4;
+            textEl.classList.remove("clamped");
 
-            // 一度クランプを外して正確に測る（重要）
-            text.classList.remove("clamped");
-
-            if (text.scrollHeight > maxHeight + 5) {
-              // 誤差許容
-              text.classList.add("clamped");
+            if (textEl.scrollHeight > maxHeight + 5) {
+              textEl.classList.add("clamped");
               moreBtn.style.display = "block";
             }
           });
 
-          // ボタンクリックで開閉
           moreBtn.addEventListener("click", () => {
-            const isClamped = text.classList.toggle("clamped");
+            const isClamped = textEl.classList.toggle("clamped");
             moreBtn.textContent = isClamped ? "もっと見る" : "一部を表示";
           });
+        }
 
+        function createCommentElement(comment, isReply) {
+          const item = document.createElement("div");
+          item.className = isReply ? "comment-reply" : "comment-item";
+
+          const body = document.createElement("div");
+          body.className = "comment-body";
+
+          const text = document.createElement("div");
+          text.className = "comment-text";
+          text.innerHTML = comment.text ? linkify(comment.text) : "";
+
+          const moreBtn = document.createElement("button");
+          moreBtn.className = "comment-more";
+          moreBtn.textContent = "もっと見る";
+          moreBtn.style.display = "none";
+
+          body.appendChild(createCommentMeta(comment));
+          body.appendChild(text);
+          body.appendChild(moreBtn);
+          body.appendChild(createCommentActions(comment));
+
+          item.appendChild(createCommentAvatarLink(comment));
+          item.appendChild(body);
+
+          attachCommentExpandBehavior(text, moreBtn);
           return item;
         }
 
