@@ -340,6 +340,26 @@ function getWallpaperPublicUrl() {
   return `/wallpaper${ext}?v=${Math.floor(mtime)}`;
 }
 
+let nodeFetchPromise;
+async function getNodeFetch() {
+  if (!nodeFetchPromise) {
+    nodeFetchPromise = import("node-fetch").then((mod) => mod.default);
+  }
+  return nodeFetchPromise;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  const fetch = await getNodeFetch();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, { windowsHide: true });
@@ -1935,18 +1955,14 @@ app.get("/api/validate-url", async (req, res) => {
   }
 
   try {
-    const fetch = await import("node-fetch").then((mod) => mod.default); // Import node-fetch dynamically
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒のタイムアウト
-
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(
+      url,
+      {
       method: "HEAD",
-      signal: controller.signal,
       redirect: "follow", // リダイレクトを追跡
-    });
-
-    clearTimeout(timeoutId);
+      },
+      5000,
+    );
 
     if (response.ok) {
       // 2xx のステータスコードは成功
@@ -1981,18 +1997,11 @@ app.post("/api/resolve-handle", async (req, res) => {
   }
 
   try {
-    const fetch = await import("node-fetch").then((mod) => mod.default); // Ensure node-fetch is available
-
     // Fetch the YouTube page HTML
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
-
     let response;
     try {
-      response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      response = await fetchWithTimeout(url, {}, 10000);
     } catch (fetchError) {
-      clearTimeout(timeoutId);
       if (fetchError.name === "AbortError") {
         console.error(`Fetch timeout for URL: ${url}`);
         return res
