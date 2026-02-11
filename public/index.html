@@ -90,6 +90,7 @@
         align-items: center;
         justify-content: space-between;
         width: 100%;
+        gap: 16px;
       }
 
       .logo {
@@ -113,11 +114,43 @@
         line-height: 1;
       }
 
+      .header-search-wrap {
+        flex: 1;
+        max-width: 720px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #111;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0 12px;
+        height: 38px;
+      }
+
+      .header-search-wrap i {
+        color: var(--subtext);
+        font-size: 14px;
+      }
+
+      .header-search {
+        width: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      .header-search::placeholder {
+        color: #777;
+      }
+
       /* ヘッダーボタン */
       .header-buttons {
         display: flex;
         gap: 12px;
         transform: scale(1.1);
+        flex-shrink: 0;
       }
 
       .icon-btn {
@@ -667,7 +700,6 @@
         border: 1px solid #222;
         border-radius: 14px;
         padding: 12px;
-        max-height: 6800px;
         overflow-y: auto;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
         min-width: 400px;
@@ -1570,6 +1602,15 @@
         <div class="logo">
           <span class="logo-icon"></span>
           <span class="logo-text">LocalTube</span>
+        </div>
+        <div class="header-search-wrap">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input
+            id="home-search-input"
+            class="header-search"
+            type="search"
+            placeholder="ホーム動画を検索"
+            autocomplete="off" />
         </div>
         <div class="header-buttons">
           <button
@@ -3280,8 +3321,10 @@
         const videoPlayer = document.getElementById("local-player");
         const videoList = document.getElementById("local-video-list");
         const homeVideoGrid = document.querySelector(".home-video-grid");
+        const homeSearchInput = document.getElementById("home-search-input");
         const titleEl = document.getElementById("player-title");
         const timeEl = document.getElementById("player-time");
+        let allLocalVideos = [];
 
         const seekBar = document.getElementById("seek-bar");
         const btnPlay = document.getElementById("btn-play");
@@ -3472,10 +3515,11 @@
           try {
             const res = await fetch("/api/local-videos");
             const videos = await res.json();
+            allLocalVideos = Array.isArray(videos) ? videos : [];
 
-            renderLocalVideos(videos);
-            renderHomeLocalVideos(videos);
-            playPendingVideoIfNeeded(videos);
+            renderLocalVideos(allLocalVideos);
+            renderHomeLocalVideos(allLocalVideos);
+            playPendingVideoIfNeeded(allLocalVideos);
           } catch (e) {
             console.error("Failed to load local videos:", e);
             videoList.innerHTML =
@@ -3548,13 +3592,30 @@
 
           homeVideoGrid.innerHTML = "";
 
+          const keyword = String(homeSearchInput?.value || "")
+            .trim()
+            .toLowerCase();
+          const filteredVideos = keyword
+            ? videos.filter((video) =>
+                String(video.title || "")
+                  .toLowerCase()
+                  .includes(keyword),
+              )
+            : videos;
+
           if (videos.length === 0) {
             homeVideoGrid.innerHTML =
               '<div class="home-video-empty">動画が見つかりません</div>';
             return;
           }
 
-          videos.forEach((video) => {
+          if (filteredVideos.length === 0) {
+            homeVideoGrid.innerHTML =
+              '<div class="home-video-empty">検索条件に一致する動画がありません</div>';
+            return;
+          }
+
+          filteredVideos.forEach((video) => {
             const item = document.createElement("div");
             item.className = "home-video-card";
 
@@ -3574,6 +3635,10 @@
             homeVideoGrid.appendChild(item);
           });
         }
+
+        homeSearchInput?.addEventListener("input", () => {
+          renderHomeLocalVideos(allLocalVideos);
+        });
 
         // ===============================
         // ★ 追加：クリックで再生／停止、ダブルクリックで全画面
