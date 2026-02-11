@@ -1233,7 +1233,9 @@ app.get("/api/local-videos", async (req, res) => {
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
     const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
 
-    const videos = [];
+    if (type === "video" && !videoExt.includes(ext)) {
+      return res.status(400).json({ error: "無効な動画ファイルです。" });
+    }
 
     for (const sourceDir of sourceDirs) {
       if (!fs.existsSync(sourceDir)) continue;
