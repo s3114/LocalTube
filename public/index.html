@@ -4203,6 +4203,7 @@
         }
 
         function renderLocalVideos(videos) {
+          if (!Array.isArray(videos)) videos = [];
           videoList.innerHTML = "";
 
           if (videos.length === 0) {
