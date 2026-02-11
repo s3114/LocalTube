@@ -1233,9 +1233,7 @@ app.get("/api/local-videos", async (req, res) => {
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
     const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
 
-    if (type === "video" && !videoExt.includes(ext)) {
-      return res.status(400).json({ error: "無効な動画ファイルです。" });
-    }
+    const videos = [];
 
     for (const sourceDir of sourceDirs) {
       if (!fs.existsSync(sourceDir)) continue;
@@ -1288,8 +1286,7 @@ app.get("/api/local-videos", async (req, res) => {
     res.json(videos);
   } catch (e) {
     console.error("Failed to scan local videos:", e);
-    // 一部フォルダー不具合でもUI全体を止めないため空配列で返す
-    res.json([]);
+    res.status(500).json({ error: "動画一覧の取得に失敗しました。" });
   }
 });
 
