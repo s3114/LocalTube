@@ -1231,39 +1231,11 @@ app.get("/api/local-videos", async (req, res) => {
     const sourceDirs = await getLocalVideoDirs();
 
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
-    const thumbExts = [".jpg", ".png", ".webp", ".jpeg", ".jfif"];
+    const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
 
-    async function findThumbnailPath(sourceDir, baseName) {
-      const normalizedBase = String(baseName || "").toLowerCase();
-      const thumbSearchDirs = [
-        sourceDir,
-        path.join(sourceDir, "サムネイル"),
-        path.join(sourceDir, "thumbnails"),
-      ];
-
-      if (path.resolve(sourceDir) === path.resolve(movieDir)) {
-        thumbSearchDirs.push(thumbnailDir);
-      }
-
-      for (const dir of thumbSearchDirs) {
-        if (!fs.existsSync(dir)) continue;
-
-        const entries = await fs.promises.readdir(dir);
-        for (const entry of entries) {
-          const ext = path.extname(entry).toLowerCase();
-          if (!thumbExts.includes(ext)) continue;
-
-          const stem = path.parse(entry).name.toLowerCase();
-          if (stem === normalizedBase) {
-            return path.join(dir, entry);
-          }
-        }
-      }
-
-      return null;
+    if (type === "video" && !videoExt.includes(ext)) {
+      return res.status(400).json({ error: "無効な動画ファイルです。" });
     }
-
-    const videos = [];
 
     for (const sourceDir of sourceDirs) {
       if (!fs.existsSync(sourceDir)) continue;
@@ -1277,7 +1249,26 @@ app.get("/api/local-videos", async (req, res) => {
         const fullPath = path.join(sourceDir, file);
         const base = path.parse(file).name;
 
-        const thumbPath = await findThumbnailPath(sourceDir, base);
+        let thumbPath = null;
+        const candidates = [];
+
+        for (const tExt of thumbExts) {
+          candidates.push(path.join(sourceDir, `${base}${tExt}`));
+        }
+
+        // デフォルト動画フォルダは既存のサムネイル保存先も探索
+        if (path.resolve(sourceDir) === path.resolve(movieDir)) {
+          for (const tExt of thumbExts) {
+            candidates.push(path.join(thumbnailDir, `${base}${tExt}`));
+          }
+        }
+
+        for (const candidate of candidates) {
+          if (fs.existsSync(candidate)) {
+            thumbPath = candidate;
+            break;
+          }
+        }
 
         videos.push({
           title: base,
