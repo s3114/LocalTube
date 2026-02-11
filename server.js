@@ -1187,17 +1187,16 @@ app.get("/info/:videoId", async (req, res) => {
 
 app.get("/api/local-media", async (req, res) => {
   try {
-    const mediaType = req.query.type;
+    const type = req.query.type;
     const targetPath = String(req.query.path || "");
 
-    if (!targetPath || !["video", "thumb"].includes(mediaType)) {
+    if (!targetPath || !["video", "thumb"].includes(type)) {
       return res.status(400).json({ error: "無効なリクエストです。" });
     }
 
     const allowedVideoDirs = await getLocalVideoDirs();
     const allowedThumbDirs = [thumbnailDir, ...allowedVideoDirs];
-    const allowedDirs =
-      mediaType === "video" ? allowedVideoDirs : allowedThumbDirs;
+    const allowedDirs = type === "video" ? allowedVideoDirs : allowedThumbDirs;
 
     const isAllowed = allowedDirs.some((dir) => isPathWithin(targetPath, dir));
     if (!isAllowed) {
@@ -1208,11 +1207,11 @@ app.get("/api/local-media", async (req, res) => {
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
     const thumbExt = [".jpg", ".jpeg", ".png", ".webp"];
 
-    if (mediaType === "video" && !videoExt.includes(ext)) {
+    if (type === "video" && !videoExt.includes(ext)) {
       return res.status(400).json({ error: "無効な動画ファイルです。" });
     }
 
-    if (mediaType === "thumb" && !thumbExt.includes(ext)) {
+    if (type === "thumb" && !thumbExt.includes(ext)) {
       return res.status(400).json({ error: "無効な画像ファイルです。" });
     }
 
@@ -1232,50 +1231,16 @@ app.get("/api/local-videos", async (req, res) => {
     const sourceDirs = await getLocalVideoDirs();
 
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
-    const thumbExts = [".jpg", ".png", ".webp", ".jpeg", ".jfif"];
+    const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
 
-    async function findThumbnailPath(sourceDir, baseName) {
-      const normalizedBase = String(baseName || "").toLowerCase();
-      const thumbSearchDirs = [
-        sourceDir,
-        path.join(sourceDir, "サムネイル"),
-        path.join(sourceDir, "thumbnails"),
-      ];
-
-      if (path.resolve(sourceDir) === path.resolve(movieDir)) {
-        thumbSearchDirs.push(thumbnailDir);
-      }
-
-      for (const dir of thumbSearchDirs) {
-        if (!fs.existsSync(dir)) continue;
-
-        const entries = await fs.promises.readdir(dir);
-        for (const entry of entries) {
-          const ext = path.extname(entry).toLowerCase();
-          if (!thumbExts.includes(ext)) continue;
-
-          const stem = path.parse(entry).name.toLowerCase();
-          if (stem === normalizedBase) {
-            return path.join(dir, entry);
-          }
-        }
-      }
-
-      return null;
+    if (type === "video" && !videoExt.includes(ext)) {
+      return res.status(400).json({ error: "無効な動画ファイルです。" });
     }
-
-    const videos = [];
 
     for (const sourceDir of sourceDirs) {
       if (!fs.existsSync(sourceDir)) continue;
 
-      let files = [];
-      try {
-        files = await fs.promises.readdir(sourceDir);
-      } catch (scanError) {
-        console.warn("Skip unreadable local video dir:", sourceDir, scanError);
-        continue;
-      }
+      const files = await fs.promises.readdir(sourceDir);
 
       for (const file of files) {
         const ext = path.extname(file).toLowerCase();
@@ -1284,7 +1249,26 @@ app.get("/api/local-videos", async (req, res) => {
         const fullPath = path.join(sourceDir, file);
         const base = path.parse(file).name;
 
-        const thumbPath = await findThumbnailPath(sourceDir, base);
+        let thumbPath = null;
+        const candidates = [];
+
+        for (const tExt of thumbExts) {
+          candidates.push(path.join(sourceDir, `${base}${tExt}`));
+        }
+
+        // デフォルト動画フォルダは既存のサムネイル保存先も探索
+        if (path.resolve(sourceDir) === path.resolve(movieDir)) {
+          for (const tExt of thumbExts) {
+            candidates.push(path.join(thumbnailDir, `${base}${tExt}`));
+          }
+        }
+
+        for (const candidate of candidates) {
+          if (fs.existsSync(candidate)) {
+            thumbPath = candidate;
+            break;
+          }
+        }
 
         videos.push({
           title: base,
