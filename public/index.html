@@ -3242,6 +3242,32 @@
           btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
         });
 
+        function findVideoById(videos, videoId) {
+          if (!videoId) return null;
+
+          return videos.find((video) => {
+            const idFromFilename = video.filename.replace(
+              /\.(mp4|mkv|webm|mov)$/i,
+              "",
+            );
+            return idFromFilename === videoId;
+          });
+        }
+
+        function playPendingVideoIfNeeded(videos) {
+          if (!pendingVideoId) return;
+
+          const matchedVideo = findVideoById(videos, pendingVideoId);
+          if (!matchedVideo) return;
+
+          const matchedItem = Array.from(
+            videoList.querySelectorAll(".local-video-item"),
+          ).find((item) => item.dataset.filename === matchedVideo.filename);
+
+          playLocalVideo(matchedVideo, matchedItem || null);
+          pendingVideoId = null;
+        }
+
         async function loadLocalVideos() {
           try {
             const res = await fetch("/api/local-videos");
@@ -3742,6 +3768,7 @@
           videos.forEach((video) => {
             const item = document.createElement("div");
             item.className = "local-video-item";
+            item.dataset.filename = video.filename;
 
             const thumbHtml = video.thumb
               ? `<img src="${video.thumb}" class="local-video-thumb">`
