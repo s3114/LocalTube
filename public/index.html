@@ -2161,6 +2161,17 @@
                   </div>
                 </div>
               </div>
+              <div class="toggle">
+                <div>
+                  仮サムネイル生成
+                  <small>通常サムネイルが見つからないときに動画から仮サムネイルを作成します。</small>
+                  <small id="fallback-thumb-status" style="color: var(--blue); margin-top: 4px;"></small>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="opt-fallback-thumbnails" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
 
               <div class="toggle">
                 <div>
@@ -2364,6 +2375,10 @@
             "save-local-video-dirs-btn",
           ),
           localVideoDirsStatus: document.getElementById("local-video-dirs-status"),
+          optFallbackThumbnails: document.getElementById(
+            "opt-fallback-thumbnails",
+          ),
+          fallbackThumbStatus: document.getElementById("fallback-thumb-status"),
         };
 
         // Load general settings from localStorage
@@ -2569,7 +2584,7 @@
         async function loadServerSettings() {
           try {
             const response = await fetch("/api/settings");
-            if (!response.ok) return;
+            if (!response.ok) return null;
 
             const settings = await response.json();
 
@@ -2589,12 +2604,38 @@
               dirs.length > 0
                 ? `${dirs.length} 件のフォルダーを登録中`
                 : "追加フォルダーは未設定です";
+
+            const fallbackEnabled =
+              settings.enableFallbackThumbnails !== false;
+            elements.optFallbackThumbnails.checked = fallbackEnabled;
+            elements.fallbackThumbStatus.textContent = fallbackEnabled
+              ? "現在: 有効"
+              : "現在: 無効";
+            return settings;
           } catch (error) {
             console.error("Failed to load settings:", error);
+            return null;
           }
         }
 
         loadServerSettings();
+
+        async function postSettings(payload) {
+          const response = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (_error) {
+            data = null;
+          }
+
+          return { ok: response.ok, status: response.status, data };
+        }
 
         // Event listener for Firefox button
         elements.setFirefoxBtn.addEventListener("click", async () => {
@@ -2677,14 +2718,29 @@
             .filter((line) => line.length > 0);
 
           try {
-            const response = await fetch("/api/settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ localVideoDirs: dirs }),
-            });
+            const result = await postSettings({ localVideoDirs: dirs });
+            const savedDirs = Array.isArray(result.data?.settings?.localVideoDirs)
+              ? result.data.settings.localVideoDirs
+              : null;
+            const saved =
+              result.ok &&
+              Array.isArray(savedDirs) &&
+              savedDirs.length === dirs.length &&
+              savedDirs.every((v, i) => v === dirs[i]);
 
-            if (!response.ok) {
-              throw new Error("フォルダー設定の保存に失敗しました");
+            if (!saved) {
+              const refreshed = await loadServerSettings();
+              const refreshedDirs = Array.isArray(refreshed?.localVideoDirs)
+                ? refreshed.localVideoDirs
+                : [];
+              const recovered =
+                refreshedDirs.length === dirs.length &&
+                refreshedDirs.every((v, i) => v === dirs[i]);
+              if (!recovered) {
+                throw new Error(
+                  `フォルダー設定の保存に失敗しました (status: ${result.status})`,
+                );
+              }
             }
 
             elements.localVideoDirsStatus.textContent =
@@ -2692,11 +2748,45 @@
                 ? `${dirs.length} 件のフォルダーを登録しました`
                 : "追加フォルダーをクリアしました";
 
-            loadLocalVideos();
+            await loadLocalVideos();
           } catch (error) {
             console.error("ローカル動画フォルダー設定の保存に失敗:", error);
             elements.localVideoDirsStatus.textContent =
               "保存に失敗しました。パスを確認して再試行してください。";
+          }
+        });
+
+        elements.optFallbackThumbnails.addEventListener("change", async (e) => {
+          const enabled = e.target.checked;
+          try {
+            const result = await postSettings({
+              enableFallbackThumbnails: enabled,
+            });
+            const savedValue = result.data?.settings?.enableFallbackThumbnails;
+            const saved = result.ok && savedValue === enabled;
+            if (!saved) {
+              const refreshed = await loadServerSettings();
+              const recovered =
+                refreshed?.enableFallbackThumbnails === enabled;
+              if (!recovered) {
+                throw new Error(
+                  `仮サムネイル設定の保存に失敗しました (status: ${result.status})`,
+                );
+              }
+            }
+
+            elements.fallbackThumbStatus.textContent = enabled
+              ? "現在: 有効"
+              : "現在: 無効";
+            await loadLocalVideos();
+          } catch (error) {
+            console.error("仮サムネイル設定の保存に失敗:", error);
+            const refreshed = await loadServerSettings();
+            if (!refreshed) {
+              elements.optFallbackThumbnails.checked = !enabled;
+              elements.fallbackThumbStatus.textContent =
+                "保存に失敗しました。再試行してください。";
+            }
           }
         });
 
