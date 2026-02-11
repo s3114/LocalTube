@@ -4530,6 +4530,144 @@
             .join("");
         }
 
+        function normalizeLiveChatBaseName(videoBaseName) {
+          return String(videoBaseName || "")
+            .replace(/\.live_chat\.json$/i, "")
+            .replace(/\.(mp4|mkv|webm|mov)$/i, "");
+        }
+
+        function parseNdjsonMessages(text) {
+          const lines = text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+          const messages = [];
+          for (const line of lines) {
+            try {
+              messages.push(JSON.parse(line));
+            } catch (e) {
+              console.warn("パース失敗した行:", line, e);
+            }
+          }
+          return messages;
+        }
+
+        function extractChatRenderer(msg) {
+          const item =
+            msg?.replayChatItemAction?.actions?.[0]?.addChatItemAction?.item;
+          return (
+            item?.liveChatTextMessageRenderer ||
+            item?.liveChatViewerEngagementMessageRenderer ||
+            null
+          );
+        }
+
+        function getChatTimeSec(msg) {
+          const timeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
+          return timeMs ? Math.floor(timeMs / 1000) : null;
+        }
+
+        function getChatBadgeInfo(renderer) {
+          const badges = renderer?.authorBadges || [];
+          const isMember = badges.some(
+            (badge) =>
+              badge?.liveChatAuthorBadgeRenderer?.tooltip?.includes("Member") ||
+              badge?.liveChatAuthorBadgeRenderer?.tooltip?.includes("メンバー"),
+          );
+          const isModerator = badges.some(
+            (badge) =>
+              badge?.liveChatAuthorBadgeRenderer?.tooltip?.includes("Moderator") ||
+              badge?.liveChatAuthorBadgeRenderer?.tooltip?.includes("モデレーター"),
+          );
+          const badgeImages = badges
+            .map(
+              (badge) =>
+                badge?.liveChatAuthorBadgeRenderer?.customThumbnail?.thumbnails?.slice(
+                  -1,
+                )[0],
+            )
+            .filter(Boolean)
+            .flat();
+
+          return { isMember, isModerator, badgeImages };
+        }
+
+        function createChatAvatarElement(renderer, author) {
+          const avatar = document.createElement("div");
+          avatar.className = "chat-avatar";
+
+          const thumbUrl = renderer?.authorPhoto?.thumbnails?.slice(-1)[0]?.url || null;
+          if (thumbUrl) {
+            const img = document.createElement("img");
+            img.src = thumbUrl;
+            img.alt = author;
+            img.loading = "lazy";
+            avatar.appendChild(img);
+          } else {
+            avatar.innerHTML = `<i class="fa-solid fa-circle-user"></i>`;
+          }
+
+          return avatar;
+        }
+
+        function createChatBadgeElement(badgeImages) {
+          const badge = document.createElement("div");
+          badge.className = "chat-badge";
+
+          const badgeContainer = document.createElement("div");
+          badgeContainer.className = "badge-container";
+          badge.appendChild(badgeContainer);
+
+          badgeImages.forEach((thumb) => {
+            const img = document.createElement("img");
+            img.src = thumb.url;
+            img.style.width = "16px";
+            img.style.height = "16px";
+            badgeContainer.appendChild(img);
+          });
+
+          return badge;
+        }
+
+        function createChatLineElement(msg) {
+          const renderer = extractChatRenderer(msg);
+          if (!renderer) return null;
+
+          const author = renderer.authorName?.simpleText || "NoName";
+          const { isMember, isModerator, badgeImages } = getChatBadgeInfo(renderer);
+          const msgHtml =
+            renderChatMessage(renderer.message) ||
+            renderer.message?.simpleText ||
+            "（メッセージなし）";
+
+          const line = document.createElement("div");
+          line.className = "chat-line";
+          const timeSec = getChatTimeSec(msg);
+          if (timeSec !== null) {
+            line.dataset.time = timeSec;
+          }
+
+          const nameEl = document.createElement("span");
+          nameEl.className = "chat-name";
+          nameEl.textContent = author;
+          if (isModerator) {
+            nameEl.classList.add("moderator");
+          } else if (isMember) {
+            nameEl.classList.add("member");
+          }
+
+          const msgEl = document.createElement("span");
+          msgEl.className = "chat-message";
+          msgEl.innerHTML = msgHtml;
+
+          line.appendChild(createChatAvatarElement(renderer, author));
+          line.appendChild(nameEl);
+          line.appendChild(createChatBadgeElement(badgeImages));
+          line.appendChild(msgEl);
+          return line;
+        }
+
         async function loadLiveChat(videoBaseName) {
           try {
             const chatContainer = document.getElementById("chat-messages");
@@ -4551,28 +4689,10 @@
               emptyEl.textContent = "チャットを読み込み中…";
             }
 
-            const base = String(videoBaseName || "")
-              .replace(/\.live_chat\.json$/i, "")
-              .replace(/\.(mp4|mkv|webm|mov)$/i, "");
+            const base = normalizeLiveChatBaseName(videoBaseName);
             const res = await fetch(`/api/live-chat/${encodeURIComponent(base)}`);
-
-            const text = await res.text(); // ★ まず生テキストで取得
-
-            // ====== ★ NDJSON（1行ごとのJSON）対応 ======
-            const lines = text
-              .split(/\r?\n/)
-              .map((l) => l.trim())
-              .filter((l) => l.length > 0);
-
-            const messages = [];
-            for (const line of lines) {
-              try {
-                messages.push(JSON.parse(line));
-              } catch (e) {
-                console.warn("パース失敗した行:", line, e);
-              }
-            }
-            // ===========================================
+            const text = await res.text();
+            const messages = parseNdjsonMessages(text);
 
             if (messages.length === 0) {
               if (emptyEl) {
@@ -4582,134 +4702,11 @@
             }
 
             emptyEl.style.display = "none";
-
-            // === 描画（超シンプル版：まずは動くこと優先） ===
-            // === ★ 時間付きで描画（同期スクロール用） ===
             messages.forEach((msg) => {
-              const item =
-                msg?.replayChatItemAction?.actions?.[0]?.addChatItemAction
-                  ?.item;
-
-              const renderer =
-                item?.liveChatTextMessageRenderer ||
-                item?.liveChatViewerEngagementMessageRenderer;
-
-              if (!renderer) return;
-
-              // ★ YouTubeのチャット時刻（ミリ秒）を秒に変換
-              const timeMs = msg.replayChatItemAction?.videoOffsetTimeMsec;
-              const timeSec = timeMs ? Math.floor(timeMs / 1000) : null;
-
-              const div = document.createElement("div");
-              div.className = "chat-line";
-
-              // ★ 秒数を属性として保存（同期スクロール用）
-              if (timeSec !== null) {
-                div.dataset.time = timeSec;
+              const line = createChatLineElement(msg);
+              if (line) {
+                chatContainer.appendChild(line);
               }
-
-              // ===== メンバー／モデレーター等のバッジ取得 =====
-              // ===== ★【判定用】メンバー／モデレーターの「元データ」=====
-              const badges = renderer.authorBadges || [];
-
-              const isMember = badges.some(
-                (b) =>
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes("Member") ||
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes("メンバー"),
-              );
-
-              const isModerator = badges.some(
-                (b) =>
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes(
-                    "Moderator",
-                  ) ||
-                  b?.liveChatAuthorBadgeRenderer?.tooltip?.includes(
-                    "モデレーター",
-                  ),
-              );
-
-              // ★ 画像バッジ用（追加）
-              const badgeImages = badges
-                .map(
-                  (b) =>
-                    b?.liveChatAuthorBadgeRenderer?.customThumbnail?.thumbnails?.slice(
-                      -1,
-                    )[0],
-                )
-                .filter(Boolean)
-                .flat();
-
-              // ===== まず「author」を確定（★ これが一番先） =====
-              const author = renderer.authorName?.simpleText || "NoName";
-
-              // ===== アイコン（YouTubeのauthorPhotoを使用） =====
-              const avatar = document.createElement("div");
-              avatar.className = "chat-avatar";
-
-              // ===== バッジ要素 =====
-              const badge = document.createElement("div");
-              badge.className = "chat-badge";
-
-              // ★ ここでコンテナを作る（正しい場所）
-              const badgeContainer = document.createElement("div");
-              badgeContainer.className = "badge-container";
-              badge.appendChild(badgeContainer);
-              badgeContainer.innerHTML = "";
-
-              badgeImages?.forEach((thumb) => {
-                const img = document.createElement("img");
-                img.src = thumb.url;
-                img.style.width = "16px";
-                img.style.height = "16px";
-                badgeContainer.appendChild(img);
-              });
-
-              // サムネURLを安全に取得
-              const thumbUrl =
-                renderer.authorPhoto?.thumbnails?.slice(-1)[0]?.url || null;
-
-              if (thumbUrl) {
-                const img = document.createElement("img");
-                img.src = thumbUrl;
-                img.alt = author;
-                img.loading = "lazy"; // スクロール最適化
-                avatar.appendChild(img);
-              } else {
-                // 取得できなかった場合のフォールバック
-                avatar.innerHTML = `<i class="fa-solid fa-circle-user"></i>`;
-              }
-
-              // ===== ユーザー名 =====
-              const nameEl = document.createElement("span");
-              nameEl.className = "chat-name";
-              nameEl.textContent = author;
-
-              // ===== ユーザー名へのクラス付与 =====
-              if (isModerator) {
-                nameEl.classList.add("moderator");
-              } else if (isMember) {
-                nameEl.classList.add("member");
-              }
-
-              // ===== コメント要素 =====
-              const msgHtml =
-                renderChatMessage(renderer.message) ||
-                renderer.message?.simpleText ||
-                "（メッセージなし）";
-
-              const msgEl = document.createElement("span");
-              msgEl.className = "chat-message";
-              msgEl.innerHTML = msgHtml;
-
-              // ===== 組み立て（横並び）=====
-              div.innerHTML = ""; // いったんクリア
-
-              div.appendChild(avatar); // アイコン
-              div.appendChild(nameEl); // 名前
-              div.appendChild(badge); // バッジ（メンバー等）
-              div.appendChild(msgEl); // コメント本文
-
-              chatContainer.appendChild(div);
             });
 
             // ★ 初回は一番上に戻す（時間順に見るため）
@@ -4757,15 +4754,33 @@
           });
         }
 
-        function applyVideoInfo(info) {
-          // タイトル
+        function formatChannelSubscribers(subCount) {
+          if (typeof subCount !== "number") return "登録者数不明";
+          if (subCount < 10000) return `${subCount}人`;
+          return `${Math.floor(subCount / 1000) / 10}万人`;
+        }
+
+        function formatUploadDateForDescription(uploadDate) {
+          const value = String(uploadDate || "");
+          if (value.length !== 8) return value;
+          return `${value.substring(0, 4)}/${value.substring(4, 6)}/${value.substring(6, 8)}`;
+        }
+
+        function buildDescriptionHeader(info) {
+          const views = info.view_count
+            ? `<b>${info.view_count.toLocaleString()}回視聴</b>`
+            : "<b>視聴回数不明</b>";
+          if (!info.upload_date) return views;
+          return `${views} • <b>${formatUploadDateForDescription(info.upload_date)}</b>`;
+        }
+
+        function updatePlayerHeaderInfo(info) {
           const titleEl = document.getElementById("player-title");
           const youtubeBtn = document.getElementById("youtube-link-btn");
 
           if (info.title && info.title.trim() !== "") {
             titleEl.textContent = info.title;
           } else if (lastSelectedFilename) {
-            // 拡張子を除いたファイル名を表示
             titleEl.textContent = lastSelectedFilename.replace(
               /\.(mp4|mkv|webm|mov)$/i,
               "",
@@ -4774,157 +4789,100 @@
             titleEl.textContent = "無題";
           }
 
-          // ★ YouTubeリンクボタンの更新
           if (info.id) {
             youtubeBtn.href = `https://www.youtube.com/watch?v=${info.id}`;
             youtubeBtn.style.display = "inline-flex";
           } else {
             youtubeBtn.style.display = "none";
           }
+        }
 
-          // ===== YouTube風：チャンネル情報（横並び＋アイコン）=====
+        function updateChannelInfo(info) {
           const avatar = document.getElementById("channel-avatar");
           const channelLink = document.getElementById("channel-link");
           const channelHandle = document.getElementById("channel-handle");
           const channelSubs = document.getElementById("channel-subs");
           const avatarLink = document.getElementById("channel-avatar-link");
+          if (!avatar || !channelLink || !channelHandle || !channelSubs || !avatarLink)
+            return;
 
-          // ===== チャンネルアイコン（見直し版：コメントを使わない） =====
-          if (info.channel_thumbnail && info.channel_thumbnail.trim() !== "") {
-            avatar.src = info.channel_thumbnail;
-          } else {
-            // ★★★ 最終フォールバック：ローカルの none_icon.jpg ★★★
-            avatar.src = "/none_icon.jpg";
-          }
-
-          // ★ 画像が壊れていた場合の保険（直後に追加）
+          avatar.src = info.channel_thumbnail?.trim() || "/none_icon.jpg";
           avatar.onerror = () => {
             avatar.src = "/none_icon.jpg";
           };
 
-          // チャンネル名＋リンク
           channelLink.textContent = info.channel;
           channelLink.href = info.channel_url;
           avatarLink.href = info.channel_url;
-
-          // ハンドル
           channelHandle.textContent = info.uploader_id;
+          channelSubs.textContent = `${formatChannelSubscribers(info.channel_follower_count)} 登録`;
+        }
 
-          // 登録者数
-          let subText = "";
-          const subCount = info.channel_follower_count;
-          if (typeof subCount === "number") {
-            if (subCount < 10000) {
-              subText = `${subCount}人`;
-            } else {
-              // 1.12万人 -> 1.1万人
-              const v = Math.floor(subCount / 1000) / 10;
-              subText = `${v}万人`;
-            }
-          } else {
-            subText = "登録者数不明";
-          }
-          channelSubs.textContent = `${subText} 登録`;
-
-          // ★ 動画統計情報の更新（高評価のみ）
+        function updateVideoStats(info) {
           const statLikes = document.getElementById("stat-likes");
-          // const statViews = document.getElementById("stat-views"); // 削除
-          // const statDate = document.getElementById("stat-date");   // 削除
+          if (!statLikes) return;
+          statLikes.textContent = info.like_count
+            ? info.like_count.toLocaleString()
+            : "---";
+        }
 
-          if (statLikes)
-            statLikes.textContent = info.like_count
-              ? info.like_count.toLocaleString()
-              : "---";
-
-          // ★ 概要欄の冒頭に「視聴回数」「投稿日」を表示するための文字列作成
-          let statsHeader = "";
-
-          // 視聴回数
-          if (info.view_count) {
-            statsHeader += `<b>${info.view_count.toLocaleString()}回視聴</b>`;
-          } else {
-            statsHeader += `<b>視聴回数不明</b>`;
-          }
-
-          // 投稿日
-          if (info.upload_date) {
-            const d = info.upload_date;
-            let dateStr = d;
-            if (d.length === 8) {
-              dateStr = `${d.substring(0, 4)}/${d.substring(4, 6)}/${d.substring(6, 8)}`;
-            }
-            statsHeader += ` • <b>${dateStr}</b>`; // 中黒でつなぐ
-          }
-
-          // ★ 概要欄（URLリンク化版）
+        function updateVideoDescription(info) {
           const descEl = document.getElementById("video-description");
-          let descContent = "";
+          if (!descEl) return;
+          const descContent = info.description
+            ? linkify(info.description)
+            : "（概要欄なし）";
 
-          if (info.description) {
-            // URLをリンク化しつつ、改行も保持
-            descContent = linkify(info.description);
-          } else {
-            descContent = "（概要欄なし）";
-          }
-
-          // 冒頭に結合
-          descEl.innerHTML = `${statsHeader}<br><br>${descContent}`;
-
-          // ★★★ 折りたたみ処理の再判定（あなたが既に入れたもの）★★★
+          descEl.innerHTML = `${buildDescriptionHeader(info)}<br><br>${descContent}`;
           descEl.classList.add("collapsed");
           updateDescButton();
+        }
 
-          // ★★★【重要】概要を変更したら折りたたみ判定をやり直す★★★
-          descEl.classList.add("collapsed"); // ← 新しい動画では必ず折りたたみ状態に戻す
-          updateDescButton(); // ← 「もっと見る」ボタンの表示判定を再実行
-
-          // ★【追加】コメント表示の状態をリセット（重要）
+        function resetCommentDisplay() {
           const list = document.getElementById("comment-list");
           const empty = document.querySelector(".comment-empty");
+          if (!list || !empty) return;
+          list.innerHTML = "";
+          empty.style.display = "none";
+        }
 
-          list.innerHTML = ""; // ← 前の動画のコメントを完全クリア
-          // list.style.display = "block"; // ← コメント欄そのものを確実に表示
-          empty.style.display = "none"; // ← 「コメントはありません」を一旦消す
+        function normalizeCommentItem(comment) {
+          if (comment.id && comment.text) {
+            if (comment.parent === "root") comment.parent = null;
+            return comment;
+          }
 
-          // ===== ★ 重要：yt-dlp のコメント形式を UI 用に変換 =====
+          const top = comment.comment || comment;
+          const parentValue = top.parent;
+          return {
+            id: top.id || top.comment_id || Math.random().toString(36).slice(2),
+            parent: parentValue === "root" ? null : parentValue || null,
+            author: top.author || top.author_name || "不明",
+            text: top.text || top.content || "",
+            like_count: top.like_count || 0,
+            _time_text: top._time_text || "",
+            author_thumbnail: top.author_thumbnail || null,
+            timestamp: top.timestamp || 0,
+            is_pinned: top.is_pinned || false,
+          };
+        }
+
+        function extractRenderableComments(info) {
           const raw = info.comments || info.comment_threads || [];
+          return raw
+            .map((comment) => normalizeCommentItem(comment))
+            .filter((comment) => comment.text && comment.text.trim() !== "");
+        }
 
-          // グローバル変数として保持して、並び替え時に再利用する
-          window.currentVideoComments = raw
-            .map((c) => {
-              // 既に整形済みならそのまま返す
-              if (c.id && c.text) {
-                if (c.parent === "root") c.parent = null; // ★ ここでも直す
-                return c;
-              }
+        function applyVideoInfo(info) {
+          updatePlayerHeaderInfo(info);
+          updateChannelInfo(info);
+          updateVideoStats(info);
+          updateVideoDescription(info);
+          resetCommentDisplay();
 
-              // yt-dlp 形式（comment_threads）の場合の変換
-              const top = c.comment || c;
-              return {
-                id:
-                  top.id ||
-                  top.comment_id ||
-                  Math.random().toString(36).slice(2),
-                parent: (() => {
-                  const p = top.parent;
-                  // console.log("id:", top.id, "raw parent:", p); // デバッグ用
-                  if (p === "root") return null;
-                  return p || null;
-                })(),
-                author: top.author || top.author_name || "不明",
-                text: top.text || top.content || "",
-                like_count: top.like_count || 0,
-                _time_text: top._time_text || "",
-                author_thumbnail: top.author_thumbnail || null,
-                timestamp: top.timestamp || 0, // ★ ソート用
-                is_pinned: top.is_pinned || false, // ★ ピン止め用
-              };
-            })
-            .filter((c) => c.text && c.text.trim() !== "");
-
-          // ★ 最終的に「確定した配列」で描画
+          window.currentVideoComments = extractRenderableComments(info);
           renderComments(window.currentVideoComments);
-          return; // ← ここで処理終了
         }
 
         function buildCommentTree(comments) {
