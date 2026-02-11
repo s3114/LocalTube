@@ -33,7 +33,7 @@ const movieDir = path.join(downloadsDir, "動画");
 if (!fs.existsSync(movieDir)) fs.mkdirSync(movieDir);
 const thumbnailDir = path.join(downloadsDir, "サムネイル");
 if (!fs.existsSync(thumbnailDir)) fs.mkdirSync(thumbnailDir);
-const fallbackThumbnailDir = path.join(thumbnailDir, "_fallback");
+const fallbackThumbnailDir = path.join(downloadsDir, "仮サムネイル");
 if (!fs.existsSync(fallbackThumbnailDir)) fs.mkdirSync(fallbackThumbnailDir);
 const commentsDir = path.join(downloadsDir, "コメント");
 if (!fs.existsSync(commentsDir)) fs.mkdirSync(commentsDir);
@@ -332,7 +332,32 @@ function getFallbackThumbPath(videoPath) {
     .parse(videoPath)
     .name
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
-  return path.join(fallbackThumbnailDir, `${baseName}_${hash}.jpg`);
+  return path.join(fallbackThumbnailDir, `${baseName}_${hash}.png`);
+}
+
+function findExistingThumbnailPath(videoPath) {
+  const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
+  const sourceDir = path.dirname(videoPath);
+  const base = path.parse(videoPath).name;
+
+  const candidates = [];
+  for (const tExt of thumbExts) {
+    candidates.push(path.join(sourceDir, `${base}${tExt}`));
+  }
+
+  if (path.resolve(sourceDir) === path.resolve(movieDir)) {
+    for (const tExt of thumbExts) {
+      candidates.push(path.join(thumbnailDir, `${base}${tExt}`));
+    }
+  }
+
+  candidates.push(getFallbackThumbPath(videoPath));
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  return null;
 }
 
 const fallbackThumbnailJobs = new Map();
@@ -348,20 +373,55 @@ async function ensureFallbackThumbnail(videoPath) {
         throw new Error("ffmpeg が見つかりません。");
       }
 
-      await runCommand(ffmpegCmd, [
-        "-y",
-        "-loglevel",
-        "error",
-        "-ss",
-        "00:00:01.500",
-        "-i",
-        videoPath,
-        "-frames:v",
-        "1",
-        "-q:v",
-        "4",
-        outputPath,
-      ]);
+      const attemptArgs = [
+        [
+          "-y",
+          "-loglevel",
+          "error",
+          "-ss",
+          "00:00:01.500",
+          "-i",
+          videoPath,
+          "-an",
+          "-sn",
+          "-dn",
+          "-frames:v",
+          "1",
+          "-f",
+          "image2",
+          outputPath,
+        ],
+        [
+          "-y",
+          "-loglevel",
+          "error",
+          "-i",
+          videoPath,
+          "-an",
+          "-sn",
+          "-dn",
+          "-frames:v",
+          "1",
+          "-f",
+          "image2",
+          outputPath,
+        ],
+      ];
+
+      let lastError = null;
+      for (const args of attemptArgs) {
+        try {
+          await runCommand(ffmpegCmd, args);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
 
       if (!fs.existsSync(outputPath)) {
         throw new Error("サムネイル生成後のファイルが見つかりません。");
@@ -371,7 +431,10 @@ async function ensureFallbackThumbnail(videoPath) {
     })();
 
     fallbackThumbnailJobs.set(outputPath, job);
-    job.finally(() => fallbackThumbnailJobs.delete(outputPath));
+    job.then(
+      () => fallbackThumbnailJobs.delete(outputPath),
+      () => fallbackThumbnailJobs.delete(outputPath),
+    );
   }
 
   return fallbackThumbnailJobs.get(outputPath);
@@ -1291,7 +1354,7 @@ app.get("/api/local-media", async (req, res) => {
     }
 
     const allowedVideoDirs = await getLocalVideoDirs();
-    const allowedThumbDirs = [thumbnailDir, ...allowedVideoDirs];
+    const allowedThumbDirs = [thumbnailDir, fallbackThumbnailDir, ...allowedVideoDirs];
     const allowedDirs = type === "video" ? allowedVideoDirs : allowedThumbDirs;
 
     const isAllowed = allowedDirs.some((dir) => isPathWithin(targetPath, dir));
@@ -1345,7 +1408,8 @@ app.get("/api/local-thumb-fallback", async (req, res) => {
       return res.status(404).json({ error: "動画が見つかりません。" });
     }
 
-    const thumbPath = await ensureFallbackThumbnail(videoPath);
+    const existingThumbPath = findExistingThumbnailPath(videoPath);
+    const thumbPath = existingThumbPath || (await ensureFallbackThumbnail(videoPath));
     res.sendFile(path.resolve(thumbPath));
   } catch (error) {
     console.error("Fallback thumbnail creation failed:", error);
@@ -1358,8 +1422,6 @@ app.get("/api/local-videos", async (req, res) => {
     const sourceDirs = await getLocalVideoDirs();
 
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
-    const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
-
     const videos = [];
 
     for (const sourceDir of sourceDirs) {
@@ -1373,27 +1435,7 @@ app.get("/api/local-videos", async (req, res) => {
 
         const fullPath = path.join(sourceDir, file);
         const base = path.parse(file).name;
-
-        let thumbPath = null;
-        const candidates = [];
-
-        for (const tExt of thumbExts) {
-          candidates.push(path.join(sourceDir, `${base}${tExt}`));
-        }
-
-        // デフォルト動画フォルダは既存のサムネイル保存先も探索
-        if (path.resolve(sourceDir) === path.resolve(movieDir)) {
-          for (const tExt of thumbExts) {
-            candidates.push(path.join(thumbnailDir, `${base}${tExt}`));
-          }
-        }
-
-        for (const candidate of candidates) {
-          if (fs.existsSync(candidate)) {
-            thumbPath = candidate;
-            break;
-          }
-        }
+        const thumbPath = findExistingThumbnailPath(fullPath);
 
         videos.push({
           title: base,
