@@ -4256,46 +4256,75 @@
           return `${y}${m}${d}`;
         }
 
+        function getHomeFilterState() {
+          return {
+            channelKeyword: String(filterChannel?.value || "")
+              .trim()
+              .toLowerCase(),
+            fromYmd: normalizeYyyymmdd(
+              filterDateFromText?.value || filterDateFrom?.value,
+            ),
+            toYmd: normalizeYyyymmdd(
+              filterDateToText?.value || filterDateTo?.value,
+            ),
+            durationMode: String(filterDurationRange?.value || "all"),
+            durationMinSec: parseDurationInput(filterDurationMin?.value),
+            durationMaxSec: parseDurationInput(filterDurationMax?.value),
+          };
+        }
+
+        function matchesChannelFilter(info, channelKeyword) {
+          if (!channelKeyword) return true;
+          const channelSource = `${info?.channel || ""} ${info?.uploader || ""}`.toLowerCase();
+          return channelSource.includes(channelKeyword);
+        }
+
+        function matchesDateFilter(video, info, fromYmd, toYmd) {
+          if (!fromYmd && !toYmd) return true;
+          const uploadYmd = getVideoUploadDateForFilter(video, info);
+          if (!uploadYmd) return false;
+
+          const uploadNum = Number(uploadYmd);
+          if (fromYmd && uploadNum < Number(fromYmd)) return false;
+          if (toYmd && uploadNum > Number(toYmd)) return false;
+          return true;
+        }
+
+        function matchesDurationFilter(info, filterState) {
+          const durationMode = filterState.durationMode;
+          if (durationMode === "all") return true;
+
+          const durationSec = Number(info?.duration);
+          if (!Number.isFinite(durationSec)) return false;
+
+          if (durationMode === "lt3") return durationSec < 180;
+          if (durationMode === "3to20")
+            return durationSec >= 180 && durationSec < 1200;
+          if (durationMode === "ge20") return durationSec >= 1200;
+          if (durationMode !== "custom") return true;
+
+          if (
+            filterState.durationMinSec !== null &&
+            durationSec < filterState.durationMinSec
+          )
+            return false;
+          if (
+            filterState.durationMaxSec !== null &&
+            durationSec > filterState.durationMaxSec
+          )
+            return false;
+          return true;
+        }
+
         function matchesAdvancedFilters(video) {
           const videoId = getVideoIdFromFilename(video.filename);
           const info = homeInfoData.get(videoId) || null;
+          const filterState = getHomeFilterState();
 
-          const channelKeyword = String(filterChannel?.value || "")
-            .trim()
-            .toLowerCase();
-          if (channelKeyword) {
-            const channelSource = `${info?.channel || ""} ${info?.uploader || ""}`.toLowerCase();
-            if (!channelSource.includes(channelKeyword)) return false;
-          }
-
-          const fromYmd = normalizeYyyymmdd(filterDateFromText?.value || filterDateFrom?.value);
-          const toYmd = normalizeYyyymmdd(filterDateToText?.value || filterDateTo?.value);
-          if (fromYmd || toYmd) {
-            const uploadYmd = getVideoUploadDateForFilter(video, info);
-            if (!uploadYmd) return false;
-            const n = Number(uploadYmd);
-            if (fromYmd && n < Number(fromYmd)) return false;
-            if (toYmd && n > Number(toYmd)) return false;
-          }
-
-          const durationMode = String(filterDurationRange?.value || "all");
-          const durationSec = Number(info?.duration);
-          if (durationMode !== "all") {
-            if (!Number.isFinite(durationSec)) return false;
-
-            if (durationMode === "lt3" && !(durationSec < 180)) return false;
-            if (durationMode === "3to20" && !(durationSec >= 180 && durationSec < 1200))
-              return false;
-            if (durationMode === "ge20" && !(durationSec >= 1200)) return false;
-            if (durationMode === "custom") {
-              const minSec = parseDurationInput(filterDurationMin?.value);
-              const maxSec = parseDurationInput(filterDurationMax?.value);
-              if (minSec !== null && durationSec < minSec) return false;
-              if (maxSec !== null && durationSec > maxSec) return false;
-            }
-          }
-
-          return true;
+          if (!matchesChannelFilter(info, filterState.channelKeyword)) return false;
+          if (!matchesDateFilter(video, info, filterState.fromYmd, filterState.toYmd))
+            return false;
+          return matchesDurationFilter(info, filterState);
         }
 
         function setDurationCustomInputState() {
@@ -4304,7 +4333,13 @@
           if (filterDurationMax) filterDurationMax.disabled = !isCustom;
         }
 
+        function rerenderHomeVideos() {
+          renderHomeLocalVideos(allLocalVideos);
+        }
+
         function bindDatePair(dateEl, textEl) {
+          if (!dateEl || !textEl) return;
+
           dateEl?.addEventListener("mousedown", (e) => {
             // 文字列選択ではなくカレンダーピッカーを開く
             e.preventDefault();
@@ -4321,15 +4356,36 @@
 
           dateEl?.addEventListener("change", () => {
             textEl.value = dateInputToYyyymmdd(dateEl.value);
-            renderHomeLocalVideos(allLocalVideos);
+            rerenderHomeVideos();
           });
           textEl?.addEventListener("input", () => {
             const ymd = normalizeYyyymmdd(textEl.value);
             if (ymd.length === 8) {
               dateEl.value = yyyymmddToDateInput(ymd);
             }
-            renderHomeLocalVideos(allLocalVideos);
+            rerenderHomeVideos();
           });
+        }
+
+        function clearHomeFilters() {
+          if (filterDateFrom) filterDateFrom.value = "";
+          if (filterDateFromText) filterDateFromText.value = "";
+          if (filterDateTo) filterDateTo.value = "";
+          if (filterDateToText) filterDateToText.value = "";
+          if (filterDurationRange) filterDurationRange.value = "all";
+          if (filterDurationMin) filterDurationMin.value = "";
+          if (filterDurationMax) filterDurationMax.value = "";
+          if (filterChannel) filterChannel.value = "";
+        }
+
+        function bindHomeFilterInputs() {
+          filterDurationRange?.addEventListener("change", () => {
+            setDurationCustomInputState();
+            rerenderHomeVideos();
+          });
+          filterDurationMin?.addEventListener("input", rerenderHomeVideos);
+          filterDurationMax?.addEventListener("input", rerenderHomeVideos);
+          filterChannel?.addEventListener("input", rerenderHomeVideos);
         }
 
         function bindHomeFilterEvents() {
@@ -4348,32 +4404,12 @@
 
           bindDatePair(filterDateFrom, filterDateFromText);
           bindDatePair(filterDateTo, filterDateToText);
-
-          filterDurationRange?.addEventListener("change", () => {
-            setDurationCustomInputState();
-            renderHomeLocalVideos(allLocalVideos);
-          });
-          filterDurationMin?.addEventListener("input", () =>
-            renderHomeLocalVideos(allLocalVideos),
-          );
-          filterDurationMax?.addEventListener("input", () =>
-            renderHomeLocalVideos(allLocalVideos),
-          );
-          filterChannel?.addEventListener("input", () =>
-            renderHomeLocalVideos(allLocalVideos),
-          );
+          bindHomeFilterInputs();
 
           filterClearBtn?.addEventListener("click", () => {
-            if (filterDateFrom) filterDateFrom.value = "";
-            if (filterDateFromText) filterDateFromText.value = "";
-            if (filterDateTo) filterDateTo.value = "";
-            if (filterDateToText) filterDateToText.value = "";
-            if (filterDurationRange) filterDurationRange.value = "all";
-            if (filterDurationMin) filterDurationMin.value = "";
-            if (filterDurationMax) filterDurationMax.value = "";
-            if (filterChannel) filterChannel.value = "";
+            clearHomeFilters();
             setDurationCustomInputState();
-            renderHomeLocalVideos(allLocalVideos);
+            rerenderHomeVideos();
           });
 
           setDurationCustomInputState();
@@ -5135,6 +5171,13 @@
         // 目標値（実際の動画の進捗）
         let targetProgress = 0;
 
+        function formatVideoTime(seconds) {
+          const total = Math.max(0, Math.floor(seconds || 0));
+          const m = Math.floor(total / 60);
+          const s = total % 60;
+          return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+
         // ① timeupdate：時間表示＋目標値の更新だけ
         videoPlayer.addEventListener("timeupdate", () => {
           if (!videoPlayer.duration) return;
@@ -5146,14 +5189,7 @@
           targetProgress =
             (videoPlayer.currentTime / videoPlayer.duration) * 100;
 
-          // 時間表示（あなたの既存ロジックそのまま）
-          const format = (s) => {
-            const m = Math.floor(s / 60);
-            const sec = s % 60;
-            return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-          };
-
-          timeDisplay.textContent = `${format(cur)} / ${format(dur)}`;
+          timeDisplay.textContent = `${formatVideoTime(cur)} / ${formatVideoTime(dur)}`;
         });
 
         // ② requestAnimationFrame：つまみを“なめらかに”追従
