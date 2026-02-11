@@ -158,6 +158,14 @@ function broadcast(event, data) {
   }
 }
 
+function apiOk(res, data, status = 200) {
+  res.status(status).json({ ok: true, data, error: null });
+}
+
+function apiError(res, status, error, data = null) {
+  res.status(status).json({ ok: false, data, error });
+}
+
 async function measureNetworkMbps() {
   const TEST_URL = "https://www.google.com/generate_204";
   const start = Date.now();
@@ -219,7 +227,7 @@ app.get("/events", sseExpress, (req, res) => {
 });
 
 app.get("/ping", (req, res) => {
-  res.json({ ok: true });
+  apiOk(res, { pong: true });
 });
 // --------------------------------------------------
 
@@ -779,10 +787,10 @@ async function ensureFallbackThumbnail(videoPath) {
 app.get("/api/settings", async (req, res) => {
   try {
     const settings = await loadConfig();
-    res.json(settings);
+    apiOk(res, settings);
   } catch (error) {
     console.error("設定の読み込みに失敗しました:", error);
-    res.status(500).json({ error: "設定の読み込みに失敗しました。" });
+    apiError(res, 500, "設定の読み込みに失敗しました。");
   }
 });
 
@@ -790,7 +798,7 @@ app.get("/api/wallpaper-meta", async (req, res) => {
   try {
     const settings = await loadConfig();
     const url = getWallpaperPublicUrl();
-    res.json({
+    apiOk(res, {
       exists: Boolean(url),
       url,
       wallpaperBlur: settings.wallpaperBlur ?? 2,
@@ -798,7 +806,7 @@ app.get("/api/wallpaper-meta", async (req, res) => {
     });
   } catch (error) {
     console.error("壁紙メタ情報の取得に失敗しました:", error);
-    res.status(500).json({ error: "壁紙メタ情報の取得に失敗しました。" });
+    apiError(res, 500, "壁紙メタ情報の取得に失敗しました。");
   }
 });
 
@@ -806,12 +814,12 @@ app.post("/api/wallpaper", upload.single("wallpaper"), async (req, res) => {
   const tempPath = req.file?.path;
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "壁紙ファイルが指定されていません。" });
+      return apiError(res, 400, "壁紙ファイルが指定されていません。");
     }
 
     const ext = path.extname(req.file.originalname || "").toLowerCase();
     if (!WALLPAPER_EXTS.includes(ext)) {
-      return res.status(400).json({ error: "対応していない画像形式です。" });
+      return apiError(res, 400, "対応していない画像形式です。");
     }
 
     for (const oldExt of WALLPAPER_EXTS) {
@@ -833,7 +841,7 @@ app.post("/api/wallpaper", upload.single("wallpaper"), async (req, res) => {
     }
     await saveConfig(config);
 
-    res.json({
+    apiOk(res, {
       message: "壁紙を保存しました。",
       url: getWallpaperPublicUrl(),
       wallpaperBlur: config.wallpaperBlur ?? 2,
@@ -841,7 +849,7 @@ app.post("/api/wallpaper", upload.single("wallpaper"), async (req, res) => {
     });
   } catch (error) {
     console.error("壁紙の保存に失敗しました:", error);
-    res.status(500).json({ error: "壁紙の保存に失敗しました。" });
+    apiError(res, 500, "壁紙の保存に失敗しました。");
   } finally {
     if (tempPath && fs.existsSync(tempPath)) {
       try {
@@ -862,13 +870,13 @@ app.post("/api/wallpaper/clear", async (_req, res) => {
       }
     }
 
-    res.json({
+    apiOk(res, {
       message: "壁紙をクリアしました。",
       url: null,
     });
   } catch (error) {
     console.error("壁紙クリアに失敗しました:", error);
-    res.status(500).json({ error: "壁紙クリアに失敗しました。" });
+    apiError(res, 500, "壁紙クリアに失敗しました。");
   }
 });
 
@@ -889,7 +897,7 @@ app.post("/api/settings", async (req, res) => {
       typeof wallpaperBlur === "undefined" &&
       typeof wallpaperBrightness === "undefined"
     ) {
-      return res.status(400).json({ error: "無効なリクエストです。" });
+      return apiError(res, 400, "無効なリクエストです。");
     }
 
     const currentConfig = await loadConfig();
@@ -916,10 +924,10 @@ app.post("/api/settings", async (req, res) => {
     const savedConfig = await saveConfig(currentConfig);
 
     console.log("設定を保存しました:", savedConfig);
-    res.json({ message: "設定を保存しました。", settings: savedConfig });
+    apiOk(res, { message: "設定を保存しました。", settings: savedConfig });
   } catch (error) {
     console.error("設定の保存に失敗しました:", error);
-    res.status(500).json({ error: "設定の保存に失敗しました。" });
+    apiError(res, 500, "設定の保存に失敗しました。");
   }
 });
 
@@ -929,15 +937,15 @@ app.post("/api/clear-history", async (req, res) => {
     const historyPath = path.join(__dirname, "finished.txt");
     await fs.promises.writeFile(historyPath, "", "utf-8");
     console.log("ダウンロード履歴を削除しました。");
-    res.json({ message: "履歴を削除しました。" });
+    apiOk(res, { message: "履歴を削除しました。" });
   } catch (error) {
     console.error("履歴の削除に失敗しました:", error);
-    res.status(500).json({ error: "履歴の削除に失敗しました。" });
+    apiError(res, 500, "履歴の削除に失敗しました。");
   }
 });
 
 app.get("/jobs", (req, res) => {
-  res.json(Array.from(jobHistory.values()));
+  apiOk(res, Array.from(jobHistory.values()));
 });
 
 app.post("/download", upload.single("cookieFile"), async (req, res) => {
@@ -955,7 +963,7 @@ app.post("/download", upload.single("cookieFile"), async (req, res) => {
   const cookieFile = req.file;
 
   if (!urls) {
-    return res.status(400).json({ error: "動画のURLは必須です。" });
+    return apiError(res, 400, "動画のURLは必須です。");
   }
 
   maxConcurrentDownloads = parseInt(parallelDownloads, 10) || 1;
@@ -1003,9 +1011,11 @@ app.post("/download", upload.single("cookieFile"), async (req, res) => {
 
   broadcast("jobs_added", newJobs);
 
-  res.status(202).json({
-    message: `${newJobs.length}件のダウンロードがキューに追加されました。`,
-  });
+  apiOk(
+    res,
+    { message: `${newJobs.length}件のダウンロードがキューに追加されました。` },
+    202,
+  );
 
   startNextDownload();
 });
@@ -1746,16 +1756,14 @@ app.get("/api/live-chat/:videoFile", async (req, res) => {
 
     if (!fs.existsSync(chatFile)) {
       console.error("[LIVE CHAT] Not found:", chatFile);
-      return res
-        .status(404)
-        .json({ error: "対応するライブチャットがありません" });
+      return apiError(res, 404, "対応するライブチャットがありません");
     }
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     fs.createReadStream(chatFile).pipe(res);
   } catch (e) {
     console.error("[LIVE CHAT] Error:", e);
-    res.status(500).json({ error: "ライブチャットの取得に失敗しました" });
+    apiError(res, 500, "ライブチャットの取得に失敗しました");
   }
 });
 
@@ -1822,7 +1830,7 @@ app.get("/api/local-media", async (req, res) => {
     const targetPath = String(req.query.path || "");
 
     if (!targetPath || !["video", "thumb"].includes(type)) {
-      return res.status(400).json({ error: "無効なリクエストです。" });
+      return apiError(res, 400, "無効なリクエストです。");
     }
 
     const allowedVideoDirs = await getLocalVideoDirs();
@@ -1831,7 +1839,7 @@ app.get("/api/local-media", async (req, res) => {
 
     const isAllowed = allowedDirs.some((dir) => isPathWithin(targetPath, dir));
     if (!isAllowed) {
-      return res.status(403).json({ error: "アクセスが許可されていません。" });
+      return apiError(res, 403, "アクセスが許可されていません。");
     }
 
     const ext = path.extname(targetPath).toLowerCase();
@@ -1839,21 +1847,21 @@ app.get("/api/local-media", async (req, res) => {
     const thumbExt = [".jpg", ".jpeg", ".png", ".webp"];
 
     if (type === "video" && !videoExt.includes(ext)) {
-      return res.status(400).json({ error: "無効な動画ファイルです。" });
+      return apiError(res, 400, "無効な動画ファイルです。");
     }
 
     if (type === "thumb" && !thumbExt.includes(ext)) {
-      return res.status(400).json({ error: "無効な画像ファイルです。" });
+      return apiError(res, 400, "無効な画像ファイルです。");
     }
 
     if (!fs.existsSync(targetPath)) {
-      return res.status(404).json({ error: "ファイルが見つかりません。" });
+      return apiError(res, 404, "ファイルが見つかりません。");
     }
 
     res.sendFile(path.resolve(targetPath));
   } catch (e) {
     console.error("Failed to serve local media:", e);
-    res.status(500).json({ error: "ローカルメディアの取得に失敗しました。" });
+    apiError(res, 500, "ローカルメディアの取得に失敗しました。");
   }
 });
 
@@ -1861,23 +1869,23 @@ app.get("/api/local-thumb-fallback", async (req, res) => {
   try {
     const videoPath = String(req.query.videoPath || "");
     if (!videoPath) {
-      return res.status(400).json({ error: "videoPath が必要です。" });
+      return apiError(res, 400, "videoPath が必要です。");
     }
 
     const allowedVideoDirs = await getLocalVideoDirs();
     const isAllowed = allowedVideoDirs.some((dir) => isPathWithin(videoPath, dir));
     if (!isAllowed) {
-      return res.status(403).json({ error: "アクセスが許可されていません。" });
+      return apiError(res, 403, "アクセスが許可されていません。");
     }
 
     const ext = path.extname(videoPath).toLowerCase();
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
     if (!videoExt.includes(ext)) {
-      return res.status(400).json({ error: "無効な動画ファイルです。" });
+      return apiError(res, 400, "無効な動画ファイルです。");
     }
 
     if (!fs.existsSync(videoPath)) {
-      return res.status(404).json({ error: "動画が見つかりません。" });
+      return apiError(res, 404, "動画が見つかりません。");
     }
 
     const settings = await loadConfig();
@@ -1937,10 +1945,10 @@ app.get("/api/local-videos", async (req, res) => {
 
     videos.sort((a, b) => b.mtime - a.mtime);
 
-    res.json(videos);
+    apiOk(res, videos);
   } catch (e) {
     console.error("Failed to scan local videos:", e);
-    res.status(500).json({ error: "動画一覧の取得に失敗しました。" });
+    apiError(res, 500, "動画一覧の取得に失敗しました。");
   }
 });
 
@@ -1949,9 +1957,7 @@ app.get("/api/validate-url", async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
-    return res
-      .status(400)
-      .json({ isValid: false, error: "URLが指定されていません。" });
+    return apiError(res, 400, "URLが指定されていません。", { isValid: false });
   }
 
   try {
@@ -1966,19 +1972,19 @@ app.get("/api/validate-url", async (req, res) => {
 
     if (response.ok) {
       // 2xx のステータスコードは成功
-      res.json({ isValid: true });
+      apiOk(res, { isValid: true });
     } else {
-      res.json({ isValid: false, error: `HTTPステータス: ${response.status}` });
+      apiOk(res, { isValid: false, error: `HTTPステータス: ${response.status}` });
     }
   } catch (error) {
     if (error.name === "AbortError") {
-      res.json({
+      apiOk(res, {
         isValid: false,
         error: "URLへの接続がタイムアウトしました。",
       });
     } else {
       console.error(`URL検証エラー (${url}):`, error);
-      res.json({
+      apiOk(res, {
         isValid: false,
         error: `URLに接続できません: ${error.message}`,
       });
@@ -1991,9 +1997,7 @@ app.post("/api/resolve-handle", async (req, res) => {
   const { url } = req.body;
 
   if (!url || !url.includes("youtube.com/@")) {
-    return res
-      .status(400)
-      .json({ error: "有効なYouTubeハンドルURLを指定してください。" });
+    return apiError(res, 400, "有効なYouTubeハンドルURLを指定してください。");
   }
 
   try {
@@ -2004,25 +2008,21 @@ app.post("/api/resolve-handle", async (req, res) => {
     } catch (fetchError) {
       if (fetchError.name === "AbortError") {
         console.error(`Fetch timeout for URL: ${url}`);
-        return res
-          .status(504)
-          .json({ error: "YouTubeページへの接続がタイムアウトしました。" });
+        return apiError(res, 504, "YouTubeページへの接続がタイムアウトしました。");
       }
       console.error(`Error fetching YouTube page for URL ${url}:`, fetchError);
-      return res
-        .status(500)
-        .json({ error: "YouTubeページの取得に失敗しました。" });
+      return apiError(res, 500, "YouTubeページの取得に失敗しました。");
     }
 
     if (!response.ok) {
       console.error(
         `Failed to fetch YouTube page. Status: ${response.status} for URL: ${url}`,
       );
-      return res
-        .status(response.status)
-        .json({
-          error: `YouTubeページの取得に失敗しました。ステータス: ${response.status}`,
-        });
+      return apiError(
+        res,
+        response.status,
+        `YouTubeページの取得に失敗しました。ステータス: ${response.status}`,
+      );
     }
 
     const html = await response.text();
@@ -2033,9 +2033,7 @@ app.post("/api/resolve-handle", async (req, res) => {
 
     if (!canonicalMatch || !canonicalMatch[1]) {
       console.error(`Canonical URL not found in HTML for URL: ${url}`);
-      return res
-        .status(404)
-        .json({ error: "チャンネルの正規URLが見つかりませんでした。" });
+      return apiError(res, 404, "チャンネルの正規URLが見つかりませんでした。");
     }
 
     const canonicalUrl = canonicalMatch[1];
@@ -2047,18 +2045,14 @@ app.post("/api/resolve-handle", async (req, res) => {
       console.error(
         `Channel ID not found in canonical URL: ${canonicalUrl} for original URL: ${url}`,
       );
-      return res
-        .status(404)
-        .json({ error: "チャンネルIDを抽出できませんでした。" });
+      return apiError(res, 404, "チャンネルIDを抽出できませんでした。");
     }
 
     const channelId = channelIdMatch[1]; // This will be UCxxxxxxxxxxx
-    res.json({ channelId });
+    apiOk(res, { channelId });
   } catch (error) {
     console.error("Handle resolution error:", error);
-    res
-      .status(500)
-      .json({ error: "ハンドルの解決中に予期せぬエラーが発生しました。" });
+    apiError(res, 500, "ハンドルの解決中に予期せぬエラーが発生しました。");
   }
 });
 
@@ -2097,27 +2091,25 @@ app.post("/api/schedule/create", (req, res) => {
       // 日本語の schtasks 出力は不要なので、最初の行のみ抽出して整形する
       const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("SUCCESS: ", "").trim();
-      return res.json({ message: cleanMessage });
+      return apiOk(res, { message: cleanMessage });
     } else if (resultContent.startsWith("ERROR:")) {
       const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("ERROR: ", "").trim();
 
-      return res.status(500).json({
-        message: cleanMessage,
-        error: resultContent.trim(),
-      });
+      return apiError(res, 500, cleanMessage, { detail: resultContent.trim() });
     } else if (error) {
       // exec自体がエラーを返した場合
-      return res.status(500).json({
-        message: "コマンド実行に失敗しました。",
-        error: stderr || error.message,
+      return apiError(res, 500, "コマンド実行に失敗しました。", {
+        detail: stderr || error.message,
       });
     } else {
       // 予期せぬ出力の場合（UACキャンセルなど）
-      return res.status(500).json({
-        message: "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
-        error: `stdout: ${stdout}, stderr: ${stderr}`,
-      });
+      return apiError(
+        res,
+        500,
+        "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
+        { detail: `stdout: ${stdout}, stderr: ${stderr}` },
+      );
     }
   });
 });
@@ -2150,26 +2142,24 @@ app.post("/api/schedule/delete", (req, res) => {
     if (resultContent.startsWith("SUCCESS:")) {
       const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("SUCCESS: ", "").trim();
-      return res.json({ message: cleanMessage });
+      return apiOk(res, { message: cleanMessage });
     } else if (resultContent.startsWith("ERROR:")) {
       const messageLines = resultContent.split("\n");
       const cleanMessage = messageLines[0].replace("ERROR: ", "").trim();
-      return res.status(500).json({
-        message: cleanMessage,
-        error: resultContent.trim(),
-      });
+      return apiError(res, 500, cleanMessage, { detail: resultContent.trim() });
     } else if (error) {
       // exec自体がエラーを返した場合
-      return res.status(500).json({
-        message: "コマンド実行に失敗しました。",
-        error: stderr || error.message,
+      return apiError(res, 500, "コマンド実行に失敗しました。", {
+        detail: stderr || error.message,
       });
     } else {
       // 予期せぬ出力の場合（UACキャンセルなど）
-      return res.status(500).json({
-        message: "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
-        error: `stdout: ${stdout}, stderr: ${stderr}`,
-      });
+      return apiError(
+        res,
+        500,
+        "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
+        { detail: `stdout: ${stdout}, stderr: ${stderr}` },
+      );
     }
   });
 });
