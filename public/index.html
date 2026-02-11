@@ -3947,37 +3947,24 @@
           pendingVideoId = null;
         }
 
-        async function loadLocalVideos() {
-          try {
-            const res = await fetch("/api/local-videos");
-            const videos = await res.json();
-            allLocalVideos = Array.isArray(videos) ? videos : [];
-
-            renderLocalVideos(allLocalVideos);
-            renderHomeLocalVideos(allLocalVideos);
-            prefetchHomeInfos(allLocalVideos);
-            playPendingVideoIfNeeded(allLocalVideos);
-          } catch (e) {
-            console.error("Failed to load local videos:", e);
-            videoList.innerHTML =
-              '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
-            if (homeVideoGrid) {
-              homeVideoGrid.innerHTML =
-                '<div class="home-video-empty" style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
-            }
+        function showLocalVideoLoadError() {
+          videoList.innerHTML =
+            '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+          if (homeVideoGrid) {
+            homeVideoGrid.innerHTML =
+              '<div class="home-video-empty" style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
           }
         }
 
-        function playLocalVideo(video, activeItem = null, shouldAutoplay = true) {
-          const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+        function activateLocalVideoItem(activeItem) {
+          if (!activeItem) return;
+          document
+            .querySelectorAll(".local-video-item")
+            .forEach((el) => el.classList.remove("active"));
+          activeItem.classList.add("active");
+        }
 
-          if (activeItem) {
-            document
-              .querySelectorAll(".local-video-item")
-              .forEach((el) => el.classList.remove("active"));
-            activeItem.classList.add("active");
-          }
-
+        function setupVideoPlayerSource(video) {
           videoPlayer.pause();
           videoPlayer.poster = video.thumb || "";
           videoPlayer.src = video.video;
@@ -3986,30 +3973,33 @@
           resetSeekBar();
           videoPlayer.load();
           titleEl.textContent = video.title;
+        }
 
+        function tryAutoplayCurrentVideo(shouldAutoplay) {
           const hasUserActivation =
             document.userActivation?.hasBeenActive ||
             document.userActivation?.isActive;
 
-          if (shouldAutoplay && hasUserActivation) {
-            videoPlayer.play().catch((err) => {
-              // ユーザー操作前は自動再生が拒否されることがある
-              if (err?.name !== "NotAllowedError") {
-                console.error("Play failed:", err);
-              }
-            });
-          }
+          if (!shouldAutoplay || !hasUserActivation) return;
+          videoPlayer.play().catch((err) => {
+            if (err?.name !== "NotAllowedError") {
+              console.error("Play failed:", err);
+            }
+          });
+        }
 
+        function loadCurrentVideoSideData(videoId) {
           fetch(`/info/${encodeURIComponent(videoId)}`)
             .then((r) => r.json())
             .then((info) => applyVideoInfo(info))
             .catch((err) => console.error("info.json 読み込み失敗:", err));
 
           loadLiveChat(videoId);
+        }
 
+        function navigateToPlayerFromVideoId(videoId) {
           history.pushState(null, "", "#player/" + encodeURIComponent(videoId));
 
-          // pushState だけでは表示は切り替わらないため、明示的にプレイヤーページへ遷移
           document
             .querySelectorAll(".page")
             .forEach((page) => page.classList.remove("active-page"));
@@ -4023,6 +4013,31 @@
               button.classList.remove("active");
             }
           });
+        }
+
+        async function loadLocalVideos() {
+          try {
+            const res = await fetch("/api/local-videos");
+            const videos = await res.json();
+            allLocalVideos = Array.isArray(videos) ? videos : [];
+
+            renderLocalVideos(allLocalVideos);
+            renderHomeLocalVideos(allLocalVideos);
+            prefetchHomeInfos(allLocalVideos);
+            playPendingVideoIfNeeded(allLocalVideos);
+          } catch (e) {
+            console.error("Failed to load local videos:", e);
+            showLocalVideoLoadError();
+          }
+        }
+
+        function playLocalVideo(video, activeItem = null, shouldAutoplay = true) {
+          const videoId = getVideoIdFromFilename(video.filename);
+          activateLocalVideoItem(activeItem);
+          setupVideoPlayerSource(video);
+          tryAutoplayCurrentVideo(shouldAutoplay);
+          loadCurrentVideoSideData(videoId);
+          navigateToPlayerFromVideoId(videoId);
         }
 
         function getHomeSearchTerms() {
@@ -4722,6 +4737,28 @@
           }
         }
 
+        function createLocalVideoListItem(video) {
+          const item = document.createElement("div");
+          item.className = "local-video-item";
+          item.dataset.filename = video.filename;
+
+          const thumbHtml = video.thumb
+            ? `<img src="${video.thumb}" class="local-video-thumb">`
+            : `<div class="local-video-thumb"></div>`;
+
+          item.innerHTML = `
+              ${thumbHtml}
+              <div class="local-video-text">
+                ${video.title}
+              </div>
+            `;
+          item.addEventListener("click", () => {
+            playLocalVideo(video, item);
+          });
+
+          return item;
+        }
+
         function renderLocalVideos(videos) {
           videoList.innerHTML = "";
 
@@ -4732,25 +4769,7 @@
           }
 
           videos.forEach((video) => {
-            const item = document.createElement("div");
-            item.className = "local-video-item";
-            item.dataset.filename = video.filename;
-
-            const thumbHtml = video.thumb
-              ? `<img src="${video.thumb}" class="local-video-thumb">`
-              : `<div class="local-video-thumb"></div>`;
-
-            item.innerHTML = `
-              ${thumbHtml}
-              <div class="local-video-text">
-                ${video.title}
-              </div>
-            `;
-
-            item.addEventListener("click", () => {
-              playLocalVideo(video, item);
-            });
-            videoList.appendChild(item);
+            videoList.appendChild(createLocalVideoListItem(video));
           });
         }
 
