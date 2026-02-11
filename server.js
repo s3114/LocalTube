@@ -37,6 +37,8 @@ const fallbackThumbnailDir = path.join(downloadsDir, "仮サムネイル");
 if (!fs.existsSync(fallbackThumbnailDir)) fs.mkdirSync(fallbackThumbnailDir);
 const commentsDir = path.join(downloadsDir, "コメント");
 if (!fs.existsSync(commentsDir)) fs.mkdirSync(commentsDir);
+const provisionalInfoDir = path.join(downloadsDir, "仮コメント");
+if (!fs.existsSync(provisionalInfoDir)) fs.mkdirSync(provisionalInfoDir);
 const liveChatDir = path.join(downloadsDir, "ライブチャット");
 if (!fs.existsSync(liveChatDir)) fs.mkdirSync(liveChatDir);
 const subtitleDir = path.join(downloadsDir, "字幕");
@@ -323,6 +325,35 @@ function runCommand(command, args) {
   });
 }
 
+function runCommandCapture(command, args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(command, args, { windowsHide: true });
+    const stdoutChunks = [];
+    let stderr = "";
+
+    proc.stdout.on("data", (chunk) => {
+      stdoutChunks.push(chunk);
+    });
+
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(stdoutChunks).toString("utf-8"));
+        return;
+      }
+      reject(
+        new Error(
+          `${command} exited with code ${code}${stderr ? `: ${stderr}` : ""}`,
+        ),
+      );
+    });
+  });
+}
+
 let ffmpegCommandCache;
 async function resolveFfmpegCommand() {
   if (typeof ffmpegCommandCache !== "undefined") return ffmpegCommandCache;
@@ -340,6 +371,25 @@ async function resolveFfmpegCommand() {
 
   ffmpegCommandCache = null;
   return ffmpegCommandCache;
+}
+
+let ffprobeCommandCache;
+async function resolveFfprobeCommand() {
+  if (typeof ffprobeCommandCache !== "undefined") return ffprobeCommandCache;
+
+  const candidates = ["ffprobe", "ffprobe.exe"];
+  for (const cmd of candidates) {
+    try {
+      await runCommand(cmd, ["-version"]);
+      ffprobeCommandCache = cmd;
+      return ffprobeCommandCache;
+    } catch (_error) {
+      // 次候補を試す
+    }
+  }
+
+  ffprobeCommandCache = null;
+  return ffprobeCommandCache;
 }
 
 function getFallbackThumbPath(videoPath) {
@@ -376,6 +426,198 @@ function findExistingThumbnailPath(videoPath, includeFallback = true) {
   }
 
   return null;
+}
+
+function makeSafeFileStem(input) {
+  const safe = String(input || "")
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+  return safe || "unknown";
+}
+
+function getProvisionalInfoPath(videoId) {
+  const safeStem = makeSafeFileStem(videoId);
+  const hash = crypto.createHash("sha1").update(String(videoId)).digest("hex").slice(0, 10);
+  return path.join(provisionalInfoDir, `${safeStem}_${hash}.info.json`);
+}
+
+async function findLocalVideoPathById(videoId) {
+  const sourceDirs = await getLocalVideoDirs();
+  const normalizedId = String(videoId || "").trim();
+  const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
+
+  for (const sourceDir of sourceDirs) {
+    if (!fs.existsSync(sourceDir)) continue;
+    const files = await fs.promises.readdir(sourceDir);
+
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (!videoExt.includes(ext)) continue;
+
+      const base = path.parse(file).name;
+      if (
+        base !== normalizedId &&
+        !base.startsWith(normalizedId) &&
+        !normalizedId.startsWith(base)
+      ) {
+        continue;
+      }
+
+      return path.join(sourceDir, file);
+    }
+  }
+
+  return null;
+}
+
+function formatDateYYYYMMDD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}${m}${d}`;
+}
+
+function extractLikelyYoutubeId(text) {
+  const source = String(text || "");
+  const m = source.match(/(^|[^A-Za-z0-9_-])([A-Za-z0-9_-]{11})(?=$|[^A-Za-z0-9_-])/);
+  return m ? m[2] : null;
+}
+
+function normalizeUploadDate(value) {
+  const source = String(value || "").trim();
+  if (!source) return null;
+
+  const digits = source.replace(/\D/g, "");
+  if (digits.length >= 8) return digits.slice(0, 8);
+  return null;
+}
+
+function extractYoutubeIdFromUrl(text) {
+  const source = String(text || "");
+  const watchMatch = source.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  if (watchMatch) return watchMatch[1];
+  const shortMatch = source.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+  return null;
+}
+
+function getTagValue(allTags, keys) {
+  for (const key of keys) {
+    const value = allTags[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+async function readVideoMetadataTags(videoPath) {
+  const ffprobeCmd = await resolveFfprobeCommand();
+  if (!ffprobeCmd) return {};
+
+  try {
+    const output = await runCommandCapture(ffprobeCmd, [
+      "-v",
+      "error",
+      "-show_format",
+      "-show_streams",
+      "-of",
+      "json",
+      videoPath,
+    ]);
+
+    const parsed = JSON.parse(output);
+    const lowerTags = {};
+
+    const addTags = (obj) => {
+      if (!obj || typeof obj !== "object") return;
+      for (const [k, v] of Object.entries(obj)) {
+        const key = String(k || "").toLowerCase();
+        if (typeof v === "string" && v.trim() !== "" && !lowerTags[key]) {
+          lowerTags[key] = v.trim();
+        }
+      }
+    };
+
+    addTags(parsed?.format?.tags);
+    if (Array.isArray(parsed?.streams)) {
+      for (const s of parsed.streams) {
+        addTags(s?.tags);
+      }
+    }
+
+    return lowerTags;
+  } catch (error) {
+    console.warn("ffprobe metadata read failed:", error.message);
+    return {};
+  }
+}
+
+async function createProvisionalInfoFromVideo(videoPath, videoId) {
+  const stats = await fs.promises.stat(videoPath);
+  const base = path.parse(videoPath).name;
+  const tags = await readVideoMetadataTags(videoPath);
+  const commentText = getTagValue(tags, ["comment"]);
+  const metaTitle = getTagValue(tags, ["title"]);
+  const metaDescription = getTagValue(tags, [
+    "description",
+    "longdescription",
+    "synopsis",
+    "comment",
+  ]);
+  const metaChannel = getTagValue(tags, [
+    "artist",
+    "performer",
+    "album_artist",
+    "uploader",
+  ]);
+  const metaUploadDate =
+    normalizeUploadDate(
+      getTagValue(tags, [
+        "recorded_date",
+        "recording_date",
+        "recording_time",
+        "date",
+        "creation_time",
+        "encoded_date",
+      ]),
+    ) || formatDateYYYYMMDD(stats.mtime);
+
+  const likelyId =
+    extractYoutubeIdFromUrl(commentText) ||
+    extractLikelyYoutubeId(base) ||
+    extractLikelyYoutubeId(videoId);
+
+  return {
+    id: likelyId || null,
+    title: metaTitle || base,
+    description:
+      metaDescription ||
+      "info.json が見つからなかったため、ローカル動画のメタデータから自動生成しました。",
+    upload_date: metaUploadDate,
+    channel: metaChannel || "ローカル動画",
+    channel_url: "#",
+    uploader_id: metaChannel || "local",
+    channel_follower_count: null,
+    like_count: null,
+    view_count: null,
+    comments: [],
+    _provisional_info: true,
+    _provisional_info_version: 2,
+    _generated_at: new Date().toISOString(),
+    _source_video: videoPath,
+    _source_mtime_ms: stats.mtimeMs,
+    _source_size: stats.size,
+    _source_tags: {
+      title: metaTitle || null,
+      description: metaDescription || null,
+      channel: metaChannel || null,
+      upload_date: metaUploadDate || null,
+      comment: commentText || null,
+    },
+  };
 }
 
 const fallbackThumbnailJobs = new Map();
@@ -1350,6 +1592,7 @@ app.get("/info/:videoId", async (req, res) => {
   try {
     const videoId = decodeURIComponent(req.params.videoId);
     const commentDir = path.join(__dirname, "downloads", "コメント");
+    const provisionalPath = getProvisionalInfoPath(videoId);
 
     console.log("[INFO] looking for base:", videoId);
 
@@ -1360,8 +1603,35 @@ app.get("/info/:videoId", async (req, res) => {
     );
 
     if (!match) {
-      console.error("[INFO] Not found for:", videoId);
-      return res.status(404).json({ error: "info.json が見つかりません" });
+      if (fs.existsSync(provisionalPath)) {
+        try {
+          const cachedRaw = await fs.promises.readFile(provisionalPath, "utf-8");
+          const cached = JSON.parse(cachedRaw);
+          if (cached?._provisional_info_version >= 2) {
+            res.type("application/json; charset=utf-8");
+            return res.sendFile(provisionalPath);
+          }
+        } catch (_error) {
+          // 壊れたJSONや旧形式は再生成する
+        }
+      }
+
+      const videoPath = await findLocalVideoPathById(videoId);
+      if (!videoPath) {
+        console.error("[INFO] Not found for:", videoId);
+        return res.status(404).json({ error: "info.json が見つかりません" });
+      }
+
+      const provisionalInfo = await createProvisionalInfoFromVideo(videoPath, videoId);
+      await fs.promises.writeFile(
+        provisionalPath,
+        JSON.stringify(provisionalInfo, null, 2),
+        "utf-8",
+      );
+      console.log("[INFO] generated provisional info:", provisionalPath);
+
+      res.type("application/json; charset=utf-8");
+      return res.sendFile(provisionalPath);
     }
 
     const infoPath = path.join(commentDir, match);
