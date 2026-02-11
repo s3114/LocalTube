@@ -1179,6 +1179,42 @@
         overflow: hidden;
       }
 
+      .home-video-card-meta {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 10px;
+        margin-top: 10px;
+        align-items: flex-start;
+      }
+
+      .home-video-channel-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #222;
+      }
+
+      .home-video-card-texts {
+        min-width: 0;
+      }
+
+      .home-video-card-title {
+        margin-top: 0;
+        font-weight: 600;
+      }
+
+      .home-video-card-channel,
+      .home-video-card-stats {
+        margin-top: 3px;
+        font-size: 12px;
+        line-height: 1.35;
+        color: var(--subtext);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       .home-video-empty {
         color: var(--subtext);
         padding: 8px;
@@ -3327,6 +3363,7 @@
         const titleEl = document.getElementById("player-title");
         const timeEl = document.getElementById("player-time");
         let allLocalVideos = [];
+        const homeInfoCache = new Map();
 
         const seekBar = document.getElementById("seek-bar");
         const btnPlay = document.getElementById("btn-play");
@@ -3624,26 +3661,116 @@
             const item = document.createElement("div");
             item.className = "home-video-card";
 
-            const thumbHtml = video.thumb
-              ? `<img src="${video.thumb}" class="home-video-card-thumb">`
-              : `<div class="home-video-card-thumb"></div>`;
+            const thumbEl = video.thumb
+              ? document.createElement("img")
+              : document.createElement("div");
+            thumbEl.className = "home-video-card-thumb";
+            if (video.thumb) {
+              thumbEl.src = video.thumb;
+              thumbEl.loading = "lazy";
+            }
 
-            item.innerHTML = `
-              ${thumbHtml}
-              <div class="home-video-card-title">${video.title}</div>
-            `;
+            const metaEl = document.createElement("div");
+            metaEl.className = "home-video-card-meta";
+
+            const iconEl = document.createElement("img");
+            iconEl.className = "home-video-channel-icon";
+            iconEl.src = "/none_icon.jpg";
+            iconEl.alt = "channel icon";
+            iconEl.loading = "lazy";
+            iconEl.onerror = () => {
+              iconEl.src = "/none_icon.jpg";
+            };
+
+            const textsEl = document.createElement("div");
+            textsEl.className = "home-video-card-texts";
+
+            const cardTitleEl = document.createElement("div");
+            cardTitleEl.className = "home-video-card-title";
+            cardTitleEl.textContent = video.title;
+
+            const channelEl = document.createElement("div");
+            channelEl.className = "home-video-card-channel";
+            channelEl.textContent = "ローカル動画";
+
+            const statsEl = document.createElement("div");
+            statsEl.className = "home-video-card-stats";
+            statsEl.textContent = "視聴回数不明 ・ 投稿日不明";
+
+            textsEl.appendChild(cardTitleEl);
+            textsEl.appendChild(channelEl);
+            textsEl.appendChild(statsEl);
+            metaEl.appendChild(iconEl);
+            metaEl.appendChild(textsEl);
+
+            item.appendChild(thumbEl);
+            item.appendChild(metaEl);
 
             item.addEventListener("click", () => {
               playLocalVideo(video);
             });
 
             homeVideoGrid.appendChild(item);
+
+            enrichHomeCardInfo(video, {
+              titleEl: cardTitleEl,
+              channelEl,
+              statsEl,
+              iconEl,
+            });
           });
         }
 
         homeSearchInput?.addEventListener("input", () => {
           renderHomeLocalVideos(allLocalVideos);
         });
+
+        function getVideoIdFromFilename(filename) {
+          return String(filename || "").replace(/\.(mp4|mkv|webm|mov)$/i, "");
+        }
+
+        function formatUploadDateText(uploadDate) {
+          const d = String(uploadDate || "").replace(/\D/g, "");
+          if (d.length !== 8) return "投稿日不明";
+          return `${d.slice(0, 4)}/${d.slice(4, 6)}/${d.slice(6, 8)}`;
+        }
+
+        function formatViewCountText(viewCount) {
+          if (typeof viewCount === "number" && Number.isFinite(viewCount)) {
+            return `${viewCount.toLocaleString()} 回視聴`;
+          }
+          return "視聴回数不明";
+        }
+
+        async function getHomeInfo(video) {
+          const videoId = getVideoIdFromFilename(video.filename);
+          if (!videoId) return null;
+
+          if (!homeInfoCache.has(videoId)) {
+            homeInfoCache.set(
+              videoId,
+              fetch(`/info/${encodeURIComponent(videoId)}`)
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null),
+            );
+          }
+
+          return homeInfoCache.get(videoId);
+        }
+
+        async function enrichHomeCardInfo(video, refs) {
+          const info = await getHomeInfo(video);
+          if (!info || !refs?.titleEl?.isConnected) return;
+
+          refs.titleEl.textContent = info.title?.trim() || video.title;
+          refs.channelEl.textContent = info.channel?.trim() || "ローカル動画";
+          refs.statsEl.textContent = `${formatViewCountText(info.view_count)} ・ ${formatUploadDateText(info.upload_date)}`;
+
+          const avatar = info.channel_thumbnail?.trim();
+          if (avatar) {
+            refs.iconEl.src = avatar;
+          }
+        }
 
         // ===============================
         // ★ 追加：クリックで再生／停止、ダブルクリックで全画面
