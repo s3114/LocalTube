@@ -3193,6 +3193,13 @@
 
         const buttons = document.querySelectorAll(".icon-btn");
         const pages = document.querySelectorAll(".page");
+        const headerSearchWrap = document.querySelector(".header-search-wrap");
+
+        window.updateHeaderSearchVisibility = (pageId) => {
+          if (!headerSearchWrap) return;
+          headerSearchWrap.style.display =
+            pageId === "page-home" ? "flex" : "none";
+        };
 
         function showPage(pageId) {
           // すべて非表示
@@ -3203,6 +3210,7 @@
           if (target) {
             target.classList.add("active-page");
           }
+          window.updateHeaderSearchVisibility(pageId);
         }
 
         function setActiveButton(pageId) {
@@ -3573,6 +3581,7 @@
             .querySelectorAll(".page")
             .forEach((page) => page.classList.remove("active-page"));
           document.getElementById("page-player")?.classList.add("active-page");
+          window.updateHeaderSearchVisibility?.("page-player");
 
           document.querySelectorAll(".icon-btn").forEach((button) => {
             if (button.dataset.page === "page-player") {
