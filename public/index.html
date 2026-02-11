@@ -744,7 +744,7 @@
       .player-video-wrap {
         position: relative;
         width: 100%;
-        /* 追加：16:9を保証 */
+        /* 16:9を維持 */
         aspect-ratio: 16 / 9;
         background: black;
         border-radius: 8px 8px 0 0;
@@ -1377,7 +1377,7 @@
           rgba(0, 0, 0, 0)
         );
 
-        /* ★ ここから追加 */
+        /* 自動表示/非表示制御 */
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.2s ease;
@@ -1423,8 +1423,8 @@
         cursor: pointer;
         transition: background 0.1s linear;
         transform: translateY(-3px); /* ← ここで高さ調整 */
-        padding: 8px 0; /* ★ 上下の当たり判定を拡大 */
-        background-clip: content-box; /* ★ padding部分を透明に */
+        padding: 8px 0; /* 上下の当たり判定を拡大 */
+        background-clip: content-box; /* padding部分を透明に */
       }
 
       /* ===== 音量スライダー：ホバー時のみ表示 ===== */
@@ -1523,7 +1523,7 @@
 
       #seek-bar:hover {
         background: rgba(255, 255, 255, 0.35);
-        background-clip: content-box; /* ★ ホバー時もpadding部分を透明に */
+        background-clip: content-box; /* ホバー時もpadding部分を透明に */
       }
 
       #seek-bar:hover::-webkit-slider-thumb {
@@ -1622,7 +1622,7 @@
         font-size: 14px; /* 少し大きく */
         padding: 6px 8px; /* ヒットエリア広げる */
         cursor: pointer;
-        margin-left: 0; /* ★ 左寄せを明示 */
+        margin-left: 0; /* 左寄せ */
         margin-top: 6px;
         display: flex;
         font-weight: 500;
@@ -1838,7 +1838,7 @@
                   <i class="fa-solid fa-play"></i>
                 </button>
 
-                <!-- ★ 追加：±5秒ボタン -->
+                <!-- ±5秒ボタン -->
                 <button
                   id="btn-rew5"
                   class="yt-btn yt-skip"
@@ -1846,7 +1846,7 @@
                   <i class="fa-solid fa-backward-step"></i>
                 </button>
 
-                <!-- ★ YouTube風：5秒進む -->
+                <!-- +5秒ボタン -->
                 <button
                   id="btn-fwd5"
                   class="yt-btn yt-skip"
@@ -1854,7 +1854,7 @@
                   <i class="fa-solid fa-forward-step"></i>
                 </button>
 
-                <!-- ★ 追加：音量バー -->
+                <!-- 音量バー -->
                 <div class="yt-volume yt-volume-hover">
                   <i class="fa-solid fa-volume-high"></i>
                   <input
@@ -1870,7 +1870,7 @@
 
                 <span id="time-display" class="yt-time">00:00 / 00:00</span>
 
-                <!-- ★ ここに再生速度ボタンを追加（全画面の左） -->
+                <!-- 再生速度 -->
                 <div class="speed-control-wrapper">
                   <button id="btn-speed" class="yt-btn" title="再生速度">
                     1.0×
@@ -1938,7 +1938,7 @@
                     <span id="channel-subs"></span>
                   </div>
                 </div>
-                <!-- ★ 動画統計情報（右寄せ） -->
+                <!-- 動画統計情報（右寄せ） -->
                 <div
                   class="video-stats"
                   style="
@@ -1969,7 +1969,7 @@
                       <span id="comment-count-display"></span> 件のコメント
                     </div>
 
-                    <!-- ★ 並び替えボタン -->
+                    <!-- 並び替えボタン -->
                     <div class="sort-container" style="position: relative">
                       <button id="sort-toggle" class="sort-btn">
                         <i class="fa-solid fa-arrow-down-short-wide"></i>
@@ -3301,12 +3301,74 @@
           if (runningEl) runningEl.textContent = `${running} 件`;
           if (errorEl) errorEl.textContent = `${error} 件`;
 
-          // --- 完了率バー（★ 追加部分）---
+          // 完了率バー
           const bar = document.getElementById("completion-bar");
           const text = document.getElementById("completion-text");
 
           if (bar) bar.style.width = `${completionRate}%`;
           if (text) text.textContent = `${completionRate}%`;
+        }
+
+        function updateServerClockDisplay(serverTime) {
+          if (!serverTime) return;
+          const clockEl = document.getElementById("info-clock");
+          if (!clockEl) return;
+          clockEl.textContent =
+            `${serverTime.yyyy}/${serverTime.MM}/${serverTime.dd} ` +
+            `${serverTime.hh}:${serverTime.mm}:${serverTime.ss}`;
+        }
+
+        function updateNetworkAndLatencyDisplay(data) {
+          const netEl = document.getElementById("info-network");
+          if (netEl && data.network_mbps != null) {
+            netEl.textContent = `${data.network_mbps} Mbps (推定)`;
+          }
+
+          const latEl = document.getElementById("info-latency");
+          if (latEl && data.latency_ms != null) {
+            latEl.textContent = `${data.latency_ms} ms`;
+          }
+        }
+
+        function updateUptimeDisplay(uptimeSec) {
+          const upEl = document.getElementById("info-uptime");
+          if (!upEl || typeof uptimeSec !== "number") return;
+
+          const h = Math.floor(uptimeSec / 3600);
+          const m = Math.floor((uptimeSec % 3600) / 60);
+          const s = uptimeSec % 60;
+          upEl.textContent = `${h}時間 ${m}分 ${s}秒`;
+        }
+
+        function pushAveragedNetworkSample(mbps, latencyMs) {
+          if (mbps == null || latencyMs == null) return;
+
+          netBuffer.push(mbps);
+          latencyBuffer.push(latencyMs);
+          if (netBuffer.length > AVG_WINDOW) netBuffer.shift();
+          if (latencyBuffer.length > AVG_WINDOW) latencyBuffer.shift();
+
+          const avgMbps = Math.round(
+            netBuffer.reduce((a, b) => a + b, 0) / netBuffer.length,
+          );
+          const avgLatency = Math.round(
+            latencyBuffer.reduce((a, b) => a + b, 0) / latencyBuffer.length,
+          );
+
+          const now = new Date();
+          const timeLabel = `${now.getMinutes()}:${now.getSeconds().toString().padStart(2, "0")}`;
+
+          networkChart.data.labels.push(timeLabel);
+          networkChart.data.datasets[0].data.push(avgMbps);
+          networkChart.data.datasets[1].data.push(avgLatency);
+
+          if (networkChart.data.labels.length > 30) {
+            networkChart.data.labels.shift();
+            networkChart.data.datasets[0].data.shift();
+            networkChart.data.datasets[1].data.shift();
+          }
+
+          networkChart.update();
         }
 
         // --- SSE Connection ---
@@ -3410,173 +3472,116 @@
 
         eventSource.addEventListener("system_info", (e) => {
           const data = JSON.parse(e.data);
-
-          // ===== サーバー時刻（★ここが追加・変更）=====
-          if (data.server_time) {
-            const t = data.server_time;
-            const clockEl = document.getElementById("info-clock");
-            if (clockEl) {
-              clockEl.textContent = `${t.yyyy}/${t.MM}/${t.dd} ${t.hh}:${t.mm}:${t.ss}`;
-            }
-          }
-
-          // --- ネットワーク表示（あれば） ---
-          const netEl = document.getElementById("info-network");
-          if (netEl && data.network_mbps != null) {
-            netEl.textContent = `${data.network_mbps} Mbps (推定)`;
-          }
-
-          // --- レイテンシ表示（あれば） ---
-          const latEl = document.getElementById("info-latency");
-          if (latEl && data.latency_ms != null) {
-            latEl.textContent = `${data.latency_ms} ms`;
-          }
-
-          // --- ★ 稼働時間（ここが問題箇所だった） ---
-          const upEl = document.getElementById("info-uptime");
-          if (upEl && typeof data.uptime_sec === "number") {
-            const sec = data.uptime_sec;
-            const h = Math.floor(sec / 3600);
-            const m = Math.floor((sec % 3600) / 60);
-            const s = sec % 60;
-
-            upEl.textContent = `${h}時間 ${m}分 ${s}秒`;
-          }
-
-          // ===== グラフにデータ追加（5秒移動平均）=====
-          if (data.network_mbps != null && data.latency_ms != null) {
-            // ① バッファに追加
-            netBuffer.push(data.network_mbps);
-            latencyBuffer.push(data.latency_ms);
-
-            // ② 5個を超えたら古いものを捨てる
-            if (netBuffer.length > AVG_WINDOW) netBuffer.shift();
-            if (latencyBuffer.length > AVG_WINDOW) latencyBuffer.shift();
-
-            // ③ 平均を計算
-            const avgMbps = Math.round(
-              netBuffer.reduce((a, b) => a + b, 0) / netBuffer.length,
-            );
-
-            const avgLatency = Math.round(
-              latencyBuffer.reduce((a, b) => a + b, 0) / latencyBuffer.length,
-            );
-
-            // ④ 時間ラベル（5秒ごとに見える感じ）
-            const now = new Date();
-            const timeLabel = `${now.getMinutes()}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-            // ⑤ グラフに追加
-            networkChart.data.labels.push(timeLabel);
-            networkChart.data.datasets[0].data.push(avgMbps);
-            networkChart.data.datasets[1].data.push(avgLatency);
-
-            // ⑥ 表示点数を最大60点に制限（＝約5分分）
-            if (networkChart.data.labels.length > 30) {
-              networkChart.data.labels.shift();
-              networkChart.data.datasets[0].data.shift();
-              networkChart.data.datasets[1].data.shift();
-            }
-
-            networkChart.update();
-          }
+          updateServerClockDisplay(data.server_time);
+          updateNetworkAndLatencyDisplay(data);
+          updateUptimeDisplay(data.uptime_sec);
+          pushAveragedNetworkSample(data.network_mbps, data.latency_ms);
         });
       });
 
       // --- Actions ---
+      function setButtonDisabled(button, disabled) {
+        if (button) button.disabled = disabled;
+      }
+
+      function parseInputUrls(urlsInput) {
+        const rawUrls = String(urlsInput?.value || "").trim();
+        if (rawUrls === "") {
+          alert("URLを入力してください。");
+          return null;
+        }
+
+        const urls = rawUrls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
+        if (urls.length === 0) {
+          alert("URLを入力してください。");
+          return null;
+        }
+        return urls;
+      }
+
+      async function validateSingleUrl(url) {
+        if (!url.startsWith("https://")) {
+          alert(
+            `「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`,
+          );
+          return false;
+        }
+
+        const validationResponse = await fetch(
+          `/api/validate-url?url=${encodeURIComponent(url)}`,
+        );
+        const validationResult = await validationResponse.json();
+        if (validationResult.isValid) return true;
+
+        alert(
+          `「${url}」はアクセスできません。${validationResult.error ? `エラー: ${validationResult.error}` : ""}`,
+        );
+        return false;
+      }
+
+      async function validateUrls(urls) {
+        for (const url of urls) {
+          const valid = await validateSingleUrl(url);
+          if (!valid) return false;
+        }
+        return true;
+      }
+
+      function buildDownloadFormData(urlsInput) {
+        const formData = new FormData();
+        formData.append("urls", urlsInput.value);
+        formData.append("format", document.getElementById("fmt").value);
+        formData.append("saveHistory", document.getElementById("optHistory").checked);
+        formData.append("downloadThumb", document.getElementById("optThumb").checked);
+        formData.append("drmProtect", document.getElementById("optDrm").checked);
+        formData.append("savePath", document.getElementById("savePath").value);
+        formData.append(
+          "parallelDownloads",
+          document.getElementById("optParallelDownloads").value,
+        );
+        formData.append(
+          "concurrentFragments",
+          document.getElementById("optConcurrentFragments").value,
+        );
+        formData.append(
+          "commentOptions",
+          document.getElementById("comment-options").value,
+        );
+
+        if (window.selectedCookieFile) {
+          formData.append("cookieFile", window.selectedCookieFile);
+        }
+        return formData;
+      }
+
+      async function submitDownload(formData) {
+        const response = await fetch("/download", {
+          method: "POST",
+          body: formData,
+        });
+        if (response.ok) return true;
+
+        const errorData = await response.json();
+        alert(`エラー: ${errorData.error}`);
+        return false;
+      }
+
       async function start() {
         const downloadBtn = document.getElementById("download-btn");
         const urlsInput = document.getElementById("urls");
-
-        if (downloadBtn) {
-          downloadBtn.disabled = true;
-        }
+        setButtonDisabled(downloadBtn, true);
 
         try {
-          const rawUrls = urlsInput.value.trim();
-          if (rawUrls === "") {
-            alert("URLを入力してください。");
-            return;
-          }
+          const urls = parseInputUrls(urlsInput);
+          if (!urls) return;
 
-          const urls = rawUrls
-            .split(/[\n\s,]+/)
-            .filter((url) => url.trim() !== "");
+          const valid = await validateUrls(urls);
+          if (!valid) return;
 
-          if (urls.length === 0) {
-            alert("URLを入力してください。");
-            return;
-          }
-
-          // 各URLをサーバーサイドで検証
-          for (const url of urls) {
-            // URLの基本的なフォーマットチェック (https://から始まるか)
-            if (!url.startsWith("https://")) {
-              alert(
-                `「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`,
-              );
-              return;
-            }
-
-            const validationResponse = await fetch(
-              `/api/validate-url?url=${encodeURIComponent(url)}`,
-            );
-            const validationResult = await validationResponse.json();
-
-            if (!validationResult.isValid) {
-              alert(
-                `「${url}」はアクセスできません。${validationResult.error ? `エラー: ${validationResult.error}` : ""}`,
-              );
-              return;
-            }
-          }
-
-          const formData = new FormData();
-          formData.append("urls", urlsInput.value);
-          formData.append("format", document.getElementById("fmt").value);
-          formData.append(
-            "saveHistory",
-            document.getElementById("optHistory").checked,
-          );
-          formData.append(
-            "downloadThumb",
-            document.getElementById("optThumb").checked,
-          );
-          formData.append(
-            "drmProtect",
-            document.getElementById("optDrm").checked,
-          );
-          formData.append(
-            "savePath",
-            document.getElementById("savePath").value,
-          );
-          formData.append(
-            "parallelDownloads",
-            document.getElementById("optParallelDownloads").value,
-          );
-          formData.append(
-            "concurrentFragments",
-            document.getElementById("optConcurrentFragments").value,
-          );
-          formData.append(
-            "commentOptions",
-            document.getElementById("comment-options").value,
-          );
-
-          if (window.selectedCookieFile) {
-            formData.append("cookieFile", window.selectedCookieFile);
-          }
-
-          const response = await fetch("/download", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            alert(`エラー: ${errorData.error}`);
-          } else {
-            urlsInput.value = ""; // Clear textarea on success
+          const formData = buildDownloadFormData(urlsInput);
+          const submitted = await submitDownload(formData);
+          if (submitted) {
+            urlsInput.value = "";
           }
         } catch (error) {
           alert(
@@ -3584,32 +3589,12 @@
           );
           console.error("Fetch error:", error);
         } finally {
-          if (downloadBtn) {
-            downloadBtn.disabled = false;
-          }
+          setButtonDisabled(downloadBtn, false);
         }
       }
 
-      // ===== ヘッダーボタンの「現在の画面」表示 =====
-      // ===== ヘッダーボタンで「ページ切替」＋「縁の移動」 =====
-      // ===== URLルーティング対応のページ切替 =====
+      // ===== ヘッダーボタンとURLルーティング =====
       document.addEventListener("DOMContentLoaded", () => {
-        // ★ URL から動画IDで選択する
-        function selectVideoById(videoId) {
-          const items = document.querySelectorAll(".local-video-item");
-
-          items.forEach((item) => {
-            const titleEl = item.querySelector(".local-video-text");
-            if (!titleEl) return;
-
-            const title = titleEl.textContent.trim();
-
-            if (title === videoId) {
-              item.click(); // 既存の再生処理をそのまま使う
-            }
-          });
-        }
-
         const buttons = document.querySelectorAll(".icon-btn");
         const pages = document.querySelectorAll(".page");
         const headerSearchWrap = document.querySelector(".header-search-wrap");
@@ -3645,7 +3630,7 @@
         function routeFromHash() {
           const hash = location.hash.replace("#", "");
 
-          // ★ 追加：player/ID を分解
+          // player/ID を分解
           const [page, videoId] = hash.split("/");
 
           let pageId;
@@ -3696,9 +3681,7 @@
         routeFromHash();
       });
 
-      // ===== ローカル動画プレイヤー（サーバー連携版） =====
       document.addEventListener("DOMContentLoaded", () => {
-        // ===== 概要欄のURLをリンク化する関数 =====
         function linkify(text) {
           if (!text) return "";
 
@@ -3709,12 +3692,11 @@
           });
         }
 
-        // ===== 概要欄 折りたたみ処理 =====
         const desc = document.getElementById("video-description");
         const toggleBtn = document.getElementById("desc-toggle");
 
         function updateDescButton() {
-          // 3行より短い場合はボタンを隠す
+          if (!desc || !toggleBtn) return;
           if (desc.scrollHeight <= desc.clientHeight) {
             toggleBtn.style.display = "none";
           } else {
@@ -3722,22 +3704,17 @@
           }
         }
 
-        // 初期チェック
-        updateDescButton();
-
-        // ウィンドウサイズ変更時にも再判定
-        window.addEventListener("resize", updateDescButton);
-
-        // ボタン押下時の挙動
-        toggleBtn.addEventListener("click", () => {
-          desc.classList.toggle("collapsed");
-
-          if (desc.classList.contains("collapsed")) {
-            toggleBtn.textContent = "もっと見る";
-          } else {
-            toggleBtn.textContent = "折りたたむ";
-          }
-        });
+        function initializeDescriptionToggle() {
+          if (!desc || !toggleBtn) return;
+          updateDescButton();
+          window.addEventListener("resize", updateDescButton);
+          toggleBtn.addEventListener("click", () => {
+            desc.classList.toggle("collapsed");
+            toggleBtn.textContent = desc.classList.contains("collapsed")
+              ? "もっと見る"
+              : "折りたたむ";
+          });
+        }
 
         const videoPlayer = document.getElementById("local-player");
         const videoList = document.getElementById("local-video-list");
@@ -3755,7 +3732,6 @@
         const filterChannel = document.getElementById("filter-channel");
         const filterClearBtn = document.getElementById("filter-clear-btn");
         const titleEl = document.getElementById("player-title");
-        const timeEl = document.getElementById("player-time");
         let allLocalVideos = [];
         const homeInfoCache = new Map();
         const homeInfoData = new Map();
@@ -3767,32 +3743,19 @@
         seekBar.value = 0;
         seekBar.style.setProperty("--progress", "0%");
 
-        function syncSeekBarWithVideo() {
+        // 再生中はシーク位置を同期
+        videoPlayer.addEventListener("timeupdate", () => {
           if (!videoPlayer.duration || isNaN(videoPlayer.duration)) return;
-
           const progress =
             (videoPlayer.currentTime / videoPlayer.duration) * 100;
-
-          // スライダーの位置を更新
           seekBar.value = progress;
-
-          // 「左側を赤く塗る」ためのCSS変数も更新
           seekBar.style.setProperty("--progress", progress + "%");
-        }
+        });
 
-        let isUserScrolling = false;
-        let scrollTimeout = null;
-
-        // 再生中は常に同期
-        videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
-
-        // ===== ★ ライブチャット同期スクロール（確実に動く版） =====
+        // 再生位置に合わせてライブチャットを同期スクロール
         videoPlayer.addEventListener("timeupdate", () => {
           const chatContainer = document.getElementById("chat-messages");
           if (!chatContainer) return;
-
-          // ユーザーがスクロール中は追従しない
-          if (isUserScrolling) return;
 
           const currentSec = Math.floor(videoPlayer.currentTime);
           const lines = chatContainer.querySelectorAll(".chat-line[data-time]");
@@ -3812,7 +3775,6 @@
 
           if (!target) return;
 
-          // ===== ★ 中央に表示（YouTube風） =====
           const targetOffset =
             target.offsetTop -
             chatContainer.clientHeight / 2 +
@@ -3829,47 +3791,24 @@
           seekBar.style.setProperty("--progress", "0%");
         }
 
-        videoPlayer.addEventListener("timeupdate", () => {
-          seekBar.value =
-            (videoPlayer.currentTime / videoPlayer.duration) * 100;
-        });
-
-        seekBar.addEventListener("input", () => {
-          if (!videoPlayer.duration) return;
-          videoPlayer.currentTime =
-            (seekBar.value / 100) * videoPlayer.duration;
-        });
-
         function updateSeekBarFill() {
-          const value = seekBar.value; // 0〜100
+          const value = seekBar.value;
           seekBar.style.setProperty("--progress", value + "%");
         }
 
-        // 初期化
-        updateSeekBarFill();
-
-        // ===== サイドバー：個別セクション開閉 =====
-        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-
-            const targetId = btn.dataset.target;
-            const section = document.getElementById(targetId);
-            const icon = btn.querySelector("i");
-
-            const isCollapsed = section.classList.toggle("collapsed");
-
-            // FontAwesomeアイコン切り替え
-            icon.className = isCollapsed
-              ? "fa-solid fa-chevron-right"
-              : "fa-solid fa-chevron-down";
+        function initializeSeekBarBindings() {
+          seekBar.addEventListener("input", () => {
+            if (!videoPlayer.duration) return;
+            videoPlayer.currentTime =
+              (seekBar.value / 100) * videoPlayer.duration;
+            updateSeekBarFill();
           });
-        });
+          updateSeekBarFill();
+        }
 
-        // ===== ライブチャットの高さをプレイヤーに合わせる =====
         const playerMain = document.querySelector(".player-main");
         const chatSection = document.getElementById("chat-section");
-        const chatContent = document.getElementById("live-chat-container"); // ★ これだけで十分
+        const chatContent = document.getElementById("live-chat-container");
 
         function syncChatHeight() {
           if (!playerMain || !chatSection || !chatContent) return;
@@ -3880,36 +3819,32 @@
             return;
           }
 
-          // 開いているとき
           chatContent.style.height = "";
           chatContent.style.overflow = "auto";
         }
 
-        // 初回ロード時にも合わせる（DOMContentLoaded後に実行）
-        setTimeout(syncChatHeight, 100);
+        function initializeChatHeightSync() {
+          setTimeout(syncChatHeight, 100);
+          window.addEventListener("resize", syncChatHeight);
+        }
 
-        // ウィンドウサイズ変更時にも追従
-        window.addEventListener("resize", syncChatHeight);
+        function initializePlayButtonBindings() {
+          btnPlay.addEventListener("click", () => {
+            if (videoPlayer.paused) {
+              videoPlayer.play();
+            } else {
+              videoPlayer.pause();
+            }
+          });
 
-        // ユーザー操作時に更新
-        seekBar.addEventListener("input", updateSeekBarFill);
+          videoPlayer.addEventListener("play", () => {
+            btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+          });
 
-        btnPlay.addEventListener("click", () => {
-          if (videoPlayer.paused) {
-            videoPlayer.play();
-          } else {
-            videoPlayer.pause();
-          }
-        });
-
-        // 再生状態に応じてアイコンを切り替え
-        videoPlayer.addEventListener("play", () => {
-          btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
-        });
-
-        videoPlayer.addEventListener("pause", () => {
-          btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
-        });
+          videoPlayer.addEventListener("pause", () => {
+            btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+          });
+        }
 
         function findVideoById(videos, videoId) {
           if (!videoId) return null;
@@ -4057,10 +3992,7 @@
           });
         }
 
-        function createHomeVideoCard(video) {
-          const item = document.createElement("div");
-          item.className = "home-video-card";
-
+        function createHomeCardThumb(video) {
           const thumbEl = video.thumb
             ? document.createElement("img")
             : document.createElement("div");
@@ -4069,7 +4001,10 @@
             thumbEl.src = video.thumb;
             thumbEl.loading = "lazy";
           }
+          return thumbEl;
+        }
 
+        function createHomeCardMetaRefs(video) {
           const metaEl = document.createElement("div");
           metaEl.className = "home-video-card-meta";
 
@@ -4103,11 +4038,19 @@
           metaEl.appendChild(iconEl);
           metaEl.appendChild(textsEl);
 
-          item.appendChild(thumbEl);
+          return { metaEl, refs: { titleEl, channelEl, statsEl, iconEl } };
+        }
+
+        function createHomeVideoCard(video) {
+          const item = document.createElement("div");
+          item.className = "home-video-card";
+          item.appendChild(createHomeCardThumb(video));
+
+          const { metaEl, refs } = createHomeCardMetaRefs(video);
           item.appendChild(metaEl);
           item.addEventListener("click", () => playLocalVideo(video));
 
-          return { item, refs: { titleEl, channelEl, statsEl, iconEl } };
+          return { item, refs };
         }
 
         function renderHomeLocalVideos(videos) {
@@ -4455,7 +4398,7 @@
         async function prefetchHomeInfos(videos) {
           const requests = videos.map((video) => getHomeInfo(video));
           await Promise.allSettled(requests);
-          renderHomeLocalVideos(allLocalVideos);
+          rerenderHomeVideos();
         }
 
         async function enrichHomeCardInfo(video, refs) {
@@ -4472,94 +4415,139 @@
           }
         }
 
-        // ===============================
-        // ★ 追加：クリックで再生／停止、ダブルクリックで全画面
-        // ===============================
-
-        let clickTimer = null;
-        const DOUBLE_CLICK_DELAY = 250; // ms（YouTubeっぽい値）
-
-        videoPlayer.addEventListener("click", (e) => {
-          // ★ コントロール（ボタン）をクリックした時は無視
-          if (e.target.closest(".yt-controls")) return;
-
-          // ダブルクリックと区別するため、少しだけ待つ
-          if (clickTimer) {
-            clearTimeout(clickTimer);
-            clickTimer = null;
-            return;
-          }
-
-          clickTimer = setTimeout(() => {
-            // ここで「シングルクリック」と確定
-            if (videoPlayer.paused) {
-              videoPlayer.play();
-            } else {
-              videoPlayer.pause();
-            }
-            clickTimer = null;
-          }, DOUBLE_CLICK_DELAY);
-        });
-
-        videoPlayer.addEventListener("dblclick", () => {
-          // ダブルクリック → 全画面トグル
-          if (!document.fullscreenElement) {
-            videoPlayer.requestFullscreen().catch(() => {
-              // 一部ブラウザ対策：ラッパーをフルスクリーン
-              document.getElementById("player-container")?.requestFullscreen();
-            });
-          } else {
-            document.exitFullscreen();
-          }
-
-          // シングルクリックのタイマーは無効化
-          if (clickTimer) {
-            clearTimeout(clickTimer);
-            clickTimer = null;
-          }
-        });
-
-        // ---- フルスクリーン ----
-        btnFull.addEventListener("click", async () => {
+        async function toggleFullscreen() {
           if (document.fullscreenElement) {
             await document.exitFullscreen();
-          } else {
-            await videoPlayer.requestFullscreen();
+            return;
           }
-        });
+          try {
+            await videoPlayer.requestFullscreen();
+          } catch (_e) {
+            await document.getElementById("player-container")?.requestFullscreen();
+          }
+        }
 
-        const btnSpeed = document.getElementById("btn-speed");
-        const speedMenu = document.getElementById("speed-menu");
-        const speedOptions = document.querySelectorAll(".speed-option");
+        function initializeVideoInteraction() {
+          let clickTimer = null;
+          const DOUBLE_CLICK_DELAY = 250;
 
-        // メニュー開閉
-        btnSpeed.addEventListener("click", (e) => {
-          e.stopPropagation(); // プレイヤークリック判定を防ぐ
-          speedMenu.classList.toggle("hidden");
-        });
+          videoPlayer.addEventListener("click", (e) => {
+            if (e.target.closest(".yt-controls")) return;
 
-        // 速度変更
-        speedOptions.forEach((option) => {
-          option.addEventListener("click", () => {
-            const speed = parseFloat(option.dataset.speed);
-            videoPlayer.playbackRate = speed;
-            btnSpeed.textContent = speed + "×";
+            if (clickTimer) {
+              clearTimeout(clickTimer);
+              clickTimer = null;
+              return;
+            }
+
+            clickTimer = setTimeout(() => {
+              if (videoPlayer.paused) {
+                videoPlayer.play();
+              } else {
+                videoPlayer.pause();
+              }
+              clickTimer = null;
+            }, DOUBLE_CLICK_DELAY);
+          });
+
+          videoPlayer.addEventListener("dblclick", async () => {
+            await toggleFullscreen();
+            if (clickTimer) {
+              clearTimeout(clickTimer);
+              clickTimer = null;
+            }
+          });
+        }
+
+        function initializeSpeedMenu() {
+          const btnSpeed = document.getElementById("btn-speed");
+          const speedMenu = document.getElementById("speed-menu");
+          const speedOptions = document.querySelectorAll(".speed-option");
+          if (!btnSpeed || !speedMenu) return;
+
+          btnSpeed.addEventListener("click", (e) => {
+            e.stopPropagation();
+            speedMenu.classList.toggle("hidden");
+          });
+
+          speedOptions.forEach((option) => {
+            option.addEventListener("click", () => {
+              const speed = parseFloat(option.dataset.speed);
+              videoPlayer.playbackRate = speed;
+              btnSpeed.textContent = speed + "×";
+              speedMenu.classList.add("hidden");
+            });
+          });
+
+          document.addEventListener("click", () => {
             speedMenu.classList.add("hidden");
           });
-        });
+        }
 
-        // 画面クリックで閉じる
-        document.addEventListener("click", () => {
-          speedMenu.classList.add("hidden");
-        });
+        function initializeSidebarToggles() {
+          document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const targetId = btn.getAttribute("data-target");
+              const section = document.getElementById(targetId);
+              if (!section) return;
 
-        // ===============================
-        // ★ ライブチャット読み込み関数（ここに追加）
-        // ===============================
+              const content = section.querySelector(".sidebar-content");
+              if (!content) return;
 
-        // ===============================
-        // ★★ 追加：絵文字を含むチャットを正しく描画する関数 ★★
-        // ===============================
+              const isCollapsed = content.classList.toggle("collapsed");
+              const icon = btn.querySelector("i");
+              if (icon) {
+                icon.className = isCollapsed
+                  ? "fa-solid fa-chevron-right"
+                  : "fa-solid fa-chevron-down";
+              }
+
+              setTimeout(syncChatHeight, 180);
+            });
+          });
+        }
+
+        function initializeCommentSortMenu() {
+          const sortToggle = document.getElementById("sort-toggle");
+          const sortMenu = document.getElementById("sort-menu");
+          const sortItems = document.querySelectorAll(".sort-item");
+          if (!sortToggle || !sortMenu) return;
+
+          sortToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sortMenu.classList.toggle("hidden");
+          });
+
+          document.addEventListener("click", (e) => {
+            if (!sortToggle.contains(e.target) && !sortMenu.contains(e.target)) {
+              sortMenu.classList.add("hidden");
+            }
+          });
+
+          sortItems.forEach((item) => {
+            item.addEventListener("click", () => {
+              const sortType = item.dataset.sort;
+              sortItems.forEach((i) => i.classList.remove("active"));
+              item.classList.add("active");
+              sortMenu.classList.add("hidden");
+
+              if (
+                !window.currentVideoComments ||
+                window.currentVideoComments.length === 0
+              )
+                return;
+
+              let sorted = [...window.currentVideoComments];
+              if (sortType === "popular") {
+                sorted.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
+              } else if (sortType === "newest") {
+                sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+              }
+              renderComments(sorted);
+            });
+          });
+        }
+
         function renderChatMessage(message) {
           if (!message) return "";
           if (message.simpleText) return escapeHtml(message.simpleText);
@@ -4722,8 +4710,6 @@
         async function loadLiveChat(videoBaseName) {
           try {
             const chatContainer = document.getElementById("chat-messages");
-
-            // ★ より安全に取得（見つからなくても落ちない）
             const emptyEl =
               document.querySelector("#live-chat-container .chat-empty") ||
               document.querySelector(".chat-empty");
@@ -4759,11 +4745,6 @@
                 chatContainer.appendChild(line);
               }
             });
-
-            // ★ 初回は一番上に戻す（時間順に見るため）
-            chatContainer.scrollTop = 0;
-
-            // 一番下までスクロール
             chatContainer.scrollTop = chatContainer.scrollHeight;
           } catch (e) {
             console.error("loadLiveChat error:", e);
@@ -5021,6 +5002,16 @@
           parentEl.appendChild(threadHitbox);
         }
 
+        function renderRootCommentNode(parentNode, list) {
+          const parentEl = createCommentElement(parentNode, false);
+          parentEl.querySelector(".comment-text")?.classList.add("clamped");
+          list.appendChild(parentEl);
+
+          if (parentNode.children.length > 0) {
+            createReplyControls(parentNode, parentEl);
+          }
+        }
+
         function renderComments(comments) {
           const list = document.getElementById("comment-list");
           const countDisplay = document.getElementById("comment-count-display");
@@ -5042,13 +5033,7 @@
 
           const roots = buildCommentTree(comments);
           roots.forEach((parentNode) => {
-            const parentEl = createCommentElement(parentNode, false);
-            parentEl.querySelector(".comment-text").classList.add("clamped");
-            list.appendChild(parentEl);
-
-            if (parentNode.children.length > 0) {
-              createReplyControls(parentNode, parentEl);
-            }
+            renderRootCommentNode(parentNode, list);
           });
         }
 
@@ -5131,26 +5116,39 @@
           });
         }
 
-        function createCommentElement(comment, isReply) {
-          const item = document.createElement("div");
-          item.className = isReply ? "comment-reply" : "comment-item";
-
-          const body = document.createElement("div");
-          body.className = "comment-body";
-
+        function createCommentTextElement(comment) {
           const text = document.createElement("div");
           text.className = "comment-text";
           text.innerHTML = comment.text ? linkify(comment.text) : "";
+          return text;
+        }
 
+        function createCommentMoreButton() {
           const moreBtn = document.createElement("button");
           moreBtn.className = "comment-more";
           moreBtn.textContent = "もっと見る";
           moreBtn.style.display = "none";
+          return moreBtn;
+        }
 
+        function createCommentBody(comment) {
+          const body = document.createElement("div");
+          body.className = "comment-body";
+
+          const text = createCommentTextElement(comment);
+          const moreBtn = createCommentMoreButton();
           body.appendChild(createCommentMeta(comment));
           body.appendChild(text);
           body.appendChild(moreBtn);
           body.appendChild(createCommentActions(comment));
+
+          return { body, text, moreBtn };
+        }
+
+        function createCommentElement(comment, isReply) {
+          const item = document.createElement("div");
+          item.className = isReply ? "comment-reply" : "comment-item";
+          const { body, text, moreBtn } = createCommentBody(comment);
 
           item.appendChild(createCommentAvatarLink(comment));
           item.appendChild(body);
@@ -5178,21 +5176,20 @@
           return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
         }
 
-        // ① timeupdate：時間表示＋目標値の更新だけ
+        // timeupdate: 時間表示と目標進捗のみ更新
         videoPlayer.addEventListener("timeupdate", () => {
           if (!videoPlayer.duration) return;
 
           const cur = Math.floor(videoPlayer.currentTime);
           const dur = Math.floor(videoPlayer.duration);
 
-          // ★ シークバーは「目標値」だけ更新
           targetProgress =
             (videoPlayer.currentTime / videoPlayer.duration) * 100;
 
           timeDisplay.textContent = `${formatVideoTime(cur)} / ${formatVideoTime(dur)}`;
         });
 
-        // ② requestAnimationFrame：つまみを“なめらかに”追従
+        // requestAnimationFrame: つまみを滑らかに追従
         function smoothSeek() {
           if (!videoPlayer.duration || isNaN(videoPlayer.duration)) {
             targetProgress = 0;
@@ -5205,7 +5202,7 @@
           const current = parseFloat(seekBar.value) || 0;
           const diff = targetProgress - current;
 
-          const easing = 0.001; // 小さいほどヌルヌル
+          const easing = 0.001;
           const newValue = current + diff * easing;
 
           seekBar.value = newValue;
@@ -5214,17 +5211,10 @@
           requestAnimationFrame(smoothSeek);
         }
 
-        // アニメーション開始
         requestAnimationFrame(smoothSeek);
 
-        // 初回ロード
         loadLocalVideos();
 
-        // ===============================
-        // ★ 追加：ショートカット＋ボタン制御
-        // ===============================
-
-        // 5秒スキップ関数
         function skip(sec) {
           const t = videoPlayer.currentTime + sec;
           videoPlayer.currentTime = Math.max(
@@ -5233,7 +5223,6 @@
           );
         }
 
-        // 音量変更関数（±5%）
         function changeVolume(delta) {
           videoPlayer.volume = Math.max(
             0,
@@ -5241,7 +5230,6 @@
           );
         }
 
-        // 再生/一時停止トグル
         function togglePlay() {
           if (videoPlayer.paused) {
             videoPlayer.play();
@@ -5250,226 +5238,137 @@
           }
         }
 
-        // ===== 個別トグル（ライブチャット／ローカル動画）【修正版】 =====
-        const sidebar = document.getElementById("player-sidebar");
+        function initializeQuickButtonsAndVolume() {
+          const btnRew5 = document.getElementById("btn-rew5");
+          const btnFwd5 = document.getElementById("btn-fwd5");
+          const volumeBar = document.getElementById("volume-bar");
+          const volumeIcon = document.querySelector(".yt-volume i");
+          if (!btnRew5 || !btnFwd5 || !volumeBar || !volumeIcon) return;
 
-        document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const targetId = btn.getAttribute("data-target");
-            const section = document.getElementById(targetId);
+          let lastVolume = volumeBar.value;
 
-            if (!section) return;
-
-            const content = section.querySelector(".sidebar-content"); // ★ 重要
-
-            if (!content) return;
-
-            const isCollapsed = content.classList.toggle("collapsed"); // ★ ここを変更
-
-            // アイコン切り替え（横幅は変えない）
-            const icon = btn.querySelector("i");
-            if (icon) {
-              icon.className = isCollapsed
-                ? "fa-solid fa-chevron-right"
-                : "fa-solid fa-chevron-down";
-            }
-
-            // ライブチャット側の高さを再同期
-            setTimeout(syncChatHeight, 180);
-          });
-        });
-
-        // ===== ★ コメント並び替えロジック =====
-        const sortToggle = document.getElementById("sort-toggle");
-        const sortMenu = document.getElementById("sort-menu");
-        const sortItems = document.querySelectorAll(".sort-item");
-
-        if (sortToggle && sortMenu) {
-          // メニュー開閉
-          sortToggle.addEventListener("click", (e) => {
-            e.stopPropagation();
-            sortMenu.classList.toggle("hidden");
-          });
-
-          // 外部クリックで閉じる
-          document.addEventListener("click", (e) => {
-            if (
-              !sortToggle.contains(e.target) &&
-              !sortMenu.contains(e.target)
-            ) {
-              sortMenu.classList.add("hidden");
+          volumeIcon.addEventListener("click", () => {
+            if (videoPlayer.muted) {
+              videoPlayer.muted = false;
+              videoPlayer.volume = lastVolume || 0.5;
+            } else {
+              videoPlayer.muted = true;
             }
           });
 
-          // 並び替え実行
-          sortItems.forEach((item) => {
-            item.addEventListener("click", () => {
-              const sortType = item.dataset.sort;
+          btnRew5.addEventListener("click", () => skip(-5));
+          btnFwd5.addEventListener("click", () => skip(5));
 
-              // アクティブ表示の切り替え
-              sortItems.forEach((i) => i.classList.remove("active"));
-              item.classList.add("active");
+          volumeBar.addEventListener("input", (e) => {
+            const v = Number(e.target.value);
+            videoPlayer.volume = v;
+            videoPlayer.muted = false;
+            lastVolume = v;
+          });
 
-              sortMenu.classList.add("hidden");
+          videoPlayer.addEventListener("volumechange", () => {
+            if (!videoPlayer.muted) {
+              volumeBar.value = videoPlayer.volume;
+              lastVolume = videoPlayer.volume;
+            }
 
-              if (
-                !window.currentVideoComments ||
-                window.currentVideoComments.length === 0
-              )
-                return;
-
-              // 並び替え処理
-              let sorted = [...window.currentVideoComments];
-              if (sortType === "popular") {
-                // いいね数順（降順）
-                sorted.sort(
-                  (a, b) => (b.like_count || 0) - (a.like_count || 0),
-                );
-              } else if (sortType === "newest") {
-                // 新しい順（降順）
-                sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-              }
-
-              // 再描画
-              renderComments(sorted);
-            });
+            if (videoPlayer.muted || videoPlayer.volume === 0) {
+              volumeIcon.className = "fa-solid fa-volume-xmark";
+            } else if (videoPlayer.volume < 0.5) {
+              volumeIcon.className = "fa-solid fa-volume-low";
+            } else {
+              volumeIcon.className = "fa-solid fa-volume-high";
+            }
           });
         }
 
-        // === 追加ボタンの動作 ===
-        const btnRew5 = document.getElementById("btn-rew5");
-        const btnFwd5 = document.getElementById("btn-fwd5");
-        const volumeBar = document.getElementById("volume-bar");
-        const volumeIcon = document.querySelector(".yt-volume i");
+        function initializeKeyboardShortcuts() {
+          document.addEventListener("keydown", (e) => {
+            const activeTag = document.activeElement?.tagName;
+            if (activeTag === "TEXTAREA" || activeTag === "INPUT") return;
 
-        let lastVolume = volumeBar.value; // 最後の音量を記憶
+            switch (e.key) {
+              case " ":
+              case "k":
+                e.preventDefault();
+                togglePlay();
+                break;
+              case "j":
+                skip(-10);
+                break;
+              case "l":
+                skip(10);
+                break;
+              case "ArrowLeft":
+                skip(-5);
+                break;
+              case "ArrowRight":
+                skip(5);
+                break;
+              case "ArrowUp":
+                changeVolume(0.05);
+                break;
+              case "ArrowDown":
+                changeVolume(-0.05);
+                break;
+              case "m":
+              case "M":
+                videoPlayer.muted = !videoPlayer.muted;
+                break;
+              default:
+                if (/^[0-9]$/.test(e.key) && videoPlayer.duration) {
+                  const percent = Number(e.key) * 10;
+                  videoPlayer.currentTime = (percent / 100) * videoPlayer.duration;
+                }
+                break;
+            }
+          });
+        }
 
-        volumeIcon.addEventListener("click", () => {
-          if (videoPlayer.muted) {
-            // ミュート解除 → 元の音量に戻す
-            videoPlayer.muted = false;
-            videoPlayer.volume = lastVolume || 0.5;
-          } else {
-            // ミュートON → 音量は変えない
-            videoPlayer.muted = true;
-          }
-        });
+        function initializeAutoHideControls() {
+          const playerContainer = document.getElementById("player-container");
+          const ytControls = document.querySelector(".yt-controls");
+          if (!playerContainer || !ytControls) return;
 
-        btnRew5.addEventListener("click", () => skip(-5));
-        btnFwd5.addEventListener("click", () => skip(5));
+          let hideTimer = null;
+          const showControls = () => ytControls.classList.add("show");
+          const scheduleHide = () => {
+            if (hideTimer) clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => {
+              ytControls.classList.remove("show");
+            }, 2000);
+          };
 
-        volumeBar.addEventListener("input", (e) => {
-          const v = Number(e.target.value);
-          videoPlayer.volume = v;
-          videoPlayer.muted = false; // スライダー触ったら自動でミュート解除
-          lastVolume = v;
-        });
-
-        videoPlayer.addEventListener("volumechange", () => {
-          // ミュート中はスライダーを動かさない
-          if (!videoPlayer.muted) {
-            volumeBar.value = videoPlayer.volume;
-            lastVolume = videoPlayer.volume;
-          }
-
-          // アイコンだけは常に更新
-          if (videoPlayer.muted || videoPlayer.volume === 0) {
-            volumeIcon.className = "fa-solid fa-volume-xmark";
-          } else if (videoPlayer.volume < 0.5) {
-            volumeIcon.className = "fa-solid fa-volume-low";
-          } else {
-            volumeIcon.className = "fa-solid fa-volume-high";
-          }
-        });
-
-        // === キーボードショートカット ===
-        document.addEventListener("keydown", (e) => {
-          // テキスト入力中は無効
-          if (
-            document.activeElement.tagName === "TEXTAREA" ||
-            document.activeElement.tagName === "INPUT"
-          )
-            return;
-
-          switch (e.key) {
-            case " ":
-            case "k":
-              e.preventDefault();
-              togglePlay();
-              break;
-
-            case "j":
-              skip(-10);
-              break;
-
-            case "l":
-              skip(10);
-              break;
-
-            case "ArrowLeft":
-              skip(-5);
-              break;
-
-            case "ArrowRight":
-              skip(5);
-              break;
-
-            case "ArrowUp":
-              changeVolume(0.05);
-              break;
-
-            case "ArrowDown":
-              changeVolume(-0.05);
-              break;
-
-            case "m":
-            case "M":
-              videoPlayer.muted = !videoPlayer.muted;
-              break;
-
-            default:
-              // 0〜9でシーク（YouTube仕様）
-              if (/^[0-9]$/.test(e.key) && videoPlayer.duration) {
-                const percent = Number(e.key) * 10;
-                videoPlayer.currentTime =
-                  (percent / 100) * videoPlayer.duration;
-              }
-              break;
-          }
-        });
-
-        // ===============================
-        // ★ 追加：YouTube風 UI 自動表示
-        // ===============================
-
-        const playerContainer = document.getElementById("player-container");
-        const ytControls = document.querySelector(".yt-controls");
-
-        let hideTimer = null;
-
-        // マウスが動画エリアに入った → 表示
-        playerContainer.addEventListener("mouseenter", () => {
-          ytControls.classList.add("show");
-        });
-
-        // マウスが動いた → 表示＋一定時間後に隠す準備
-        playerContainer.addEventListener("mousemove", () => {
-          ytControls.classList.add("show");
-
-          // すでにあるタイマーをクリア
-          if (hideTimer) clearTimeout(hideTimer);
-
-          // 2秒間動きがなければ非表示（YouTube風）
-          hideTimer = setTimeout(() => {
+          playerContainer.addEventListener("mouseenter", showControls);
+          playerContainer.addEventListener("mousemove", () => {
+            showControls();
+            scheduleHide();
+          });
+          playerContainer.addEventListener("mouseleave", () => {
             ytControls.classList.remove("show");
-          }, 2000);
+            if (hideTimer) clearTimeout(hideTimer);
+          });
+        }
+
+        function initializeAppUi() {
+          initializeDescriptionToggle();
+          initializeSeekBarBindings();
+          initializeChatHeightSync();
+          initializePlayButtonBindings();
+          initializeVideoInteraction();
+          initializeSpeedMenu();
+          initializeSidebarToggles();
+          initializeCommentSortMenu();
+          initializeQuickButtonsAndVolume();
+          initializeKeyboardShortcuts();
+          initializeAutoHideControls();
+        }
+
+        btnFull.addEventListener("click", async () => {
+          await toggleFullscreen();
         });
 
-        // マウスが動画エリアから出た → 即非表示
-        playerContainer.addEventListener("mouseleave", () => {
-          ytControls.classList.remove("show");
-          if (hideTimer) clearTimeout(hideTimer);
-        });
+        initializeAppUi();
       });
 
       document.addEventListener("job_completed", () => {
