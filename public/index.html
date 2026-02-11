@@ -10,7 +10,7 @@
 
       :root {
         --bg: #0f0f0f;
-        --panel: #181818;
+        --panel: rgba(18, 18, 18, 0.78);
         --border: #303030;
         --text: #f1f1f1;
         --subtext: #aaa;
@@ -18,7 +18,7 @@
         --warn: #ff9800;
         --green: #4caf50;
         --blue: #2196f3;
-        --black-panel: #000;
+        --black-panel: rgba(0, 0, 0, 0.62);
       }
 
       /* ==================================================
@@ -34,6 +34,32 @@
         font-family: "Segoe UI", Roboto, sans-serif;
         background: var(--bg);
         color: var(--text);
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        pointer-events: none;
+        background-image: var(--wallpaper-url, none);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        filter: blur(var(--wallpaper-blur, 2px))
+          brightness(var(--wallpaper-brightness, 50%));
+        transform: scale(1.05);
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background: rgba(0, 0, 0, 0.18);
       }
 
       /* ==================================================
@@ -45,6 +71,7 @@
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 20px;
+        backdrop-filter: blur(2px);
       }
 
       /* 黒ベースのボックス共通化 */
@@ -52,6 +79,7 @@
         background: var(--black-panel);
         border: 1px solid var(--border);
         border-radius: 8px;
+        backdrop-filter: blur(2px);
       }
 
       /* フォーム共通 */
@@ -281,7 +309,6 @@
       main {
         max-width: 1800px;
         margin: 80px auto 40px;
-        padding: 0 16px;
       }
 
       /* ページ切替 */
@@ -702,18 +729,17 @@
       .player-layout {
         display: grid;
         grid-template-columns: 1.18fr 400px;
-        gap: 24px;
         align-items: start;
       }
 
       .player-main {
-        background: #000;
-        border: 1px solid var(--border);
+        border: 1px solid #30303000;
         border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+        padding: 12px 16px 0px 0px;
+        /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); */
         overflow: hidden;
         position: relative;
+        backdrop-filter: blur(2px);
       }
 
       .player-video-wrap {
@@ -757,7 +783,6 @@
 
       .yt-info {
         padding: 12px 14px 14px;
-        background: #0f0f0f;
       }
 
       .yt-volume {
@@ -787,12 +812,12 @@
 
       /* サイドバー */
       .player-sidebar {
-        background: var(--bg);
-        border: 1px solid #222;
+        background: transparent;
+        border: none;
         border-radius: 14px;
-        padding: 12px;
+        padding: 12px 16px 0px 0px;
         overflow-y: auto;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); */
         min-width: 400px;
       }
 
@@ -895,9 +920,12 @@
         margin-bottom: 0;
       }
 
-      /* ===== サイドバー：セクション単位の開閉 ===== */
       .sidebar-section {
-        margin-bottom: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        margin-bottom: 12px;
+        border-radius: 15px;
+        backdrop-filter: blur(2px);
+        backdrop-filter: brightness(0.5);
       }
 
       /* 最後のセクションは余白を消す */
@@ -915,22 +943,6 @@
       /* 折りたたみ時：ヘッダー下の余白を消す */
       .sidebar-section.collapsed .sidebar-header {
         margin-bottom: 0;
-      }
-
-      /* ===== 見た目を“分離”するためのスタイル ===== */
-      .sidebar-section {
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px;
-        margin-bottom: 12px;
-      }
-
-      /* もともとのサイドバーは“外枠”っぽく調整 */
-      .player-sidebar {
-        background: transparent; /* ← 変更 */
-        border: none; /* ← 変更 */
-        padding: 6px; /* 少しだけ余白 */
       }
 
       /* 最後のセクションの余白は不要 */
@@ -951,7 +963,6 @@
       .chat-content {
         display: flex;
         flex-direction: column;
-        background: #0b0b0b; /* プレイヤー寄りの黒 */
         border-radius: 10px;
         padding: 8px;
         overflow-y: auto;
@@ -974,11 +985,6 @@
 
       /* ライブチャットだけ少しだけ色を変える（さりげなく） */
       #chat-section {
-        background: linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0.02),
-          var(--bg)
-        );
         max-height: 650px;
         display: flex;
         flex-direction: column;
@@ -993,7 +999,7 @@
       .yt-description {
         margin-top: 12px;
         padding: 12px;
-        background: var(--black-panel);
+        background: rgba(255,255,255,0.1);
         border: 1px solid var(--border);
         border-radius: 10px;
         color: var(--text);
@@ -1739,7 +1745,8 @@
             placeholder="ホーム動画を検索（全項目）"
             autocomplete="off" />
           <div class="header-filter-container">
-            <button id="home-filter-btn" class="header-filter-btn" type="button">
+            <button id="home-filter-btn" class="header-filter-btn"
+              type="button">
               フィルタ
             </button>
             <div id="home-filter-panel" class="home-filter-panel hidden">
@@ -2394,6 +2401,68 @@
                   </div>
                 </div>
               </div>
+              <div class="toggle" style="align-items: flex-start; gap: 16px;">
+                <div>
+                  壁紙
+                  <small>参照した画像を `public/wallpaper.拡張子` として保存します。</small>
+                  <small id="wallpaper-status"
+                    style="color: var(--blue); margin-top: 4px;"></small>
+                </div>
+                <div
+                  style="display: flex; flex-direction: column; gap: 10px; min-width: 460px; max-width: 700px; width: 100%;">
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input
+                      type="file"
+                      id="wallpaper-file-input"
+                      accept="image/*"
+                      style="display: none;" />
+                    <button
+                      id="wallpaper-select-btn"
+                      style="
+                        background: var(--blue);
+                        border: 1px solid var(--border);
+                        color: var(--text);
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                      ">
+                      参照
+                    </button>
+                    <button
+                      id="wallpaper-clear-btn"
+                      style="
+                        background: #444;
+                        border: 1px solid var(--border);
+                        color: var(--text);
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                      ">
+                      クリア
+                    </button>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="min-width: 60px;">Blur</div>
+                    <input
+                      type="range"
+                      id="wallpaper-blur-range"
+                      min="0"
+                      max="30"
+                      value="0" />
+                    <span id="wallpaper-blur-value">0 px</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="min-width: 60px;">Brightness</div>
+                    <input
+                      type="range"
+                      id="wallpaper-brightness-range"
+                      min="30"
+                      max="200"
+                      value="100" />
+                    <span id="wallpaper-brightness-value">100 %</span>
+                  </div>
+                </div>
+              </div>
               <div class="toggle">
                 <div>
                   一時サムネイルの作成
@@ -2612,7 +2681,20 @@
           optFallbackThumbnails: document.getElementById(
             "opt-fallback-thumbnails",
           ),
+          wallpaperStatus: document.getElementById("wallpaper-status"),
+          wallpaperFileInput: document.getElementById("wallpaper-file-input"),
+          wallpaperSelectBtn: document.getElementById("wallpaper-select-btn"),
+          wallpaperClearBtn: document.getElementById("wallpaper-clear-btn"),
+          wallpaperBlurRange: document.getElementById("wallpaper-blur-range"),
+          wallpaperBlurValue: document.getElementById("wallpaper-blur-value"),
+          wallpaperBrightnessRange: document.getElementById(
+            "wallpaper-brightness-range",
+          ),
+          wallpaperBrightnessValue: document.getElementById(
+            "wallpaper-brightness-value",
+          ),
         };
+        let currentWallpaperUrl = null;
 
         // Load general settings from localStorage
         elements.fmt.value = loadSetting("fmt", elements.fmt.value);
@@ -2814,6 +2896,55 @@
           }
         }
 
+        function applyWallpaperStyle(url, blurPx, brightnessPercent) {
+          if (typeof url !== "undefined") {
+            currentWallpaperUrl = url || null;
+          }
+          const safeBlur = Number.isFinite(Number(blurPx))
+            ? Math.max(0, Math.min(30, Number(blurPx)))
+            : 0;
+          const safeBrightness = Number.isFinite(Number(brightnessPercent))
+            ? Math.max(30, Math.min(200, Number(brightnessPercent)))
+            : 100;
+          document.documentElement.style.setProperty(
+            "--wallpaper-url",
+            currentWallpaperUrl ? `url("${currentWallpaperUrl}")` : "none",
+          );
+          document.documentElement.style.setProperty(
+            "--wallpaper-blur",
+            `${safeBlur}px`,
+          );
+          document.documentElement.style.setProperty(
+            "--wallpaper-brightness",
+            `${safeBrightness}%`,
+          );
+          elements.wallpaperBlurRange.value = String(safeBlur);
+          elements.wallpaperBlurValue.textContent = `${safeBlur} px`;
+          elements.wallpaperBrightnessRange.value = String(safeBrightness);
+          elements.wallpaperBrightnessValue.textContent = `${safeBrightness} %`;
+        }
+
+        async function loadWallpaperMeta() {
+          try {
+            const response = await fetch("/api/wallpaper-meta");
+            if (!response.ok) return null;
+            const data = await response.json();
+            applyWallpaperStyle(
+              data.url || null,
+              data.wallpaperBlur ?? 2,
+              data.wallpaperBrightness ?? 50,
+            );
+            elements.wallpaperStatus.textContent = data.exists
+              ? "壁紙を設定済み"
+              : "壁紙は未設定です";
+            return data;
+          } catch (error) {
+            console.error("壁紙情報の取得に失敗:", error);
+            elements.wallpaperStatus.textContent = "壁紙情報の取得に失敗しました";
+            return null;
+          }
+        }
+
         async function loadServerSettings() {
           try {
             const response = await fetch("/api/settings");
@@ -2841,6 +2972,15 @@
             const fallbackEnabled =
               settings.enableFallbackThumbnails !== false;
             elements.optFallbackThumbnails.checked = fallbackEnabled;
+            const blurValue = Number.isFinite(Number(settings.wallpaperBlur))
+              ? Number(settings.wallpaperBlur)
+              : 0;
+            const brightnessValue = Number.isFinite(
+              Number(settings.wallpaperBrightness),
+            )
+              ? Number(settings.wallpaperBrightness)
+              : 100;
+            applyWallpaperStyle(null, blurValue, brightnessValue);
             return settings;
           } catch (error) {
             console.error("Failed to load settings:", error);
@@ -2848,7 +2988,7 @@
           }
         }
 
-        loadServerSettings();
+        loadServerSettings().then(() => loadWallpaperMeta());
 
         async function postSettings(payload) {
           const response = await fetch("/api/settings", {
@@ -2949,6 +3089,118 @@
             }
           } catch (error) {
             console.error("ネットワークエラー:", error);
+          }
+        });
+
+        elements.wallpaperSelectBtn.addEventListener("click", () => {
+          elements.wallpaperFileInput.click();
+        });
+
+        elements.wallpaperClearBtn.addEventListener("click", async () => {
+          try {
+            const response = await fetch("/api/wallpaper/clear", {
+              method: "POST",
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok) {
+              throw new Error(result?.error || "壁紙のクリアに失敗しました。");
+            }
+
+            applyWallpaperStyle(
+              null,
+              Number(elements.wallpaperBlurRange.value),
+              Number(elements.wallpaperBrightnessRange.value),
+            );
+            elements.wallpaperStatus.textContent = "壁紙をクリアしました。";
+          } catch (error) {
+            console.error("壁紙クリアエラー:", error);
+            elements.wallpaperStatus.textContent = "壁紙のクリアに失敗しました。";
+          }
+        });
+
+        elements.wallpaperFileInput.addEventListener("change", async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          try {
+            const formData = new FormData();
+            formData.append("wallpaper", file);
+            formData.append("wallpaperBlur", elements.wallpaperBlurRange.value);
+            formData.append(
+              "wallpaperBrightness",
+              elements.wallpaperBrightnessRange.value,
+            );
+
+            const response = await fetch("/api/wallpaper", {
+              method: "POST",
+              body: formData,
+            });
+
+            const result = await response.json().catch(() => null);
+            if (!response.ok) {
+              throw new Error(result?.error || "壁紙の保存に失敗しました。");
+            }
+
+            applyWallpaperStyle(
+              result?.url || null,
+              result?.wallpaperBlur ?? 2,
+              result?.wallpaperBrightness ?? 50,
+            );
+            elements.wallpaperStatus.textContent = `壁紙を保存しました: ${file.name}`;
+          } catch (error) {
+            console.error("壁紙の保存エラー:", error);
+            elements.wallpaperStatus.textContent =
+              "壁紙の保存に失敗しました。画像形式を確認してください。";
+          } finally {
+            elements.wallpaperFileInput.value = "";
+          }
+        });
+
+        elements.wallpaperBlurRange.addEventListener("input", (e) => {
+          applyWallpaperStyle(
+            currentWallpaperUrl,
+            Number(e.target.value),
+            Number(elements.wallpaperBrightnessRange.value),
+          );
+        });
+
+        elements.wallpaperBlurRange.addEventListener("change", async (e) => {
+          const blurValue = Number(e.target.value);
+          try {
+            const result = await postSettings({ wallpaperBlur: blurValue });
+            if (!result.ok) throw new Error("壁紙Blurの保存に失敗しました。");
+            elements.wallpaperStatus.textContent =
+              "Blur設定を保存しました。";
+            await loadWallpaperMeta();
+          } catch (error) {
+            console.error("壁紙Blur設定の保存エラー:", error);
+            elements.wallpaperStatus.textContent =
+              "Blur設定の保存に失敗しました。";
+          }
+        });
+
+        elements.wallpaperBrightnessRange.addEventListener("input", (e) => {
+          applyWallpaperStyle(
+            currentWallpaperUrl,
+            Number(elements.wallpaperBlurRange.value),
+            Number(e.target.value),
+          );
+        });
+
+        elements.wallpaperBrightnessRange.addEventListener("change", async (e) => {
+          const brightnessValue = Number(e.target.value);
+          try {
+            const result = await postSettings({
+              wallpaperBrightness: brightnessValue,
+            });
+            if (!result.ok) throw new Error("壁紙Brightnessの保存に失敗しました。");
+            elements.wallpaperStatus.textContent =
+              "Brightness設定を保存しました。";
+            await loadWallpaperMeta();
+          } catch (error) {
+            console.error("壁紙Brightness設定の保存エラー:", error);
+            elements.wallpaperStatus.textContent =
+              "Brightness設定の保存に失敗しました。";
           }
         });
 
