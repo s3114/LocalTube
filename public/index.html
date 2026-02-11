@@ -1231,7 +1231,7 @@
       }
 
       .comment-replies {
-        margin-left: 56px; /* アイコン40px + gap 16px */
+        /* margin-left: 56px; */
         margin-top: 8px;
         display: flex;
         flex-direction: column;
@@ -1602,6 +1602,7 @@
         display: flex;
         gap: 10px;
         padding: 10px;
+        position: relative;
       }
 
       .comment-avatar {
@@ -1612,6 +1613,7 @@
 
       .comment-body {
         flex: 1;
+        position: relative;
       }
 
       .comment-author {
@@ -1639,18 +1641,17 @@
       }
 
       .comment-replies {
-        margin-left: 46px; /* アバター幅(36px)+余白分 */
+        /* margin-left: 46px; */
         margin-top: 8px;
-      }
-
-      .comment-replies .comment-replies {
-        margin-left: 32px; /* 返信の返信をさらにインデント */
+        position: relative;
+        /* padding-left: 20px; */
       }
 
       .comment-reply {
         margin-bottom: 8px;
         display: flex;
         gap: 10px;
+        position: relative;
       }
 
       .comment-reply .comment-avatar {
@@ -1675,6 +1676,7 @@
         font-weight: 500;
         align-self: flex-start; /* Flexアイテムとして左寄せ */
         border-radius: 18px;
+        position: relative;
       }
 
       .comment-toggle:hover {
@@ -1682,6 +1684,17 @@
         border-radius: 18px;
         text-decoration: none; /* 下線なし */
       }
+
+      .thread-hitbox {
+        pointer-events: auto;
+        cursor: pointer;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 36px;
+        height: 100%;
+      }
+
 
       .channel-info {
         margin-top: 6px;
@@ -5074,7 +5087,7 @@
               toggleBtn.textContent = `返信${parentNode.children.length}件 ▼`;
               toggleBtn.dataset.parentId = parent.id;
 
-              toggleBtn.addEventListener("click", () => {
+              function toggleReplies() {
                 const container = document.getElementById(
                   "replies-" + toggleBtn.dataset.parentId,
                 );
@@ -5084,6 +5097,11 @@
                 toggleBtn.textContent = isCollapsed
                   ? `返信${parentNode.children.length}件 ▼`
                   : `返信${parentNode.children.length}件 ▲`;
+              }
+
+              toggleBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleReplies();
               });
 
               parentEl.querySelector(".comment-body").appendChild(toggleBtn);
@@ -5109,6 +5127,16 @@
               parentEl
                 .querySelector(".comment-body")
                 .appendChild(replyContainer);
+
+              const threadHitbox = document.createElement("div");
+              threadHitbox.className = "thread-hitbox";
+              threadHitbox.title = "返信を開閉";
+              threadHitbox.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleReplies();
+              });
+              parentEl.appendChild(threadHitbox);
             }
           });
         }
