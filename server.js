@@ -227,7 +227,11 @@ const CONFIG_PATH = path.join(__dirname, "config.json");
 async function loadConfig() {
   try {
     if (!fs.existsSync(CONFIG_PATH)) {
-      return { selectedBrowser: "", localVideoDirs: [] };
+      return {
+        selectedBrowser: "",
+        localVideoDirs: [],
+        enableFallbackThumbnails: true,
+      };
     }
 
     const configData = await fs.promises.readFile(CONFIG_PATH, "utf-8");
@@ -238,10 +242,18 @@ async function loadConfig() {
       localVideoDirs: Array.isArray(parsed.localVideoDirs)
         ? parsed.localVideoDirs
         : [],
+      enableFallbackThumbnails:
+        typeof parsed.enableFallbackThumbnails === "boolean"
+          ? parsed.enableFallbackThumbnails
+          : true,
     };
   } catch (error) {
     console.error("設定ファイル読み込みエラー:", error);
-    return { selectedBrowser: "", localVideoDirs: [] };
+    return {
+      selectedBrowser: "",
+      localVideoDirs: [],
+      enableFallbackThumbnails: true,
+    };
   }
 }
 
@@ -251,6 +263,10 @@ async function saveConfig(config) {
     localVideoDirs: Array.isArray(config.localVideoDirs)
       ? config.localVideoDirs
       : [],
+    enableFallbackThumbnails:
+      typeof config.enableFallbackThumbnails === "boolean"
+        ? config.enableFallbackThumbnails
+        : true,
   };
 
   await fs.promises.writeFile(CONFIG_PATH, JSON.stringify(normalized, null, 2));
@@ -335,7 +351,7 @@ function getFallbackThumbPath(videoPath) {
   return path.join(fallbackThumbnailDir, `${baseName}_${hash}.png`);
 }
 
-function findExistingThumbnailPath(videoPath) {
+function findExistingThumbnailPath(videoPath, includeFallback = true) {
   const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
   const sourceDir = path.dirname(videoPath);
   const base = path.parse(videoPath).name;
@@ -351,7 +367,9 @@ function findExistingThumbnailPath(videoPath) {
     }
   }
 
-  candidates.push(getFallbackThumbPath(videoPath));
+  if (includeFallback) {
+    candidates.push(getFallbackThumbPath(videoPath));
+  }
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return candidate;
@@ -361,16 +379,19 @@ function findExistingThumbnailPath(videoPath) {
 }
 
 const fallbackThumbnailJobs = new Map();
+const failedFallbackThumbnails = new Set();
 
 async function ensureFallbackThumbnail(videoPath) {
   const outputPath = getFallbackThumbPath(videoPath);
   if (fs.existsSync(outputPath)) return outputPath;
+  if (failedFallbackThumbnails.has(outputPath)) return null;
 
   if (!fallbackThumbnailJobs.has(outputPath)) {
     const job = (async () => {
       const ffmpegCmd = await resolveFfmpegCommand();
       if (!ffmpegCmd) {
-        throw new Error("ffmpeg が見つかりません。");
+        failedFallbackThumbnails.add(outputPath);
+        return null;
       }
 
       const attemptArgs = [
@@ -387,8 +408,8 @@ async function ensureFallbackThumbnail(videoPath) {
           "-dn",
           "-frames:v",
           "1",
-          "-f",
-          "image2",
+          "-update",
+          "1",
           outputPath,
         ],
         [
@@ -402,8 +423,8 @@ async function ensureFallbackThumbnail(videoPath) {
           "-dn",
           "-frames:v",
           "1",
-          "-f",
-          "image2",
+          "-update",
+          "1",
           outputPath,
         ],
       ];
@@ -420,11 +441,13 @@ async function ensureFallbackThumbnail(videoPath) {
       }
 
       if (lastError) {
+        failedFallbackThumbnails.add(outputPath);
         throw lastError;
       }
 
       if (!fs.existsSync(outputPath)) {
-        throw new Error("サムネイル生成後のファイルが見つかりません。");
+        failedFallbackThumbnails.add(outputPath);
+        return null;
       }
 
       return outputPath;
@@ -454,8 +477,12 @@ app.get("/api/settings", async (req, res) => {
 // 設定を保存するAPI
 app.post("/api/settings", async (req, res) => {
   try {
-    const { browser, localVideoDirs } = req.body || {};
-    if (typeof browser === "undefined" && typeof localVideoDirs === "undefined") {
+    const { browser, localVideoDirs, enableFallbackThumbnails } = req.body || {};
+    if (
+      typeof browser === "undefined" &&
+      typeof localVideoDirs === "undefined" &&
+      typeof enableFallbackThumbnails === "undefined"
+    ) {
       return res.status(400).json({ error: "無効なリクエストです。" });
     }
 
@@ -467,6 +494,10 @@ app.post("/api/settings", async (req, res) => {
 
     if (typeof localVideoDirs !== "undefined") {
       currentConfig.localVideoDirs = normalizeDirList(localVideoDirs);
+    }
+
+    if (typeof enableFallbackThumbnails !== "undefined") {
+      currentConfig.enableFallbackThumbnails = Boolean(enableFallbackThumbnails);
     }
 
     const savedConfig = await saveConfig(currentConfig);
@@ -1408,11 +1439,20 @@ app.get("/api/local-thumb-fallback", async (req, res) => {
       return res.status(404).json({ error: "動画が見つかりません。" });
     }
 
-    const existingThumbPath = findExistingThumbnailPath(videoPath);
+    const settings = await loadConfig();
+    const fallbackEnabled = settings.enableFallbackThumbnails !== false;
+    if (!fallbackEnabled) {
+      return res.redirect("/none_icon.jpg");
+    }
+
+    const existingThumbPath = findExistingThumbnailPath(videoPath, true);
     const thumbPath = existingThumbPath || (await ensureFallbackThumbnail(videoPath));
+    if (!thumbPath) {
+      return res.redirect("/none_icon.jpg");
+    }
     res.sendFile(path.resolve(thumbPath));
   } catch (error) {
-    console.error("Fallback thumbnail creation failed:", error);
+    console.warn("Fallback thumbnail creation skipped:", error.message);
     res.redirect("/none_icon.jpg");
   }
 });
@@ -1420,6 +1460,8 @@ app.get("/api/local-thumb-fallback", async (req, res) => {
 app.get("/api/local-videos", async (req, res) => {
   try {
     const sourceDirs = await getLocalVideoDirs();
+    const settings = await loadConfig();
+    const fallbackEnabled = settings.enableFallbackThumbnails !== false;
 
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
     const videos = [];
@@ -1435,14 +1477,16 @@ app.get("/api/local-videos", async (req, res) => {
 
         const fullPath = path.join(sourceDir, file);
         const base = path.parse(file).name;
-        const thumbPath = findExistingThumbnailPath(fullPath);
+        const thumbPath = findExistingThumbnailPath(fullPath, fallbackEnabled);
 
         videos.push({
           title: base,
           video: `/api/local-media?type=video&path=${encodeURIComponent(fullPath)}`,
           thumb: thumbPath
             ? `/api/local-media?type=thumb&path=${encodeURIComponent(thumbPath)}`
-            : `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}`,
+            : fallbackEnabled
+              ? `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}`
+              : null,
           filename: file,
           mtime: (await fs.promises.stat(fullPath)).mtimeMs,
           sourceDir,
