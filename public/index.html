@@ -2133,6 +2133,35 @@
                   履歴を削除
                 </button>
               </div>
+              <div class="toggle" style="align-items: flex-start; gap: 16px;">
+                <div>
+                  ローカル動画フォルダー
+                  <small>ローカル動画として認識するフォルダーを1行ずつ入力してください。</small>
+                  <small>例: D:\Videos や E:\Archive\LocalTube</small>
+                  <small id="local-video-dirs-status" style="color: var(--blue); margin-top: 4px;"></small>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px; min-width: 460px; max-width: 700px; width: 100%;">
+                  <textarea
+                    id="local-video-dirs-input"
+                    placeholder="追加したいフォルダを1行ずつ入力"
+                    style="min-height: 120px;"></textarea>
+                  <div>
+                    <button
+                      id="save-local-video-dirs-btn"
+                      style="
+                        background: var(--blue);
+                        border: 1px solid var(--border);
+                        color: var(--text);
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                      ">
+                      フォルダー設定を保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="toggle">
                 <div>
                   PC起動時の自動実行
@@ -2330,6 +2359,11 @@
           cookiePathSet: document.getElementById("cookiePathSet"),
           commentOptions: document.getElementById("comment-options"),
           clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+          localVideoDirsInput: document.getElementById("local-video-dirs-input"),
+          saveLocalVideoDirsBtn: document.getElementById(
+            "save-local-video-dirs-btn",
+          ),
+          localVideoDirsStatus: document.getElementById("local-video-dirs-status"),
         };
 
         // Load general settings from localStorage
@@ -2532,24 +2566,35 @@
           }
         }
 
-        // Load initial cookie settings
-        (async () => {
+        async function loadServerSettings() {
           try {
             const response = await fetch("/api/settings");
-            if (response.ok) {
-              const settings = await response.json();
-              if (settings.selectedBrowser === "firefox") {
-                elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
-                updateCookieButtonStyles(elements.setFirefoxBtn);
-              } else {
-                elements.cookieStatusDisplay.textContent = "設定されていません";
-                updateCookieButtonStyles(null);
-              }
+            if (!response.ok) return;
+
+            const settings = await response.json();
+
+            if (settings.selectedBrowser === "firefox") {
+              elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
+              updateCookieButtonStyles(elements.setFirefoxBtn);
+            } else {
+              elements.cookieStatusDisplay.textContent = "設定されていません";
+              updateCookieButtonStyles(null);
             }
+
+            const dirs = Array.isArray(settings.localVideoDirs)
+              ? settings.localVideoDirs
+              : [];
+            elements.localVideoDirsInput.value = dirs.join("\n");
+            elements.localVideoDirsStatus.textContent =
+              dirs.length > 0
+                ? `${dirs.length} 件のフォルダーを登録中`
+                : "追加フォルダーは未設定です";
           } catch (error) {
             console.error("Failed to load settings:", error);
           }
-        })();
+        }
+
+        loadServerSettings();
 
         // Event listener for Firefox button
         elements.setFirefoxBtn.addEventListener("click", async () => {
@@ -2622,6 +2667,36 @@
             }
           } catch (error) {
             console.error("ネットワークエラー:", error);
+          }
+        });
+
+        elements.saveLocalVideoDirsBtn.addEventListener("click", async () => {
+          const dirs = elements.localVideoDirsInput.value
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+          try {
+            const response = await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ localVideoDirs: dirs }),
+            });
+
+            if (!response.ok) {
+              throw new Error("フォルダー設定の保存に失敗しました");
+            }
+
+            elements.localVideoDirsStatus.textContent =
+              dirs.length > 0
+                ? `${dirs.length} 件のフォルダーを登録しました`
+                : "追加フォルダーをクリアしました";
+
+            loadLocalVideos();
+          } catch (error) {
+            console.error("ローカル動画フォルダー設定の保存に失敗:", error);
+            elements.localVideoDirsStatus.textContent =
+              "保存に失敗しました。パスを確認して再試行してください。";
           }
         });
 
@@ -3298,6 +3373,61 @@
                 '<div class="home-video-empty" style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
             }
           }
+
+          fetch(`/info/${encodeURIComponent(videoId)}`)
+            .then((r) => r.json())
+            .then((info) => applyVideoInfo(info))
+            .catch((err) => console.error("info.json 読み込み失敗:", err));
+
+          loadLiveChat(videoId);
+
+          history.pushState(null, "", "#player/" + encodeURIComponent(videoId));
+
+          // pushState だけでは表示は切り替わらないため、明示的にプレイヤーページへ遷移
+          document
+            .querySelectorAll(".page")
+            .forEach((page) => page.classList.remove("active-page"));
+          document.getElementById("page-player")?.classList.add("active-page");
+
+          document.querySelectorAll(".icon-btn").forEach((button) => {
+            if (button.dataset.page === "page-player") {
+              button.classList.add("active");
+            } else {
+              button.classList.remove("active");
+            }
+          });
+        }
+
+        function renderHomeLocalVideos(videos) {
+          if (!homeVideoGrid) return;
+
+          homeVideoGrid.innerHTML = "";
+
+          if (videos.length === 0) {
+            homeVideoGrid.innerHTML =
+              '<div class="home-video-empty">動画が見つかりません</div>';
+            return;
+          }
+
+          videos.forEach((video) => {
+            const item = document.createElement("div");
+            item.className = "home-video-card";
+
+            const thumbHtml = video.thumb
+              ? `<img src="${video.thumb}" class="home-video-card-thumb">`
+              : `<div class="home-video-card-thumb"></div>`;
+
+            item.innerHTML = `
+              ${thumbHtml}
+              <div class="home-video-card-title">${video.title}</div>
+            `;
+
+            item.addEventListener("click", () => {
+              playLocalVideo(video);
+            });
+
+            homeVideoGrid.appendChild(item);
+          });
         }
 
         function playLocalVideo(video, activeItem = null) {

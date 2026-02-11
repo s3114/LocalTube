@@ -222,16 +222,70 @@ app.get("/ping", (req, res) => {
 // --------------------------------------------------
 const CONFIG_PATH = path.join(__dirname, "config.json");
 
+async function loadConfig() {
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) {
+      return { selectedBrowser: "", localVideoDirs: [] };
+    }
+
+    const configData = await fs.promises.readFile(CONFIG_PATH, "utf-8");
+    const parsed = JSON.parse(configData);
+
+    return {
+      selectedBrowser: parsed.selectedBrowser || "",
+      localVideoDirs: Array.isArray(parsed.localVideoDirs)
+        ? parsed.localVideoDirs
+        : [],
+    };
+  } catch (error) {
+    console.error("設定ファイル読み込みエラー:", error);
+    return { selectedBrowser: "", localVideoDirs: [] };
+  }
+}
+
+async function saveConfig(config) {
+  const normalized = {
+    selectedBrowser: config.selectedBrowser || "",
+    localVideoDirs: Array.isArray(config.localVideoDirs)
+      ? config.localVideoDirs
+      : [],
+  };
+
+  await fs.promises.writeFile(CONFIG_PATH, JSON.stringify(normalized, null, 2));
+  return normalized;
+}
+
+function normalizeDirList(dirList) {
+  if (!Array.isArray(dirList)) return [];
+
+  return dirList
+    .map((dir) => String(dir || "").trim())
+    .filter(Boolean)
+    .filter((dir, idx, arr) => arr.indexOf(dir) === idx);
+}
+
+function isPathWithin(targetPath, baseDir) {
+  const resolvedTarget = path.resolve(targetPath);
+  const resolvedBase = path.resolve(baseDir);
+  return (
+    resolvedTarget === resolvedBase ||
+    resolvedTarget.startsWith(resolvedBase + path.sep)
+  );
+}
+
+async function getLocalVideoDirs() {
+  const config = await loadConfig();
+  const extraDirs = normalizeDirList(config.localVideoDirs);
+  return [movieDir, ...extraDirs].filter(
+    (dir, idx, arr) => arr.indexOf(dir) === idx,
+  );
+}
+
 // 設定を読み込むAPI
 app.get("/api/settings", async (req, res) => {
   try {
-    if (fs.existsSync(CONFIG_PATH)) {
-      const configData = await fs.promises.readFile(CONFIG_PATH, "utf-8");
-      res.json(JSON.parse(configData));
-    } else {
-      // ファイルが存在しない場合はデフォルト設定を返す
-      res.json({ selectedBrowser: "" });
-    }
+    const settings = await loadConfig();
+    res.json(settings);
   } catch (error) {
     console.error("設定の読み込みに失敗しました:", error);
     res.status(500).json({ error: "設定の読み込みに失敗しました。" });
@@ -241,20 +295,25 @@ app.get("/api/settings", async (req, res) => {
 // 設定を保存するAPI
 app.post("/api/settings", async (req, res) => {
   try {
-    const { browser } = req.body;
-    if (typeof browser === "undefined") {
+    const { browser, localVideoDirs } = req.body || {};
+    if (typeof browser === "undefined" && typeof localVideoDirs === "undefined") {
       return res.status(400).json({ error: "無効なリクエストです。" });
     }
 
-    const newConfig = { selectedBrowser: browser };
+    const currentConfig = await loadConfig();
 
-    await fs.promises.writeFile(
-      CONFIG_PATH,
-      JSON.stringify(newConfig, null, 2),
-    );
+    if (typeof browser !== "undefined") {
+      currentConfig.selectedBrowser = browser;
+    }
 
-    console.log("設定を保存しました:", newConfig);
-    res.json({ message: "設定を保存しました。" });
+    if (typeof localVideoDirs !== "undefined") {
+      currentConfig.localVideoDirs = normalizeDirList(localVideoDirs);
+    }
+
+    const savedConfig = await saveConfig(currentConfig);
+
+    console.log("設定を保存しました:", savedConfig);
+    res.json({ message: "設定を保存しました。", settings: savedConfig });
   } catch (error) {
     console.error("設定の保存に失敗しました:", error);
     res.status(500).json({ error: "設定の保存に失敗しました。" });
@@ -1126,46 +1185,102 @@ app.get("/info/:videoId", async (req, res) => {
   }
 });
 
+app.get("/api/local-media", async (req, res) => {
+  try {
+    const type = req.query.type;
+    const targetPath = String(req.query.path || "");
+
+    if (!targetPath || !["video", "thumb"].includes(type)) {
+      return res.status(400).json({ error: "無効なリクエストです。" });
+    }
+
+    const allowedVideoDirs = await getLocalVideoDirs();
+    const allowedThumbDirs = [thumbnailDir, ...allowedVideoDirs];
+    const allowedDirs = type === "video" ? allowedVideoDirs : allowedThumbDirs;
+
+    const isAllowed = allowedDirs.some((dir) => isPathWithin(targetPath, dir));
+    if (!isAllowed) {
+      return res.status(403).json({ error: "アクセスが許可されていません。" });
+    }
+
+    const ext = path.extname(targetPath).toLowerCase();
+    const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
+    const thumbExt = [".jpg", ".jpeg", ".png", ".webp"];
+
+    if (type === "video" && !videoExt.includes(ext)) {
+      return res.status(400).json({ error: "無効な動画ファイルです。" });
+    }
+
+    if (type === "thumb" && !thumbExt.includes(ext)) {
+      return res.status(400).json({ error: "無効な画像ファイルです。" });
+    }
+
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ error: "ファイルが見つかりません。" });
+    }
+
+    res.sendFile(path.resolve(targetPath));
+  } catch (e) {
+    console.error("Failed to serve local media:", e);
+    res.status(500).json({ error: "ローカルメディアの取得に失敗しました。" });
+  }
+});
+
 app.get("/api/local-videos", async (req, res) => {
   try {
-    const movieDir = path.join(__dirname, "downloads", "動画");
-    const thumbDir = path.join(__dirname, "downloads", "サムネイル");
+    const sourceDirs = await getLocalVideoDirs();
 
-    const files = await fs.promises.readdir(movieDir);
-
-    // 再生可能な動画拡張子
     const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
+    const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
 
     const videos = [];
 
-    for (const file of files) {
-      const ext = path.extname(file).toLowerCase();
-      if (!videoExt.includes(ext)) continue;
+    for (const sourceDir of sourceDirs) {
+      if (!fs.existsSync(sourceDir)) continue;
 
-      const base = path.parse(file).name;
+      const files = await fs.promises.readdir(sourceDir);
 
-      // 対応するサムネイルを探す
-      let thumb = null;
-      const possibleThumbs = [`${base}.jpg`, `${base}.png`, `${base}.webp`];
+      for (const file of files) {
+        const ext = path.extname(file).toLowerCase();
+        if (!videoExt.includes(ext)) continue;
 
-      for (const t of possibleThumbs) {
-        const tpath = path.join(thumbDir, t);
-        if (fs.existsSync(tpath)) {
-          thumb = `/downloads/サムネイル/${encodeURIComponent(t)}`;
-          break;
+        const fullPath = path.join(sourceDir, file);
+        const base = path.parse(file).name;
+
+        let thumbPath = null;
+        const candidates = [];
+
+        for (const tExt of thumbExts) {
+          candidates.push(path.join(sourceDir, `${base}${tExt}`));
         }
-      }
 
-      videos.push({
-        title: base,
-        video: `/downloads/動画/${encodeURIComponent(file)}`,
-        thumb: thumb || null,
-        filename: file,
-        mtime: (await fs.promises.stat(path.join(movieDir, file))).mtimeMs,
-      });
+        // デフォルト動画フォルダは既存のサムネイル保存先も探索
+        if (path.resolve(sourceDir) === path.resolve(movieDir)) {
+          for (const tExt of thumbExts) {
+            candidates.push(path.join(thumbnailDir, `${base}${tExt}`));
+          }
+        }
+
+        for (const candidate of candidates) {
+          if (fs.existsSync(candidate)) {
+            thumbPath = candidate;
+            break;
+          }
+        }
+
+        videos.push({
+          title: base,
+          video: `/api/local-media?type=video&path=${encodeURIComponent(fullPath)}`,
+          thumb: thumbPath
+            ? `/api/local-media?type=thumb&path=${encodeURIComponent(thumbPath)}`
+            : null,
+          filename: file,
+          mtime: (await fs.promises.stat(fullPath)).mtimeMs,
+          sourceDir,
+        });
+      }
     }
 
-    // 新しい順にソート
     videos.sort((a, b) => b.mtime - a.mtime);
 
     res.json(videos);
