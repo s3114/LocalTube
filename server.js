@@ -25,6 +25,9 @@ const {
 const { registerInfoRoutes } = require("./server/routes/info-routes");
 const { registerNetworkRoutes } = require("./server/routes/network-routes");
 const { registerScheduleRoutes } = require("./server/routes/schedule-routes");
+const {
+  registerDownloadRoutes,
+} = require("./server/routes/download-routes");
 const { createSseBus } = require("./server/services/sse-bus");
 const { apiOk, apiError } = require("./server/services/http-utils");
 const {
@@ -41,6 +44,9 @@ const {
 const {
   createDownloadQueueService,
 } = require("./server/services/download-queue-service");
+const {
+  createInputUrlResolver,
+} = require("./server/services/input-url-resolver");
 
 // Expressアプリケーションのインスタンスを作成します。
 const app = express();
@@ -143,6 +149,11 @@ const downloadQueueService = createDownloadQueueService({
   jobHistory,
   broadcast,
   processJob: (job) => downloadJobService.processDownloadJob(job),
+});
+const inputUrlResolver = createInputUrlResolver({
+  spawn,
+  path,
+  baseDir: __dirname,
 });
 // --------------------------------------------------
 
@@ -582,169 +593,19 @@ registerSettingsWallpaperRoutes(app, {
   apiError,
 });
 
-// 履歴を削除するAPI
-app.post("/api/clear-history", async (req, res) => {
-  try {
-    const historyPath = path.join(__dirname, "finished.txt");
-    await fs.promises.writeFile(historyPath, "", "utf-8");
-    console.log("ダウンロード履歴を削除しました。");
-    apiOk(res, { message: "履歴を削除しました。" });
-  } catch (error) {
-    console.error("履歴の削除に失敗しました:", error);
-    apiError(res, 500, "履歴の削除に失敗しました。");
-  }
+registerDownloadRoutes(app, {
+  upload,
+  crypto,
+  jobHistory,
+  broadcast,
+  downloadQueueService,
+  getUrlsFromInput: inputUrlResolver.getUrlsFromInput,
+  fs,
+  path,
+  baseDir: __dirname,
+  apiOk,
+  apiError,
 });
-
-app.get("/jobs", (req, res) => {
-  apiOk(res, Array.from(jobHistory.values()));
-});
-
-app.post("/download", upload.single("cookieFile"), async (req, res) => {
-  const {
-    urls,
-    format,
-    saveHistory,
-    downloadThumb,
-    drmProtect,
-    savePath,
-    parallelDownloads,
-    concurrentFragments,
-    commentOptions,
-  } = req.body;
-  const cookieFile = req.file;
-
-  if (!urls) {
-    return apiError(res, 400, "動画のURLは必須です。");
-  }
-
-  downloadQueueService.setMaxConcurrentDownloads(parallelDownloads);
-
-  const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
-  const newJobs = [];
-
-  for (const url of inputUrls) {
-    try {
-      const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
-      for (const videoUrl of videoUrls) {
-        const jobId = crypto.randomUUID();
-        const job = {
-          id: jobId,
-          url: videoUrl.trim(),
-          options: {
-            format,
-            saveHistory: saveHistory === "true",
-            downloadThumb: downloadThumb === "true",
-            drmProtect: drmProtect === "true",
-            savePath,
-            concurrentFragments,
-            commentOptions,
-          },
-          cookieFile,
-          status: "queued",
-          title: videoUrl.trim(),
-          progress: {
-            percentage: 0,
-            size: "",
-            totalSize: "",
-            speed: "",
-            eta: "",
-          },
-        };
-        newJobs.push(job);
-      }
-    } catch (error) {
-      console.error(`URLの解析に失敗しました: ${url}`, error);
-      // エラーをクライアントに通知することも検討
-    }
-  }
-
-  broadcast("jobs_added", newJobs);
-
-  apiOk(
-    res,
-    { message: `${newJobs.length}件のダウンロードがキューに追加されました。` },
-    202,
-  );
-
-  downloadQueueService.enqueueJobs(newJobs);
-});
-
-// URLを解析して動画URLのリストを取得する関数
-function getUrlsFromInput(url, cookiePath) {
-  return new Promise((resolve, reject) => {
-    const ytDlpPath = path.join(__dirname, "yt-dlp.exe");
-    let args = [];
-    const commonArgs = ["--skip-download", "--quiet", "--no-warnings"];
-    if (cookiePath) {
-      commonArgs.push("--cookies", cookiePath);
-    }
-
-    // YouTube
-    if (url.includes("youtube.com/playlist?list=")) {
-      args = [url, "--flat-playlist", "--get-url", ...commonArgs];
-    } else if (
-      url.includes("youtube.com/watch?v=") ||
-      url.includes("youtu.be/")
-    ) {
-      // プレイリストの一部である可能性を考慮してindexを取り除く
-      const cleanUrl = url.split("&")[0];
-      resolve([cleanUrl]);
-      return;
-    } else if (
-      url.includes("youtube.com/@") ||
-      url.includes("youtube.com/channel")
-    ) {
-      args = [url, "--flat-playlist", "--get-id", ...commonArgs];
-    }
-    // ABEMA
-    else if (url.includes("abema.tv/video/title/")) {
-      //シリーズ
-      args = [url, "--flat-playlist", "--get-url", ...commonArgs];
-    } else if (url.includes("abema.tv/video/episode/")) {
-      //動画
-      resolve([url]);
-      return;
-    } else {
-      // 不明なURLはそのまま渡す
-      resolve([url]);
-      return;
-    }
-
-    console.log(
-      `[yt-dlp getUrlsFromInput Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`,
-    );
-    const ytDlp = spawn(ytDlpPath, args);
-    let videoUrls = "";
-    ytDlp.stdout.on("data", (data) => {
-      videoUrls += data.toString();
-    });
-
-    ytDlp.stderr.on("data", (data) => {
-      console.error(`[${url}] yt-dlp stderr: ${data}`);
-    });
-
-    ytDlp.on("close", (code) => {
-      if (code === 0) {
-        const urls = videoUrls.split("\n").filter((u) => u.trim() !== "");
-        // チャンネルの場合、IDのリストが返るのでURLに変換する
-        if (
-          url.includes("youtube.com/@") ||
-          url.includes("youtube.com/channel")
-        ) {
-          resolve(urls.map((id) => `https://www.youtube.com/watch?v=${id}`));
-        } else {
-          resolve(urls);
-        }
-      } else {
-        reject(new Error(`yt-dlp exited with code ${code} for URL: ${url}`));
-      }
-    });
-
-    ytDlp.on("error", (err) => {
-      reject(err);
-    });
-  });
-}
 
 // ==================================================
 // ■ ライブチャット取得API（拡張子あり／なし 両対応版）
