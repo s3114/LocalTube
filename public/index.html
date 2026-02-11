@@ -104,11 +104,10 @@
         left: 0;
         right: 0;
         height: 56px;
-        background: var(--panel);
+        background: rgb(0 0 0 / 34%);
         display: flex;
         align-items: center;
         padding: 0 16px;
-        border-bottom: 1px solid var(--border);
         z-index: 10;
         width: 100%;
       }
@@ -308,7 +307,7 @@
 
       main {
         max-width: 1800px;
-        margin: 80px auto 40px;
+        margin: 56px auto 20px;
       }
 
       /* ページ切替 */
@@ -824,6 +823,7 @@
       .sidebar-title {
         font-weight: 700;
         margin-bottom: 8px;
+        padding: 0px 0px 0px 8px;
       }
 
       /* ===== サイドバーのヘッダー（タイトル＋ボタン） ===== */
@@ -831,7 +831,6 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 8px;
       }
 
       /* 開閉ボタン */
@@ -841,7 +840,7 @@
         color: #aaa;
         cursor: pointer;
         font-size: 12px;
-        padding: 4px 6px;
+        padding: 0px 12px;
         border-radius: 6px;
       }
 
@@ -920,7 +919,7 @@
         margin-bottom: 0;
       }
 
-      .sidebar-section {
+      .sidebar-live_chat {
         background: rgba(0, 0, 0, 0.2);
         margin-bottom: 12px;
         border-radius: 15px;
@@ -929,34 +928,72 @@
       }
 
       /* 最後のセクションは余白を消す */
-      .sidebar-section:last-child {
+      .sidebar-live_chat:last-child {
         margin-bottom: 0;
       }
 
       /* 折りたたみ時：そのセクションの中身だけ隠す */
-      .sidebar-section.collapsed .sidebar-content {
+      .sidebar-live_chat.collapsed .sidebar-content {
         display: none;
         overflow-y: auto;
         flex: 1;
       }
 
       /* 折りたたみ時：ヘッダー下の余白を消す */
-      .sidebar-section.collapsed .sidebar-header {
+      .sidebar-live_chat.collapsed .sidebar-header {
         margin-bottom: 0;
       }
 
       /* 最後のセクションの余白は不要 */
-      .sidebar-section:last-child {
+      .sidebar-live_chat:last-child {
         margin-bottom: 0;
       }
 
       /* セクション内のヘッダーを整える */
-      .sidebar-section .sidebar-header {
+      .sidebar-live_chat .sidebar-header {
         margin-bottom: 6px;
       }
 
       /* 折りたたみ時はヘッダーだけ残す */
-      .sidebar-section.collapsed {
+      .sidebar-live_chat.collapsed {
+        padding-bottom: 6px;
+      }
+
+      .sidebar-local_movie {
+        border-radius: 15px;
+        /* backdrop-filter: blur(2px);
+        backdrop-filter: brightness(0.5); */
+      }
+
+      /* 最後のセクションは余白を消す */
+      .sidebar-local_movie:last-child {
+        margin-bottom: 0;
+      }
+
+      /* 折りたたみ時：そのセクションの中身だけ隠す */
+      .sidebar-local_movie.collapsed .sidebar-content {
+        display: none;
+        overflow-y: auto;
+        flex: 1;
+      }
+
+      /* 折りたたみ時：ヘッダー下の余白を消す */
+      .sidebar-local_movie.collapsed .sidebar-header {
+        margin-bottom: 0;
+      }
+
+      /* 最後のセクションの余白は不要 */
+      .sidebar-local_movie:last-child {
+        margin-bottom: 0;
+      }
+
+      /* セクション内のヘッダーを整える */
+      .sidebar-local_movie .sidebar-header {
+        /* margin-bottom: 6px; */
+      }
+
+      /* 折りたたみ時はヘッダーだけ残す */
+      .sidebar-local_movie.collapsed {
         padding-bottom: 6px;
       }
 
@@ -1550,7 +1587,6 @@
       .comment-section {
         margin-top: 16px;
         padding-top: 12px;
-        border-top: 1px solid var(--border);
       }
 
       .comment-header {
@@ -1566,7 +1602,6 @@
         display: flex;
         gap: 10px;
         padding: 10px;
-        border-bottom: 1px solid var(--border);
       }
 
       .comment-avatar {
@@ -2020,7 +2055,7 @@
           <!-- ===== 右：ローカル動画一覧 ===== -->
           <div class="player-sidebar" id="player-sidebar">
             <!-- ===== ライブチャット（新規） ===== -->
-            <div class="sidebar-section" id="chat-section">
+            <div class="sidebar-live_chat" id="chat-section">
               <div class="sidebar-header">
                 <div class="sidebar-title">ライブチャット</div>
                 <button class="sidebar-toggle" data-target="chat-section">
@@ -2036,7 +2071,7 @@
             </div>
 
             <!-- ===== ローカル動画（既存） ===== -->
-            <div class="sidebar-section" id="video-section">
+            <div class="sidebar-local_movie" id="video-section">
               <div class="sidebar-header">
                 <div class="sidebar-title">ローカル動画</div>
                 <button class="sidebar-toggle" data-target="video-section">
