@@ -1092,6 +1092,178 @@
         gap: 8px;
       }
 
+      .video-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .youtube-link-btn {
+        display: none;
+        color: #ff0000;
+      }
+
+      .youtube-link-icon {
+        font-size: 24px;
+      }
+
+      .video-stats {
+        margin-left: auto;
+        display: flex;
+        gap: 16px;
+        color: #aaa;
+        font-size: 14px;
+        align-items: center;
+      }
+
+      .comment-header-row {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .sort-container {
+        position: relative;
+      }
+
+      .comment-empty {
+        display: none;
+      }
+
+      .settings-inline-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .settings-gap-8 {
+        gap: 8px;
+      }
+
+      .settings-gap-10 {
+        gap: 10px;
+      }
+
+      .settings-stack {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .settings-stack-8 {
+        gap: 8px;
+      }
+
+      .settings-stack-10 {
+        gap: 10px;
+      }
+
+      .settings-stack-wide {
+        min-width: 460px;
+        max-width: 700px;
+        width: 100%;
+      }
+
+      .settings-stack-tool {
+        flex: none;
+        margin-left: auto;
+        width: 800px;
+      }
+
+      .settings-hint-blue {
+        color: var(--blue);
+        margin-top: 4px;
+      }
+
+      .settings-error-text {
+        color: var(--accent);
+        font-size: 12px;
+        min-height: 1.2em;
+      }
+
+      .settings-hidden-input {
+        display: none;
+      }
+
+      .settings-textarea-lg {
+        min-height: 120px;
+      }
+
+      .settings-input-full {
+        width: 100%;
+      }
+
+      .settings-input-flex {
+        flex: 1;
+      }
+
+      .wallpaper-label {
+        min-width: 60px;
+      }
+
+      .settings-toggle-top {
+        align-items: flex-start;
+        gap: 16px;
+      }
+
+      .btn-ui {
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .btn-ui.btn-blue {
+        background: var(--blue);
+      }
+
+      .btn-ui.btn-green {
+        background: var(--green);
+      }
+
+      .btn-ui.btn-red {
+        background: #c0392b;
+      }
+
+      .btn-ui.btn-dark {
+        background: #333;
+      }
+
+      .btn-ui.btn-gray {
+        background: #444;
+      }
+
+      .btn-ui.btn-tight {
+        padding: 8px 12px;
+      }
+
+      .btn-ui.btn-narrow {
+        padding: 8px 9px;
+      }
+
+      .btn-ui.btn-copy {
+        border: none;
+        color: #fff;
+        white-space: nowrap;
+      }
+
+      .card-margin-top-20 {
+        margin-top: 20px;
+      }
+
+      .status-warn-text {
+        color: var(--warn);
+      }
+
+      .status-subtext {
+        color: var(--subtext);
+      }
+
+      .info-value-wide {
+        width: 80%;
+      }
+
       .comment-count {
         color: var(--subtext);
         font-weight: normal;
@@ -1896,14 +2068,7 @@
               </div>
             </div>
             <div class="yt-info">
-              <div
-                class="video-header-row"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  gap: 10px;
-                ">
+              <div class="video-header-row">
                 <div id="player-title" class="yt-title">
                   動画を選択してください
                 </div>
@@ -1911,10 +2076,9 @@
                   id="youtube-link-btn"
                   href="#"
                   target="_blank"
-                  class="yt-btn"
-                  style="display: none; color: #ff0000"
+                  class="yt-btn youtube-link-btn"
                   title="YouTubeで見る">
-                  <i class="fa-brands fa-youtube" style="font-size: 24px"></i>
+                  <i class="fa-brands fa-youtube youtube-link-icon"></i>
                 </a>
               </div>
 
@@ -1939,16 +2103,7 @@
                   </div>
                 </div>
                 <!-- 動画統計情報（右寄せ） -->
-                <div
-                  class="video-stats"
-                  style="
-                    margin-left: auto;
-                    display: flex;
-                    gap: 16px;
-                    color: #aaa;
-                    font-size: 14px;
-                    align-items: center;
-                  ">
+                <div class="video-stats">
                   <div title="高評価数">
                     <i class="fa-regular fa-thumbs-up"></i>
                     <span id="stat-likes"></span>
@@ -1964,13 +2119,13 @@
 
               <div class="comment-section">
                 <div class="comment-header">
-                  <div style="display: flex; align-items: center; gap: 20px">
+                  <div class="comment-header-row">
                     <div>
                       <span id="comment-count-display"></span> 件のコメント
                     </div>
 
                     <!-- 並び替えボタン -->
-                    <div class="sort-container" style="position: relative">
+                    <div class="sort-container">
                       <button id="sort-toggle" class="sort-btn">
                         <i class="fa-solid fa-arrow-down-short-wide"></i>
                         並び替え
@@ -1985,7 +2140,7 @@
                   </div>
                 </div>
 
-                <div class="comment-empty" style="display: none">
+                <div class="comment-empty">
                   コメントはありません
                 </div>
 
@@ -2107,46 +2262,25 @@
                   Cookieファイル
                   <small id="cookie-status-display">設定されていません</small>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px">
+                <div class="settings-inline-row">
                   <button
                     id="set-firefox-btn"
-                    style="
-                      background: #333;
-                      border: 1px solid var(--border);
-                      color: var(--text);
-                      padding: 8px 12px;
-                      border-radius: 8px;
-                      cursor: pointer;
-                    ">
+                    class="btn-ui btn-dark btn-tight">
                     FireFox
                   </button>
                   <input
                     type="file"
                     id="cookiePathSet"
                     accept=".txt"
-                    style="display: none" />
+                    class="settings-hidden-input" />
                   <button
                     id="manual-select-btn"
-                    style="
-                      background: #333;
-                      border: 1px solid var(--border);
-                      color: var(--text);
-                      padding: 8px 12px;
-                      border-radius: 8px;
-                      cursor: pointer;
-                    ">
+                    class="btn-ui btn-dark btn-tight">
                     手動選択
                   </button>
                   <button
                     id="none-select-btn"
-                    style="
-                      background: #333;
-                      border: 1px solid var(--border);
-                      color: var(--text);
-                      padding: 8px 9px;
-                      border-radius: 8px;
-                      cursor: pointer;
-                    ">
+                    class="btn-ui btn-dark btn-narrow">
                     使用しない
                   </button>
                 </div>
@@ -2254,9 +2388,9 @@
               <div class="info-label">エラー</div>
               <div id="info-error-count" class="info-value">0 件</div>
             </div>
-            <div class="info-item">
-              <div class="info-label">完了率</div>
-              <div class="info-value" style="width: 80%">
+              <div class="info-item">
+                <div class="info-label">完了率</div>
+              <div class="info-value info-value-wide">
                 <div class="completion-bar-container">
                   <div id="completion-bar" class="completion-bar"></div>
                 </div>
@@ -2278,45 +2412,25 @@
                   メン限のプレイリストURLを取得
                   <small>チャンネルURLから自動的に再生リストURLを生成します。</small>
                 </div>
-                <div
-                  style="
-                    flex: none;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                    margin-left: auto;
-                    width: 800px;
-                  ">
+                <div class="settings-stack settings-stack-8 settings-stack-tool">
                   <input
                     type="text"
                     id="youtubeChannelUrlInput"
                     placeholder="YoutubeチャンネルのURLを入力してください"
-                    style="width: 100%" />
+                    class="settings-input-full" />
                   <div
                     id="channelUrlError"
-                    style="
-                      color: var(--accent);
-                      font-size: 12px;
-                      min-height: 1.2em;
-                    "></div>
-                  <div style="display: flex; gap: 8px; align-items: center">
+                    class="settings-error-text"></div>
+                  <div class="settings-inline-row settings-gap-8">
                     <input
                       type="text"
                       id="youtubePlaylistUrlOutput"
                       readonly
                       placeholder="変換された再生リストURL"
-                      style="flex: 1" />
+                      class="settings-input-flex" />
                     <button
                       id="copyPlaylistUrlBtn"
-                      style="
-                        background: var(--blue);
-                        border: none;
-                        color: #fff;
-                        padding: 8px 12px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        white-space: nowrap;
-                      ">
+                      class="btn-ui btn-blue btn-tight btn-copy">
                       コピー
                     </button>
                   </div>
@@ -2326,7 +2440,7 @@
           </div>
         </div>
 
-        <div class="card card-layout" style="margin-top: 20px;">
+        <div class="card card-layout card-margin-top-20">
           <div class="card-main">
             <h2>設定</h2>
             <div class="options">
@@ -2337,89 +2451,59 @@
                 </div>
                 <button
                   id="clearHistoryBtn"
-                  style="
-                    background: #c0392b;
-                    border: 1px solid var(--border);
-                    color: var(--text);
-                    padding: 8px 16px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                  ">
+                  class="btn-ui btn-red">
                   履歴を削除
                 </button>
               </div>
-              <div class="toggle" style="align-items: flex-start; gap: 16px;">
+              <div class="toggle settings-toggle-top">
                 <div>
                   ローカル動画フォルダー
                   <small>ローカル動画として認識するフォルダーを設定します。改行してパスを入力してください。</small>
                   <small>例: D:\Videos や E:\Archive\LocalTube</small>
                   <small id="local-video-dirs-status"
-                    style="color: var(--blue); margin-top: 4px;"></small>
+                    class="settings-hint-blue"></small>
                 </div>
-                <div
-                  style="display: flex; flex-direction: column; gap: 8px; min-width: 460px; max-width: 700px; width: 100%;">
+                <div class="settings-stack settings-stack-8 settings-stack-wide">
                   <textarea
                     id="local-video-dirs-input"
                     placeholder="追加したいフォルダを1行ずつ入力"
-                    style="min-height: 120px;"></textarea>
+                    class="settings-textarea-lg"></textarea>
                   <div>
                     <button
                       id="save-local-video-dirs-btn"
-                      style="
-                        background: var(--blue);
-                        border: 1px solid var(--border);
-                        color: var(--text);
-                        padding: 8px 16px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                      ">
+                      class="btn-ui btn-blue">
                       フォルダー設定を保存
                     </button>
                   </div>
                 </div>
               </div>
-              <div class="toggle" style="align-items: flex-start; gap: 16px;">
+              <div class="toggle settings-toggle-top">
                 <div>
                   壁紙
                   <small>参照した画像を `public/wallpaper.拡張子` として保存します。</small>
                   <small id="wallpaper-status"
-                    style="color: var(--blue); margin-top: 4px;"></small>
+                    class="settings-hint-blue"></small>
                 </div>
-                <div
-                  style="display: flex; flex-direction: column; gap: 10px; min-width: 460px; max-width: 700px; width: 100%;">
-                  <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="settings-stack settings-stack-10 settings-stack-wide">
+                  <div class="settings-inline-row settings-gap-8">
                     <input
                       type="file"
                       id="wallpaper-file-input"
                       accept="image/*"
-                      style="display: none;" />
+                      class="settings-hidden-input" />
                     <button
                       id="wallpaper-select-btn"
-                      style="
-                        background: var(--blue);
-                        border: 1px solid var(--border);
-                        color: var(--text);
-                        padding: 8px 16px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                      ">
+                      class="btn-ui btn-blue">
                       参照
                     </button>
                     <button
                       id="wallpaper-clear-btn"
-                      style="
-                        background: #444;
-                        border: 1px solid var(--border);
-                        color: var(--text);
-                        padding: 8px 16px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                      ">
+                      class="btn-ui btn-gray">
                       クリア
                     </button>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="min-width: 60px;">Blur</div>
+                  <div class="settings-inline-row">
+                    <div class="wallpaper-label">Blur</div>
                     <input
                       type="range"
                       id="wallpaper-blur-range"
@@ -2428,8 +2512,8 @@
                       value="0" />
                     <span id="wallpaper-blur-value">0 px</span>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="min-width: 60px;">Brightness</div>
+                  <div class="settings-inline-row">
+                    <div class="wallpaper-label">Brightness</div>
                     <input
                       type="range"
                       id="wallpaper-brightness-range"
@@ -2445,7 +2529,7 @@
                   一時サムネイルの作成
                   <small>サムネイルフォルダに該当のサムネが見つからないときに動画からffmpegを用いて仮のサムネイルを生成します。</small>
                   <small id="fallback-thumb-status"
-                    style="color: var(--blue); margin-top: 4px;"></small>
+                    class="settings-hint-blue"></small>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="opt-fallback-thumbnails" checked />
@@ -2458,31 +2542,17 @@
                   PC起動時の自動実行
                   <small>PCを起動したときに、このアプリケーションを自動で起動するように設定します。</small>
                   <small id="autostart-status"
-                    style="color: var(--blue); margin-top: 4px;"></small>
+                    class="settings-hint-blue"></small>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div class="settings-inline-row settings-gap-10">
                   <button
                     id="btn-create-autostart-task"
-                    style="
-                      background: var(--green);
-                      border: 1px solid var(--border);
-                      color: var(--text);
-                      padding: 8px 16px;
-                      border-radius: 8px;
-                      cursor: pointer;
-                    ">
+                    class="btn-ui btn-green">
                     有効化
                   </button>
                   <button
                     id="btn-delete-autostart-task"
-                    style="
-                      background: #c0392b;
-                      border: 1px solid var(--border);
-                      color: var(--text);
-                      padding: 8px 16px;
-                      border-radius: 8px;
-                      cursor: pointer;
-                    ">
+                    class="btn-ui btn-red">
                     無効化
                   </button>
                 </div>
@@ -2516,26 +2586,117 @@
         }
       }
 
+      function getJobProgressData(job) {
+        if (job.status === "downloading") {
+          return {
+            width: `${job.progress.percentage || 0}%`,
+            text: `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`,
+            hints: [],
+          };
+        }
+
+        if (job.status === "completed") {
+          return {
+            width: "100%",
+            text: job.progress.eta || "完了",
+            hints: [],
+          };
+        }
+
+        if (job.status !== "error") {
+          return {
+            width: "0%",
+            text: job.progress.eta || job.status,
+            hints: [],
+          };
+        }
+
+        const errorMessage = job.progress.eta || "エラー";
+        const hints = [];
+        if (errorMessage.includes("Sign in to confirm you’re not a bot")) {
+          hints.push(
+            "Cookieファイルを指定し、再度ダウンロードを実行してください。",
+          );
+        }
+        if (errorMessage.includes("skipped as they are DRM protected")) {
+          hints.push(
+            "DRM保護の動画のトグルを有効にし再度ダウンロードを実行してください。",
+          );
+        }
+        if (errorMessage.includes("Join this channel to get access to members")) {
+          hints.push("正しいCookieファイルを指定し、再度ダウンロードを実行してください。");
+        }
+        if (errorMessage.includes("Requested format is not available")) {
+          hints.push(
+            "このエラーは様々な理由で発生します。最大の原因はショート動画のDLです。詳しくはサポートサーバーにて質問して下さい。",
+          );
+        }
+        if (errorMessage.includes("HTTP Error 403: Forbidden")) {
+          hints.push(
+            "情報不足にて確実な対処方法が確立していません。詳しくはサポートサーバーにて質問して下さい。",
+          );
+        }
+        if (errorMessage.includes("Unsupported URL: ")) {
+          hints.push("そのURLはサポートされていません。");
+        }
+        if (errorMessage.includes("' is not a valid URL")) {
+          hints.push("URLが有効ではありません。");
+        }
+
+        return { width: "100%", text: errorMessage, hints };
+      }
+
+      function renderJobProgressText(container, text, hints = []) {
+        container.textContent = text;
+        hints.forEach((hint) => {
+          container.appendChild(document.createElement("br"));
+          const span = document.createElement("span");
+          span.className = "cookie-error-hint";
+          span.textContent = hint;
+          container.appendChild(span);
+        });
+      }
+
       function renderJob(job) {
         jobStates.set(job.id, job);
         const statusIcon = getStatusIcon(job.status);
-        const progressText =
-          job.status === "downloading"
-            ? `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`
-            : job.progress.eta || job.status;
+        const progress = getJobProgressData(job);
 
-        return `
-                <div class="job-item" id="job-${job.id}" data-status="${job.status}">
-                    <div class="job-status-icon">${statusIcon}</div>
-                    <div class="job-details">
-                        <div class="job-title" title="${job.title}">${job.title}</div>
-                        <div class="job-progress-bar-container">
-                            <div class="job-progress-bar" style="width: ${job.progress.percentage || 0}%;"></div>
-                        </div>
-                        <div class="job-progress-text">${progressText}</div>
-                    </div>
-                </div>
-            `;
+        const item = document.createElement("div");
+        item.className = "job-item";
+        item.id = `job-${job.id}`;
+        item.dataset.status = job.status;
+
+        const iconEl = document.createElement("div");
+        iconEl.className = "job-status-icon";
+        iconEl.textContent = statusIcon;
+
+        const detailsEl = document.createElement("div");
+        detailsEl.className = "job-details";
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "job-title";
+        titleEl.title = job.title;
+        titleEl.textContent = job.title;
+
+        const progressBarContainer = document.createElement("div");
+        progressBarContainer.className = "job-progress-bar-container";
+
+        const progressBar = document.createElement("div");
+        progressBar.className = "job-progress-bar";
+        progressBar.style.width = progress.width;
+        progressBarContainer.appendChild(progressBar);
+
+        const progressTextEl = document.createElement("div");
+        progressTextEl.className = "job-progress-text";
+        renderJobProgressText(progressTextEl, progress.text, progress.hints);
+
+        detailsEl.appendChild(titleEl);
+        detailsEl.appendChild(progressBarContainer);
+        detailsEl.appendChild(progressTextEl);
+        item.appendChild(iconEl);
+        item.appendChild(detailsEl);
+        return item;
       }
 
       function updateJobElement(job) {
@@ -2552,57 +2713,13 @@
         const progressTextElement =
           jobElement.querySelector(".job-progress-text");
 
-        let progressText = "";
-        if (job.status === "downloading") {
-          progressBar.style.width = `${job.progress.percentage}%`;
-          progressText = `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`;
-        } else if (job.status === "completed") {
-          progressBar.style.width = "100%";
-          progressText = job.progress.eta || "完了";
-        } else if (job.status === "error") {
-          progressBar.style.width = "100%";
-          let errorMessage = job.progress.eta || "エラー";
-          if (errorMessage.includes("Sign in to confirm you’re not a bot")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">Cookieファイルを指定し、再度ダウンロードを実行してください。</span>';
-          }
-          if (errorMessage.includes("skipped as they are DRM protected")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">DRM保護の動画のトグルを有効にし再度ダウンロードを実行してください。</span>';
-          }
-          if (
-            errorMessage.includes("Join this channel to get access to members")
-          ) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">正しいCookieファイルを指定し、再度ダウンロードを実行してください。</span>';
-          }
-          if (errorMessage.includes("Requested format is not available")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">このエラーは様々な理由で発生します。最大の原因はショート動画のDLです。詳しくはサポートサーバーにて質問して下さい。</span>';
-          }
-          if (errorMessage.includes("HTTP Error 403: Forbidden")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">情報不足にて確実な対処方法が確立していません。詳しくはサポートサーバーにて質問して下さい。</span>';
-          }
-          if (errorMessage.includes("Unsupported URL: ")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">そのURLはサポートされていません。</span>';
-          }
-          if (errorMessage.includes("' is not a valid URL")) {
-            errorMessage +=
-              '<br><span class="cookie-error-hint">URLが有効ではありません。</span>';
-          }
-
-          progressText = errorMessage;
-        } else {
-          progressBar.style.width = "0%";
-          progressText = job.progress.eta || job.status;
-        }
-        progressTextElement.innerHTML = progressText; // Use innerHTML because we're adding HTML tags
+        const progress = getJobProgressData(job);
+        progressBar.style.width = progress.width;
+        renderJobProgressText(progressTextElement, progress.text, progress.hints);
       }
 
       // --- Main Logic ---
-      document.addEventListener("DOMContentLoaded", () => {
+      function initializeSettingsAndSse() {
         function saveSetting(key, value) {
           try {
             localStorage.setItem(key, value);
@@ -3417,17 +3534,21 @@
         eventSource.addEventListener("initial_state", (e) => {
           const jobs = JSON.parse(e.data);
           elements.jobQueue.innerHTML = "";
+          const frag = document.createDocumentFragment();
           jobs.forEach((job) => {
-            elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
+            frag.appendChild(renderJob(job));
           });
+          elements.jobQueue.appendChild(frag);
           updateJobCounts();
         });
 
         eventSource.addEventListener("jobs_added", (e) => {
           const newJobs = JSON.parse(e.data);
+          const frag = document.createDocumentFragment();
           newJobs.forEach((job) => {
-            elements.jobQueue.insertAdjacentHTML("beforeend", renderJob(job));
+            frag.appendChild(renderJob(job));
           });
+          elements.jobQueue.appendChild(frag);
           updateJobCounts();
         });
 
@@ -3465,7 +3586,7 @@
           console.error("EventSource failed:", err);
           const jobQueueDiv = document.getElementById("job-queue");
           jobQueueDiv.innerHTML =
-            '<div style="color: var(--warn);">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' +
+            '<div class="status-warn-text">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' +
             jobQueueDiv.innerHTML;
           eventSource.close();
         };
@@ -3477,7 +3598,7 @@
           updateUptimeDisplay(data.uptime_sec);
           pushAveragedNetworkSample(data.network_mbps, data.latency_ms);
         });
-      });
+      }
 
       // --- Actions ---
       function setButtonDisabled(button, disabled) {
@@ -3594,7 +3715,7 @@
       }
 
       // ===== ヘッダーボタンとURLルーティング =====
-      document.addEventListener("DOMContentLoaded", () => {
+      function initializeHeaderRouting() {
         const buttons = document.querySelectorAll(".icon-btn");
         const pages = document.querySelectorAll(".page");
         const headerSearchWrap = document.querySelector(".header-search-wrap");
@@ -3615,6 +3736,7 @@
             target.classList.add("active-page");
           }
           window.updateHeaderSearchVisibility(pageId);
+          window.updateSmoothSeekLoopState?.();
         }
 
         function setActiveButton(pageId) {
@@ -3679,17 +3801,28 @@
 
         // 初期表示（URLに合わせて表示）
         routeFromHash();
-      });
+      }
 
-      document.addEventListener("DOMContentLoaded", () => {
+      function initializePlayerPage() {
         function linkify(text) {
           if (!text) return "";
-
+          const source = String(text);
           const urlRegex = /(https?:\/\/[^\s]+)/g;
+          const parts = [];
+          let lastIndex = 0;
 
-          return text.replace(urlRegex, (url) => {
-            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="desc-link">${url}</a>`;
-          });
+          for (const match of source.matchAll(urlRegex)) {
+            const url = match[0];
+            const start = match.index ?? 0;
+            parts.push(escapeHtml(source.slice(lastIndex, start)));
+            parts.push(
+              `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" class="desc-link">${escapeHtml(url)}</a>`,
+            );
+            lastIndex = start + url.length;
+          }
+
+          parts.push(escapeHtml(source.slice(lastIndex)));
+          return parts.join("");
         }
 
         const desc = document.getElementById("video-description");
@@ -3735,6 +3868,11 @@
         let allLocalVideos = [];
         const homeInfoCache = new Map();
         const homeInfoData = new Map();
+        let infoAbortController = null;
+        let infoRequestToken = 0;
+        let chatAbortController = null;
+        let chatRequestToken = 0;
+        let smoothSeekRafId = null;
 
         const seekBar = document.getElementById("seek-bar");
         const btnPlay = document.getElementById("btn-play");
@@ -3884,10 +4022,10 @@
 
         function showLocalVideoLoadError() {
           videoList.innerHTML =
-            '<div style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+            '<div class="status-warn-text">動画一覧の取得に失敗しました</div>';
           if (homeVideoGrid) {
             homeVideoGrid.innerHTML =
-              '<div class="home-video-empty" style="color:var(--warn)">動画一覧の取得に失敗しました</div>';
+              '<div class="home-video-empty status-warn-text">動画一覧の取得に失敗しました</div>';
           }
         }
 
@@ -3924,10 +4062,25 @@
         }
 
         function loadCurrentVideoSideData(videoId) {
-          fetch(`/info/${encodeURIComponent(videoId)}`)
+          infoRequestToken += 1;
+          const currentInfoToken = infoRequestToken;
+          if (infoAbortController) {
+            infoAbortController.abort();
+          }
+          infoAbortController = new AbortController();
+
+          fetch(`/info/${encodeURIComponent(videoId)}`, {
+            signal: infoAbortController.signal,
+          })
             .then((r) => r.json())
-            .then((info) => applyVideoInfo(info))
-            .catch((err) => console.error("info.json 読み込み失敗:", err));
+            .then((info) => {
+              if (currentInfoToken !== infoRequestToken) return;
+              applyVideoInfo(info);
+            })
+            .catch((err) => {
+              if (err?.name === "AbortError") return;
+              console.error("info.json 読み込み失敗:", err);
+            });
 
           loadLiveChat(videoId);
         }
@@ -3940,6 +4093,7 @@
             .forEach((page) => page.classList.remove("active-page"));
           document.getElementById("page-player")?.classList.add("active-page");
           window.updateHeaderSearchVisibility?.("page-player");
+          window.updateSmoothSeekLoopState?.();
 
           document.querySelectorAll(".icon-btn").forEach((button) => {
             if (button.dataset.page === "page-player") {
@@ -4077,11 +4231,6 @@
           });
         }
 
-        homeSearchInput?.addEventListener("input", () => {
-          renderHomeLocalVideos(allLocalVideos);
-        });
-        bindHomeFilterEvents();
-
         function getVideoIdFromFilename(filename) {
           return String(filename || "").replace(/\.(mp4|mkv|webm|mov)$/i, "");
         }
@@ -4216,6 +4365,67 @@
           };
         }
 
+        function getHomeSearchStateForUrl() {
+          return {
+            q: String(homeSearchInput?.value || "").trim(),
+            ch: String(filterChannel?.value || "").trim(),
+            df: normalizeYyyymmdd(filterDateFromText?.value || filterDateFrom?.value),
+            dt: normalizeYyyymmdd(filterDateToText?.value || filterDateTo?.value),
+            dr: String(filterDurationRange?.value || "all"),
+            dmin: String(filterDurationMin?.value || "").trim(),
+            dmax: String(filterDurationMax?.value || "").trim(),
+          };
+        }
+
+        function applyHomeSearchStateFromUrl() {
+          const params = new URLSearchParams(location.search);
+          const safeDurationModes = new Set(["all", "lt3", "3to20", "ge20", "custom"]);
+
+          if (homeSearchInput) homeSearchInput.value = params.get("q") || "";
+          if (filterChannel) filterChannel.value = params.get("ch") || "";
+
+          const fromYmd = normalizeYyyymmdd(params.get("df") || "");
+          const toYmd = normalizeYyyymmdd(params.get("dt") || "");
+          if (filterDateFromText) filterDateFromText.value = fromYmd;
+          if (filterDateToText) filterDateToText.value = toYmd;
+          if (filterDateFrom) filterDateFrom.value = yyyymmddToDateInput(fromYmd);
+          if (filterDateTo) filterDateTo.value = yyyymmddToDateInput(toYmd);
+
+          const durationMode = params.get("dr") || "all";
+          if (filterDurationRange) {
+            filterDurationRange.value = safeDurationModes.has(durationMode)
+              ? durationMode
+              : "all";
+          }
+          if (filterDurationMin) filterDurationMin.value = params.get("dmin") || "";
+          if (filterDurationMax) filterDurationMax.value = params.get("dmax") || "";
+        }
+
+        function syncHomeSearchStateToUrl() {
+          const params = new URLSearchParams(location.search);
+          const state = getHomeSearchStateForUrl();
+
+          const assignOrDelete = (key, value) => {
+            if (value) {
+              params.set(key, value);
+            } else {
+              params.delete(key);
+            }
+          };
+
+          assignOrDelete("q", state.q);
+          assignOrDelete("ch", state.ch);
+          assignOrDelete("df", state.df);
+          assignOrDelete("dt", state.dt);
+          assignOrDelete("dr", state.dr !== "all" ? state.dr : "");
+          assignOrDelete("dmin", state.dmin);
+          assignOrDelete("dmax", state.dmax);
+
+          const search = params.toString();
+          const nextUrl = `${location.pathname}${search ? `?${search}` : ""}${location.hash}`;
+          history.replaceState(null, "", nextUrl);
+        }
+
         function matchesChannelFilter(info, channelKeyword) {
           if (!channelKeyword) return true;
           const channelSource = `${info?.channel || ""} ${info?.uploader || ""}`.toLowerCase();
@@ -4299,6 +4509,7 @@
 
           dateEl?.addEventListener("change", () => {
             textEl.value = dateInputToYyyymmdd(dateEl.value);
+            syncHomeSearchStateToUrl();
             rerenderHomeVideos();
           });
           textEl?.addEventListener("input", () => {
@@ -4306,6 +4517,7 @@
             if (ymd.length === 8) {
               dateEl.value = yyyymmddToDateInput(ymd);
             }
+            syncHomeSearchStateToUrl();
             rerenderHomeVideos();
           });
         }
@@ -4324,11 +4536,21 @@
         function bindHomeFilterInputs() {
           filterDurationRange?.addEventListener("change", () => {
             setDurationCustomInputState();
+            syncHomeSearchStateToUrl();
             rerenderHomeVideos();
           });
-          filterDurationMin?.addEventListener("input", rerenderHomeVideos);
-          filterDurationMax?.addEventListener("input", rerenderHomeVideos);
-          filterChannel?.addEventListener("input", rerenderHomeVideos);
+          filterDurationMin?.addEventListener("input", () => {
+            syncHomeSearchStateToUrl();
+            rerenderHomeVideos();
+          });
+          filterDurationMax?.addEventListener("input", () => {
+            syncHomeSearchStateToUrl();
+            rerenderHomeVideos();
+          });
+          filterChannel?.addEventListener("input", () => {
+            syncHomeSearchStateToUrl();
+            rerenderHomeVideos();
+          });
         }
 
         function bindHomeFilterEvents() {
@@ -4352,11 +4574,24 @@
           filterClearBtn?.addEventListener("click", () => {
             clearHomeFilters();
             setDurationCustomInputState();
+            syncHomeSearchStateToUrl();
             rerenderHomeVideos();
           });
 
           setDurationCustomInputState();
         }
+
+        function initializeHomeSearchAndFilters() {
+          applyHomeSearchStateFromUrl();
+          homeSearchInput?.addEventListener("input", () => {
+            syncHomeSearchStateToUrl();
+            rerenderHomeVideos();
+          });
+          bindHomeFilterEvents();
+          setDurationCustomInputState();
+        }
+
+        initializeHomeSearchAndFilters();
 
         function formatUploadDateText(uploadDate) {
           const d = String(uploadDate || "").replace(/\D/g, "");
@@ -4708,6 +4943,13 @@
         }
 
         async function loadLiveChat(videoBaseName) {
+          chatRequestToken += 1;
+          const currentChatToken = chatRequestToken;
+          if (chatAbortController) {
+            chatAbortController.abort();
+          }
+          chatAbortController = new AbortController();
+
           try {
             const chatContainer = document.getElementById("chat-messages");
             const emptyEl =
@@ -4727,8 +4969,11 @@
             }
 
             const base = normalizeLiveChatBaseName(videoBaseName);
-            const res = await fetch(`/api/live-chat/${encodeURIComponent(base)}`);
+            const res = await fetch(`/api/live-chat/${encodeURIComponent(base)}`, {
+              signal: chatAbortController.signal,
+            });
             const text = await res.text();
+            if (currentChatToken !== chatRequestToken) return;
             const messages = parseNdjsonMessages(text);
 
             if (messages.length === 0) {
@@ -4747,6 +4992,7 @@
             });
             chatContainer.scrollTop = chatContainer.scrollHeight;
           } catch (e) {
+            if (e?.name === "AbortError") return;
             console.error("loadLiveChat error:", e);
             const emptyEl = document.querySelector(".chat-empty");
             if (emptyEl)
@@ -4759,16 +5005,22 @@
           item.className = "local-video-item";
           item.dataset.filename = video.filename;
 
-          const thumbHtml = video.thumb
-            ? `<img src="${video.thumb}" class="local-video-thumb">`
-            : `<div class="local-video-thumb"></div>`;
+          if (video.thumb) {
+            const thumbImg = document.createElement("img");
+            thumbImg.src = video.thumb;
+            thumbImg.className = "local-video-thumb";
+            item.appendChild(thumbImg);
+          } else {
+            const thumbPlaceholder = document.createElement("div");
+            thumbPlaceholder.className = "local-video-thumb";
+            item.appendChild(thumbPlaceholder);
+          }
 
-          item.innerHTML = `
-              ${thumbHtml}
-              <div class="local-video-text">
-                ${video.title}
-              </div>
-            `;
+          const textEl = document.createElement("div");
+          textEl.className = "local-video-text";
+          textEl.textContent = video.title;
+          item.appendChild(textEl);
+
           item.addEventListener("click", () => {
             playLocalVideo(video, item);
           });
@@ -4781,7 +5033,7 @@
 
           if (videos.length === 0) {
             videoList.innerHTML =
-              '<div style="color:var(--subtext)">動画が見つかりません</div>';
+              '<div class="status-subtext">動画が見つかりません</div>';
             return;
           }
 
@@ -5164,6 +5416,14 @@
           return div.innerHTML;
         }
 
+        function escapeAttr(str) {
+          return String(str || "")
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        }
+
         // ======== 滑らかなシークバー同期（時間表示は維持） ========
 
         // 目標値（実際の動画の進捗）
@@ -5175,6 +5435,32 @@
           const s = total % 60;
           return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
         }
+
+        function shouldRunSmoothSeekLoop() {
+          const playerPage = document.getElementById("page-player");
+          return (
+            !document.hidden &&
+            !!playerPage &&
+            playerPage.classList.contains("active-page")
+          );
+        }
+
+        function updateSmoothSeekLoopState() {
+          if (shouldRunSmoothSeekLoop()) {
+            if (smoothSeekRafId === null) {
+              smoothSeekRafId = requestAnimationFrame(smoothSeek);
+            }
+            return;
+          }
+
+          if (smoothSeekRafId !== null) {
+            cancelAnimationFrame(smoothSeekRafId);
+            smoothSeekRafId = null;
+          }
+        }
+
+        window.updateSmoothSeekLoopState = updateSmoothSeekLoopState;
+        document.addEventListener("visibilitychange", updateSmoothSeekLoopState);
 
         // timeupdate: 時間表示と目標進捗のみ更新
         videoPlayer.addEventListener("timeupdate", () => {
@@ -5195,7 +5481,7 @@
             targetProgress = 0;
             seekBar.value = 0;
             seekBar.style.setProperty("--progress", "0%");
-            requestAnimationFrame(smoothSeek);
+            smoothSeekRafId = requestAnimationFrame(smoothSeek);
             return;
           }
 
@@ -5208,10 +5494,10 @@
           seekBar.value = newValue;
           seekBar.style.setProperty("--progress", newValue + "%");
 
-          requestAnimationFrame(smoothSeek);
+          smoothSeekRafId = requestAnimationFrame(smoothSeek);
         }
 
-        requestAnimationFrame(smoothSeek);
+        updateSmoothSeekLoopState();
 
         loadLocalVideos();
 
@@ -5369,10 +5655,17 @@
         });
 
         initializeAppUi();
+        window.refreshLocalVideos = loadLocalVideos;
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        initializeSettingsAndSse();
+        initializeHeaderRouting();
+        initializePlayerPage();
       });
 
       document.addEventListener("job_completed", () => {
-        loadLocalVideos();
+        window.refreshLocalVideos?.();
       });
     </script>
   </body>
