@@ -1078,15 +1078,15 @@
 
       /* ===== コメント欄（YouTube風） ===== */
       .comment-section {
-        margin-top: 24px;
-        padding-top: 0;
+        margin-top: 16px;
+        padding-top: 12px;
         border-top: none; /* YouTubeは区切り線なし */
       }
 
       .comment-header {
         font-weight: bold;
         font-size: 20px;
-        margin-bottom: 24px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -1102,21 +1102,23 @@
         display: flex;
         flex-direction: column;
         gap: 16px;
+        overflow-y: auto;
       }
 
       /* 個々のコメントアイテム */
       .comment-item,
       .comment-reply {
         display: flex;
-        gap: 16px;
-        padding: 0; /* ボーダーやパディングはなくす */
+        gap: 10px;
+        padding: 10px;
         border-bottom: none;
         align-items: flex-start;
+        position: relative;
       }
 
       .comment-avatar {
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         object-fit: cover;
         flex-shrink: 0;
@@ -1125,8 +1127,8 @@
 
       /* 返信のアイコンは少し小さい */
       .comment-reply .comment-avatar {
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
       }
 
       .comment-body {
@@ -1135,6 +1137,7 @@
         flex-direction: column;
         gap: 4px;
         min-width: 0; /* テキスト折り返し用 */
+        position: relative;
       }
 
       /* ヘッダー行（名前 + 時間） */
@@ -1147,10 +1150,10 @@
       }
 
       .comment-author {
-        font-weight: 600;
+        font-weight: 700;
         color: #f1f1f1;
         text-decoration: none;
-        margin-right: 4px;
+        margin-right: 6px;
       }
 
       .comment-author:hover {
@@ -1159,7 +1162,7 @@
       }
 
       .comment-time {
-        color: var(--subtext);
+        color: #aaa;
         font-size: 12px;
       }
 
@@ -1584,52 +1587,6 @@
         vertical-align: middle;
       }
 
-      .comment-section {
-        margin-top: 16px;
-        padding-top: 12px;
-      }
-
-      .comment-header {
-        font-weight: bold;
-        margin-bottom: 8px;
-      }
-
-      .comment-list {
-        overflow-y: auto;
-      }
-
-      .comment-item {
-        display: flex;
-        gap: 10px;
-        padding: 10px;
-        position: relative;
-      }
-
-      .comment-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-      }
-
-      .comment-body {
-        flex: 1;
-        position: relative;
-      }
-
-      .comment-author {
-        font-weight: bold;
-        margin-right: 6px;
-      }
-
-      .comment-time {
-        color: #aaa;
-        font-size: 12px;
-      }
-
-      .comment-text {
-        white-space: pre-wrap; /* 改行を反映 */
-      }
-
       /* ===== コメント内のリンク ===== */
       .comment-text a.desc-link {
         color: #8ab4ff; /* YouTubeっぽい青 */
@@ -1652,11 +1609,6 @@
         display: flex;
         gap: 10px;
         position: relative;
-      }
-
-      .comment-reply .comment-avatar {
-        width: 28px;
-        height: 28px;
       }
 
       .comment-replies.collapsed {
@@ -1695,29 +1647,6 @@
         height: 100%;
       }
 
-
-      .channel-info {
-        margin-top: 6px;
-        margin-bottom: 10px;
-        font-size: 14px;
-        color: #aaa;
-      }
-
-      .channel-name {
-        color: #fff;
-        font-weight: bold;
-        text-decoration: none;
-      }
-
-      .channel-handle {
-        margin-left: 6px;
-        color: #888;
-      }
-
-      .channel-subs {
-        margin-left: 10px;
-        color: #888;
-      }
 
       /* ===== YouTube風：チャンネル行 ===== */
       .channel-row {
@@ -4580,50 +4509,27 @@
         // ★★ 追加：絵文字を含むチャットを正しく描画する関数 ★★
         // ===============================
         function renderChatMessage(message) {
-          if (!message?.runs) return "";
+          if (!message) return "";
+          if (message.simpleText) return escapeHtml(message.simpleText);
+          if (!message.runs) return "";
 
           return message.runs
             .map((run) => {
-              if (run.text) {
-                // 通常テキスト
-                return run.text;
-              }
+              if (run.text) return escapeHtml(run.text);
+              if (!run.emoji) return "";
 
-              if (run.emoji?.image?.thumbnails?.length) {
-                // 絵文字（メンバー絵文字含む）
-                const url = run.emoji.image.thumbnails.slice(-1)[0].url;
-                const alt = run.emoji.emojiId || "";
-                return `<img src="${url}" alt="${alt}" class="chat-emoji">`;
-              }
-
-              return "";
+              const thumb = run.emoji.image?.thumbnails?.slice(-1)[0];
+              if (!thumb?.url) return "";
+              const alt =
+                run.emoji.image?.accessibility?.accessibilityData?.label ||
+                run.emoji.emojiId ||
+                "emoji";
+              return `<img src="${thumb.url}" alt="${escapeHtml(alt)}" class="chat-emoji">`;
             })
             .join("");
         }
 
-        function loadLiveChat(videoFile) {
-          // ★ 引数名に合わせて統一（これがポイント）
-          const base = videoFile.replace(/\.live_chat\.json$/i, "");
-
-          const url = `/api/live-chat/${encodeURIComponent(base)}.live_chat.json`;
-
-          fetch(url)
-            .then((r) => {
-              if (!r.ok) throw new Error(`HTTP ${r.status}`);
-              return r.json();
-            })
-            .then((data) => {
-              renderLiveChat(data);
-            })
-            .catch((err) => {
-              console.warn("ライブチャットなし or 読み込み失敗:", err);
-              if (typeof clearLiveChat === "function") {
-                clearLiveChat();
-              }
-            });
-        }
-
-        async function loadLiveChat(filename) {
+        async function loadLiveChat(videoBaseName) {
           try {
             const chatContainer = document.getElementById("chat-messages");
 
@@ -4644,11 +4550,10 @@
               emptyEl.textContent = "チャットを読み込み中…";
             }
 
-            const chatFile = filename.replace(/\.mp4$/, ".live_chat.json");
-
-            const res = await fetch(
-              `/api/live-chat/${encodeURIComponent(chatFile)}`,
-            );
+            const base = String(videoBaseName || "")
+              .replace(/\.live_chat\.json$/i, "")
+              .replace(/\.(mp4|mkv|webm|mov)$/i, "");
+            const res = await fetch(`/api/live-chat/${encodeURIComponent(base)}`);
 
             const text = await res.text(); // ★ まず生テキストで取得
 
@@ -5261,42 +5166,6 @@
           });
 
           return item;
-        }
-
-        // URLをリンク化
-        function linkify(text) {
-          const urlPattern =
-            /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
-          return text.replace(
-            urlPattern,
-            '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
-          );
-        }
-
-        // YouTubeチャットメッセージのレンダリング（runs対応）
-        function renderChatMessage(message) {
-          if (!message) return "";
-          if (message.simpleText) return escapeHtml(message.simpleText);
-
-          if (message.runs) {
-            return message.runs
-              .map((run) => {
-                if (run.text) return escapeHtml(run.text);
-                if (run.emoji) {
-                  // 絵文字の場合
-                  const url = run.emoji.image.thumbnails[0]?.url;
-                  const alt =
-                    run.emoji.image.accessibility?.accessibilityData?.label ||
-                    "emoji";
-                  return url
-                    ? `<img src="${url}" alt="${alt}" class="chat-emoji" style="width:16px;height:16px;vertical-align:middle;">`
-                    : "";
-                }
-                return "";
-              })
-              .join("");
-          }
-          return "";
         }
 
         // XSS対策
