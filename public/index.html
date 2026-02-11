@@ -3498,6 +3498,84 @@
           });
         }
 
+        function playLocalVideo(video, activeItem = null) {
+          const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+
+          if (activeItem) {
+            document
+              .querySelectorAll(".local-video-item")
+              .forEach((el) => el.classList.remove("active"));
+            activeItem.classList.add("active");
+          }
+
+          videoPlayer.pause();
+          videoPlayer.src = video.video;
+          lastSelectedFilename = video.filename;
+
+          resetSeekBar();
+          videoPlayer.load();
+          titleEl.textContent = video.title;
+
+          videoPlayer.play().catch((err) => {
+            console.error("Play failed:", err);
+          });
+
+          fetch(`/info/${encodeURIComponent(videoId)}`)
+            .then((r) => r.json())
+            .then((info) => applyVideoInfo(info))
+            .catch((err) => console.error("info.json 読み込み失敗:", err));
+
+          loadLiveChat(videoId);
+
+          history.pushState(null, "", "#player/" + encodeURIComponent(videoId));
+
+          // pushState だけでは表示は切り替わらないため、明示的にプレイヤーページへ遷移
+          document
+            .querySelectorAll(".page")
+            .forEach((page) => page.classList.remove("active-page"));
+          document.getElementById("page-player")?.classList.add("active-page");
+
+          document.querySelectorAll(".icon-btn").forEach((button) => {
+            if (button.dataset.page === "page-player") {
+              button.classList.add("active");
+            } else {
+              button.classList.remove("active");
+            }
+          });
+        }
+
+        function renderHomeLocalVideos(videos) {
+          if (!homeVideoGrid) return;
+
+          homeVideoGrid.innerHTML = "";
+
+          if (videos.length === 0) {
+            homeVideoGrid.innerHTML =
+              '<div class="home-video-empty">動画が見つかりません</div>';
+            return;
+          }
+
+          videos.forEach((video) => {
+            const item = document.createElement("div");
+            item.className = "home-video-card";
+
+            const thumbHtml = video.thumb
+              ? `<img src="${video.thumb}" class="home-video-card-thumb">`
+              : `<div class="home-video-card-thumb"></div>`;
+
+            item.innerHTML = `
+              ${thumbHtml}
+              <div class="home-video-card-title">${video.title}</div>
+            `;
+
+            item.addEventListener("click", () => {
+              playLocalVideo(video);
+            });
+
+            homeVideoGrid.appendChild(item);
+          });
+        }
+
         // ===============================
         // ★ 追加：クリックで再生／停止、ダブルクリックで全画面
         // ===============================
