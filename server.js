@@ -1288,7 +1288,8 @@ app.get("/api/local-videos", async (req, res) => {
     res.json(videos);
   } catch (e) {
     console.error("Failed to scan local videos:", e);
-    res.status(500).json({ error: "動画一覧の取得に失敗しました。" });
+    // 一部フォルダー不具合でもUI全体を止めないため空配列で返す
+    res.json([]);
   }
 });
 
