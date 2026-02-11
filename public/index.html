@@ -3359,7 +3359,22 @@
         async function loadLocalVideos() {
           try {
             const res = await fetch("/api/local-videos");
-            const videos = await res.json();
+            let payload = null;
+
+            try {
+              payload = await res.json();
+            } catch (_err) {
+              payload = null;
+            }
+
+            if (!res.ok) {
+              const serverMessage = payload?.error || "動画一覧の取得に失敗しました";
+              throw new Error(serverMessage);
+            }
+
+            if (!Array.isArray(payload)) {
+              throw new Error("動画一覧データの形式が不正です");
+            }
 
             renderLocalVideos(videos);
             renderHomeLocalVideos(videos);
@@ -3519,6 +3534,94 @@
           }
 
           videoPlayer.pause();
+          videoPlayer.src = video.video;
+          lastSelectedFilename = video.filename;
+
+          resetSeekBar();
+          videoPlayer.load();
+          titleEl.textContent = video.title;
+
+          const hasUserActivation =
+            document.userActivation?.hasBeenActive ||
+            document.userActivation?.isActive;
+
+          if (shouldAutoplay && hasUserActivation) {
+            videoPlayer.play().catch((err) => {
+              // ユーザー操作前は自動再生が拒否されることがある
+              if (err?.name !== "NotAllowedError") {
+                console.error("Play failed:", err);
+              }
+            });
+          }
+
+          fetch(`/info/${encodeURIComponent(videoId)}`)
+            .then((r) => r.json())
+            .then((info) => applyVideoInfo(info))
+            .catch((err) => console.error("info.json 読み込み失敗:", err));
+
+          loadLiveChat(videoId);
+
+          history.pushState(null, "", "#player/" + encodeURIComponent(videoId));
+
+          // pushState だけでは表示は切り替わらないため、明示的にプレイヤーページへ遷移
+          document
+            .querySelectorAll(".page")
+            .forEach((page) => page.classList.remove("active-page"));
+          document.getElementById("page-player")?.classList.add("active-page");
+
+          document.querySelectorAll(".icon-btn").forEach((button) => {
+            if (button.dataset.page === "page-player") {
+              button.classList.add("active");
+            } else {
+              button.classList.remove("active");
+            }
+          });
+        }
+
+        function renderHomeLocalVideos(videos) {
+          if (!homeVideoGrid) return;
+
+          homeVideoGrid.innerHTML = "";
+
+          if (videos.length === 0) {
+            homeVideoGrid.innerHTML =
+              '<div class="home-video-empty">動画が見つかりません</div>';
+            return;
+          }
+
+          videos.forEach((video) => {
+            const item = document.createElement("div");
+            item.className = "home-video-card";
+
+            const thumbHtml = video.thumb
+              ? `<img src="${video.thumb}" class="home-video-card-thumb">`
+              : `<div class="home-video-card-thumb"></div>`;
+
+            item.innerHTML = `
+              ${thumbHtml}
+              <div class="home-video-card-title">${video.title}</div>
+            `;
+
+            item.addEventListener("click", () => {
+              playLocalVideo(video);
+            });
+
+            homeVideoGrid.appendChild(item);
+          });
+        }
+
+        function playLocalVideo(video, activeItem = null, shouldAutoplay = true) {
+          const videoId = video.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
+
+          if (activeItem) {
+            document
+              .querySelectorAll(".local-video-item")
+              .forEach((el) => el.classList.remove("active"));
+            activeItem.classList.add("active");
+          }
+
+          videoPlayer.pause();
+          videoPlayer.poster = video.thumb || "";
           videoPlayer.src = video.video;
           lastSelectedFilename = video.filename;
 
