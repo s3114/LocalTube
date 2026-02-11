@@ -2637,6 +2637,17 @@
           return { ok: response.ok, status: response.status, data };
         }
 
+        function normalizeDirListForUi(dirList) {
+          if (!Array.isArray(dirList)) return [];
+          const normalized = [];
+          for (const raw of dirList) {
+            const value = String(raw || "").trim();
+            if (!value) continue;
+            if (!normalized.includes(value)) normalized.push(value);
+          }
+          return normalized;
+        }
+
         // Event listener for Firefox button
         elements.setFirefoxBtn.addEventListener("click", async () => {
           window.selectedCookieFile = null; // Clear manual selection
@@ -2712,30 +2723,23 @@
         });
 
         elements.saveLocalVideoDirsBtn.addEventListener("click", async () => {
-          const dirs = elements.localVideoDirsInput.value
-            .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
+          const inputDirs = normalizeDirListForUi(
+            elements.localVideoDirsInput.value.split("\n"),
+          );
 
           try {
-            const result = await postSettings({ localVideoDirs: dirs });
+            const result = await postSettings({ localVideoDirs: inputDirs });
             const savedDirs = Array.isArray(result.data?.settings?.localVideoDirs)
               ? result.data.settings.localVideoDirs
               : null;
-            const saved =
-              result.ok &&
-              Array.isArray(savedDirs) &&
-              savedDirs.length === dirs.length &&
-              savedDirs.every((v, i) => v === dirs[i]);
+            const saved = result.ok && Array.isArray(savedDirs);
 
             if (!saved) {
               const refreshed = await loadServerSettings();
               const refreshedDirs = Array.isArray(refreshed?.localVideoDirs)
                 ? refreshed.localVideoDirs
                 : [];
-              const recovered =
-                refreshedDirs.length === dirs.length &&
-                refreshedDirs.every((v, i) => v === dirs[i]);
+              const recovered = refreshed && Array.isArray(refreshedDirs);
               if (!recovered) {
                 throw new Error(
                   `フォルダー設定の保存に失敗しました (status: ${result.status})`,
@@ -2743,14 +2747,32 @@
               }
             }
 
+            const appliedDirs = Array.isArray(savedDirs) ? savedDirs : inputDirs;
             elements.localVideoDirsStatus.textContent =
-              dirs.length > 0
-                ? `${dirs.length} 件のフォルダーを登録しました`
+              appliedDirs.length > 0
+                ? `${appliedDirs.length} 件のフォルダーを登録しました`
                 : "追加フォルダーをクリアしました";
 
             await loadLocalVideos();
           } catch (error) {
             console.error("ローカル動画フォルダー設定の保存に失敗:", error);
+            const refreshed = await loadServerSettings();
+            const refreshedDirs = normalizeDirListForUi(
+              refreshed?.localVideoDirs || [],
+            );
+            const recovered =
+              refreshedDirs.length === inputDirs.length &&
+              refreshedDirs.every((v, i) => v === inputDirs[i]);
+
+            if (recovered) {
+              elements.localVideoDirsStatus.textContent =
+                refreshedDirs.length > 0
+                  ? `${refreshedDirs.length} 件のフォルダーを登録しました`
+                  : "追加フォルダーをクリアしました";
+              await loadLocalVideos();
+              return;
+            }
+
             elements.localVideoDirsStatus.textContent =
               "保存に失敗しました。パスを確認して再試行してください。";
           }
