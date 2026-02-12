@@ -80,3 +80,23 @@ Frontend scripts are split under `public/`:
 - `app-state.js` (shared app state)
 - `app-actions.js` (download form actions)
 - `app-routing.js` (header/hash routing)
+
+## Performance Check (Browser)
+
+Runtime performance metrics are logged in DevTools console as `[perf] ...`.
+You can also inspect current aggregated stats:
+
+```js
+window.getPerfMetricSummary()
+```
+
+Typical keys:
+
+- `local_videos_load_ms`
+- `home_render_ms`
+- `home_prefetch_ms`
+- `info_load_ms`
+- `chat_load_ms`
+
+Use these values (especially `p50` / `p95`) before and after changes to
+compare performance impact.

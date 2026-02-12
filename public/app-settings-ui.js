@@ -3,7 +3,8 @@
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
-  alertImpl: (message) => global.alert?.(message),
+  notifyInfoImpl: (message) => global.alert?.(message),
+  notifyErrorImpl: (message) => global.alert?.(message),
   confirmImpl: (message) => global.confirm?.(message) ?? true,
   writeClipboardTextImpl: async (text) => {
     if (global.navigator?.clipboard?.writeText) {
@@ -165,10 +166,10 @@ function clampNumberInRange(value, min, max, fallback) {
             });
             const result = await settingsUiDeps.parseApiResponseImpl(response);
             if (!result.ok) throw new Error(result.error || "履歴の削除に失敗しました。");
-            settingsUiDeps.alertImpl(result.data?.message || "履歴を削除しました。");
+            settingsUiDeps.notifyInfoImpl(result.data?.message || "履歴を削除しました。");
           } catch (error) {
             console.error("履歴削除エラー:", error);
-            settingsUiDeps.alertImpl("履歴の削除に失敗しました。");
+            settingsUiDeps.notifyErrorImpl("履歴の削除に失敗しました。");
           }
         });
       }
@@ -288,15 +289,15 @@ function clampNumberInRange(value, min, max, fallback) {
         copyPlaylistUrlBtn.addEventListener("click", async () => {
           const playlistUrl = youtubePlaylistUrlOutput.value;
           if (!playlistUrl) {
-            settingsUiDeps.alertImpl("変換された再生リストURLがありません。");
+            settingsUiDeps.notifyErrorImpl("変換された再生リストURLがありません。");
             return;
           }
           try {
             await settingsUiDeps.writeClipboardTextImpl(playlistUrl);
-            settingsUiDeps.alertImpl("再生リストURLをコピーしました！");
+            settingsUiDeps.notifyInfoImpl("再生リストURLをコピーしました！");
           } catch (err) {
             console.error("Failed to copy: ", err);
-            settingsUiDeps.alertImpl("コピーに失敗しました。手動でコピーしてください。");
+            settingsUiDeps.notifyErrorImpl("コピーに失敗しました。手動でコピーしてください。");
           }
         });
       }

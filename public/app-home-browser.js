@@ -345,12 +345,64 @@
     homeVideoGrid.innerHTML = `<div class="home-video-empty">${message}</div>`;
   }
 
-  function renderHomeVideoCards(homeVideoGrid, videos, createCard, enrichCardInfo) {
-    videos.forEach((video) => {
-      const { item, refs } = createCard(video);
-      homeVideoGrid.appendChild(item);
-      enrichCardInfo(video, refs);
-    });
+  function scheduleNextFrame(callback) {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(callback);
+      return;
+    }
+    setTimeout(callback, 0);
+  }
+
+  function buildVideoStableKey(video) {
+    return String(video?.filename || "");
+  }
+
+  function areStringArraysEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    return a.every((value, index) => value === b[index]);
+  }
+
+  async function renderHomeVideoCardsStaged({
+    homeVideoGrid,
+    videos,
+    createCard,
+    enrichCardInfo,
+    cardRefsByVideoId,
+    renderTokenRef,
+    initialBatchSize = 24,
+    chunkSize = 18,
+  }) {
+    if (!homeVideoGrid) return;
+    const renderToken = renderTokenRef.current;
+    const appendBatch = (start, end) => {
+      if (renderTokenRef.current !== renderToken) return false;
+      const fragment = document.createDocumentFragment();
+      for (let i = start; i < end; i += 1) {
+        const video = videos[i];
+        const { item, refs } = createCard(video);
+        const videoId = getVideoIdFromFilename(video.filename);
+        if (videoId) {
+          cardRefsByVideoId.set(videoId, { video, refs });
+        }
+        fragment.appendChild(item);
+        enrichCardInfo(video, refs);
+      }
+      homeVideoGrid.appendChild(fragment);
+      return true;
+    };
+
+    const firstEnd = Math.min(videos.length, initialBatchSize);
+    appendBatch(0, firstEnd);
+
+    let offset = firstEnd;
+    while (offset < videos.length) {
+      await new Promise((resolve) => scheduleNextFrame(resolve));
+      const nextEnd = Math.min(offset + chunkSize, videos.length);
+      const applied = appendBatch(offset, nextEnd);
+      if (!applied) return;
+      offset = nextEnd;
+    }
   }
 
   async function getCachedHomeInfo(homeInfoData, homeInfoCache, video) {
@@ -394,7 +446,7 @@
     };
   }
 
-  function renderHomeVideoBrowserGrid({
+  async function renderHomeVideoBrowserGrid({
     homeVideoGrid,
     allVideos,
     homeInfoData,
@@ -402,10 +454,15 @@
     homeSearchInput,
     createHomeVideoCard,
     enrichHomeCardInfo,
+    cardRefsByVideoId,
+    renderedKeysRef,
+    renderTokenRef,
+    onMetric,
   }) {
     if (!homeVideoGrid) return;
-    homeVideoGrid.innerHTML = "";
+    const renderStart = performance.now();
     if (allVideos.length === 0) {
+      homeVideoGrid.innerHTML = "";
       renderHomeVideoGridEmpty(homeVideoGrid, "動画が見つかりません");
       return;
     }
@@ -416,15 +473,32 @@
       homeSearchInput,
     );
     if (filteredVideos.length === 0) {
+      homeVideoGrid.innerHTML = "";
       renderHomeVideoGridEmpty(homeVideoGrid, "検索条件に一致する動画がありません");
       return;
     }
-    renderHomeVideoCards(
+
+    const nextKeys = filteredVideos.map((video) => buildVideoStableKey(video));
+    if (areStringArraysEqual(nextKeys, renderedKeysRef.current)) {
+      return;
+    }
+    renderedKeysRef.current = nextKeys;
+    cardRefsByVideoId.clear();
+    homeVideoGrid.innerHTML = "";
+    renderTokenRef.current += 1;
+
+    await renderHomeVideoCardsStaged({
       homeVideoGrid,
-      filteredVideos,
-      createHomeVideoCard,
-      enrichHomeCardInfo,
-    );
+      videos: filteredVideos,
+      createCard: createHomeVideoCard,
+      enrichCardInfo: enrichHomeCardInfo,
+      cardRefsByVideoId,
+      renderTokenRef,
+    });
+    onMetric?.("home_render_ms", performance.now() - renderStart, {
+      total: allVideos.length,
+      rendered: filteredVideos.length,
+    });
   }
 
   function bindHomeVideoBrowserEvents({
@@ -519,10 +593,15 @@
     filterChannel,
     filterClearBtn,
     onSelectVideo,
+    onMetric = (_name, _value, _meta) => {},
   }) {
     let allVideos = [];
     const homeInfoCache = new Map();
     const homeInfoData = new Map();
+    const cardRefsByVideoId = new Map();
+    const renderedKeysRef = { current: [] };
+    const renderTokenRef = { current: 0 };
+    let lastFilteredVideos = [];
     const createHomeVideoCard = createHomeVideoCardFactory(onSelectVideo);
     const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData, homeInfoCache);
     const homeSearchInputs = {
@@ -554,8 +633,16 @@
       render();
     }
 
-    function render() {
-      renderHomeVideoBrowserGrid({
+    async function render() {
+      const filterState = getHomeFilterStateFromInputs(homeSearchInputs);
+      const terms = getHomeSearchTermsFromInput(homeSearchInput);
+      lastFilteredVideos = filterHomeVideosWithInputs(
+        allVideos,
+        homeInfoData,
+        filterState,
+        terms,
+      );
+      await renderHomeVideoBrowserGrid({
         homeVideoGrid,
         allVideos,
         homeInfoData,
@@ -563,6 +650,10 @@
         homeSearchInput,
         createHomeVideoCard,
         enrichHomeCardInfo,
+        cardRefsByVideoId,
+        renderedKeysRef,
+        renderTokenRef,
+        onMetric,
       });
     }
 
@@ -597,16 +688,31 @@
     async function prefetch() {
       const maxPrefetch = 120;
       const concurrency = 6;
-      const targets = allVideos.slice(0, maxPrefetch);
+      const prioritized = [
+        ...lastFilteredVideos,
+        ...allVideos.filter((video) => !lastFilteredVideos.includes(video)),
+      ];
+      const targets = prioritized.slice(0, maxPrefetch);
       if (targets.length === 0) return;
 
+      const startedAt = performance.now();
       for (let i = 0; i < targets.length; i += concurrency) {
         const batch = targets
           .slice(i, i + concurrency)
           .map((video) => getCachedHomeInfo(homeInfoData, homeInfoCache, video));
         await Promise.allSettled(batch);
       }
-      render();
+      onMetric?.("home_prefetch_ms", performance.now() - startedAt, {
+        targetCount: targets.length,
+      });
+      for (const video of targets) {
+        const videoId = getVideoIdFromFilename(video.filename);
+        const mapped = cardRefsByVideoId.get(videoId);
+        const info = homeInfoData.get(videoId);
+        if (mapped && info) {
+          applyHomeCardInfoFromInfo(mapped.video, mapped.refs, info);
+        }
+      }
     }
 
     return {

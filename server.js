@@ -253,6 +253,7 @@ registerInfoRoutes(app, {
   getProvisionalInfoPath: localVideoService.getProvisionalInfoPath,
   findLocalVideoPathById: localVideoService.findLocalVideoPathById,
   createProvisionalInfoFromVideo: localVideoService.createProvisionalInfoFromVideo,
+  ensureProvisionalInfo: localVideoService.ensureProvisionalInfo,
 });
 
 registerLocalMediaRoutes(app, {

@@ -22,6 +22,8 @@
     fetchImpl = fetch,
     doc = document,
     alertImpl = alert,
+    notifyInfo = () => {},
+    notifyError = (message) => alertImpl(message),
     getSelectedCookieFile = () => global.selectedCookieFile,
     onError = (error) => console.error("Fetch error:", error),
   }) {
@@ -32,7 +34,7 @@
     function parseInputUrls(urlsInput) {
       const parsed = parseUrlsFromInputValue(urlsInput?.value);
       if (!parsed.ok) {
-        alertImpl("URLを入力してください。");
+        notifyError("URLを入力してください。");
         return null;
       }
       return parsed.urls;
@@ -40,7 +42,7 @@
 
     async function validateSingleUrl(url) {
       if (!isHttpsUrl(url)) {
-        alertImpl(
+        notifyError(
           `「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`,
         );
         return false;
@@ -54,7 +56,7 @@
       if (validationData.isValid) return true;
       const errorMessage = validationData.error || validationResult.error || "";
 
-      alertImpl(
+      notifyError(
         `「${url}」はアクセスできません。${errorMessage ? `エラー: ${errorMessage}` : ""}`,
       );
       return false;
@@ -101,7 +103,7 @@
       const result = await parseApiResponse(response);
       if (result.ok) return true;
 
-      alertImpl(`エラー: ${result.error || "ダウンロードの開始に失敗しました。"}`);
+      notifyError(`エラー: ${result.error || "ダウンロードの開始に失敗しました。"}`);
       return false;
     }
 
@@ -120,10 +122,11 @@
         const formData = buildDownloadFormData(urlsInput);
         const submitted = await submitDownload(formData);
         if (submitted) {
+          notifyInfo("ダウンロードを開始しました。");
           urlsInput.value = "";
         }
       } catch (error) {
-        alertImpl(`ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`);
+        notifyError(`ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`);
         onError(error);
       } finally {
         setButtonDisabled(downloadBtn, false);

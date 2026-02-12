@@ -20,6 +20,10 @@ function createLocalVideoService(deps) {
   let ffprobeCommandCache;
   const fallbackThumbnailJobs = new Map();
   const failedFallbackThumbnails = new Set();
+  const provisionalInfoJobs = new Map();
+  const provisionalJobQueue = [];
+  let activeProvisionalJobs = 0;
+  const PROVISIONAL_JOB_CONCURRENCY = 2;
 
   async function resolveFfmpegCommand() {
     if (typeof ffmpegCommandCache !== "undefined") return ffmpegCommandCache;
@@ -300,6 +304,75 @@ function createLocalVideoService(deps) {
     };
   }
 
+  async function readFreshProvisionalInfo(provisionalPath, stats) {
+    if (!fs.existsSync(provisionalPath)) return null;
+    try {
+      const raw = await fs.promises.readFile(provisionalPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      const sameMtime = Number(parsed?._source_mtime_ms) === Number(stats.mtimeMs);
+      const sameSize = Number(parsed?._source_size) === Number(stats.size);
+      const sameVersion = Number(parsed?._provisional_info_version) >= 3;
+      if (sameMtime && sameSize && sameVersion) {
+        return parsed;
+      }
+    } catch (_error) {
+      // ignore broken cache
+    }
+    return null;
+  }
+
+  function pumpProvisionalQueue() {
+    while (
+      activeProvisionalJobs < PROVISIONAL_JOB_CONCURRENCY &&
+      provisionalJobQueue.length > 0
+    ) {
+      const next = provisionalJobQueue.shift();
+      if (!next) break;
+      activeProvisionalJobs += 1;
+      next.run()
+        .then(next.resolve)
+        .catch(next.reject)
+        .finally(() => {
+          activeProvisionalJobs = Math.max(0, activeProvisionalJobs - 1);
+          pumpProvisionalQueue();
+        });
+    }
+  }
+
+  function enqueueProvisionalInfoJob(run) {
+    return new Promise((resolve, reject) => {
+      provisionalJobQueue.push({ run, resolve, reject });
+      pumpProvisionalQueue();
+    });
+  }
+
+  async function ensureProvisionalInfo(videoPath, videoId) {
+    const provisionalPath = getProvisionalInfoPath(videoId);
+    const stats = await fs.promises.stat(videoPath);
+    const fresh = await readFreshProvisionalInfo(provisionalPath, stats);
+    if (fresh) {
+      return { path: provisionalPath, info: fresh, fromCache: true };
+    }
+
+    if (!provisionalInfoJobs.has(provisionalPath)) {
+      const task = enqueueProvisionalInfoJob(async () => {
+        const provisionalInfo = await createProvisionalInfoFromVideo(videoPath, videoId);
+        await fs.promises.writeFile(
+          provisionalPath,
+          JSON.stringify(provisionalInfo, null, 2),
+          "utf-8",
+        );
+        return { path: provisionalPath, info: provisionalInfo, fromCache: false };
+      });
+      provisionalInfoJobs.set(provisionalPath, task);
+      task.finally(() => {
+        provisionalInfoJobs.delete(provisionalPath);
+      });
+    }
+
+    return provisionalInfoJobs.get(provisionalPath);
+  }
+
   async function ensureFallbackThumbnail(videoPath) {
     const outputPath = getFallbackThumbPath(videoPath);
     if (fs.existsSync(outputPath)) return outputPath;
@@ -387,6 +460,7 @@ function createLocalVideoService(deps) {
     getProvisionalInfoPath,
     findLocalVideoPathById,
     createProvisionalInfoFromVideo,
+    ensureProvisionalInfo,
     ensureFallbackThumbnail,
   };
 }

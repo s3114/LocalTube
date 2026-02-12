@@ -9,11 +9,56 @@ const appState = window.AppState || {
       // --- Helper Functions ---
       const appCore = window.createAppCore({ jobStates });
       const { renderJob, updateJobElement, parseApiResponse, linkifyText } = appCore;
+      const perfMetrics = new Map();
+      window.recordPerfMetric = (name, value, meta = {}) => {
+        if (!Number.isFinite(value)) return;
+        const key = String(name || "unknown");
+        if (!perfMetrics.has(key)) perfMetrics.set(key, []);
+        const list = perfMetrics.get(key);
+        list.push(Number(value));
+        if (list.length > 30) list.shift();
+        const sorted = [...list].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const p50 = sorted[mid];
+        const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+        console.debug(`[perf] ${key}`, {
+          latest: Math.round(value),
+          p50: Math.round(p50),
+          p95: Math.round(p95),
+          samples: sorted.length,
+          ...meta,
+        });
+      };
+      window.getPerfMetricSummary = () => {
+        const summary = {};
+        for (const [key, list] of perfMetrics.entries()) {
+          if (list.length === 0) continue;
+          const sorted = [...list].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          summary[key] = {
+            samples: sorted.length,
+            min: Math.round(sorted[0]),
+            p50: Math.round(sorted[mid]),
+            p95: Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]),
+            max: Math.round(sorted[sorted.length - 1]),
+          };
+        }
+        return summary;
+      };
+      const uiFeedback = window.createUiFeedback?.() || {
+        showInfo: () => {},
+        showSuccess: () => {},
+        showError: () => {},
+      };
 
       const dashboardController = window.createDashboardController({
         jobStates,
         renderJob,
         updateJobElement,
+        documentRef: document,
+        EventSourceImpl: window.EventSource,
+        ChartImpl: window.Chart,
+        nowProvider: () => new Date(),
       });
       const localVideoModule = window.createLocalVideoModule({
         appState,
@@ -25,6 +70,12 @@ const appState = window.AppState || {
         getVideoIdFromFilename,
         createCommentRenderer,
         createChatLineElementFromMessage,
+        onMetric: (name, value, meta) => window.recordPerfMetric?.(name, value, meta),
+        onError: (message, error) => {
+          console.error(message, error);
+          const suffix = error?.message ? ` ${error.message}` : "";
+          uiFeedback.showError(`${message}${suffix}`);
+        },
       });
       const { createVideoDataController, createLocalVideoController } =
         localVideoModule;
@@ -87,7 +138,8 @@ const appState = window.AppState || {
           dependencies: {
             parseApiResponseImpl: parseApiResponse,
             fetchImpl: (...args) => fetch(...args),
-            alertImpl: (message) => alert(message),
+            notifyInfoImpl: (message) => uiFeedback.showInfo(message),
+            notifyErrorImpl: (message) => uiFeedback.showError(message),
             confirmImpl: (message) => confirm(message),
             writeClipboardTextImpl: (text) => navigator.clipboard.writeText(text),
           },
@@ -101,6 +153,11 @@ const appState = window.AppState || {
       // --- Actions ---
       const downloadActions = window.createDownloadActions({
         parseApiResponse,
+        notifyInfo: (message) => uiFeedback.showSuccess(message),
+        notifyError: (message) => uiFeedback.showError(message),
+        onError: (error) => {
+          console.error("Fetch error:", error);
+        },
       });
       window.start = () => downloadActions.startDownload();
 
