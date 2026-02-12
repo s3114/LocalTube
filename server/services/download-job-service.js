@@ -107,15 +107,106 @@ function createDownloadJobService({
     }
   }
 
-  function parseProgressFromLine(line) {
-    const progressMatch = line.match(/\[download\]\s+([\d.]+)%/);
-    if (!progressMatch) return null;
+  function parseDownloadProgressFromLine(line) {
+    const detailMatch = line.match(
+      /\[download\]\s+([\d.]+)%\s+of\s+(.+?)\s+at\s+(.+?)\s+ETA\s+(.+)/i,
+    );
+    if (detailMatch) {
+      return {
+        percentage: Math.max(0, Math.min(100, parseFloat(detailMatch[1]))),
+        totalSize: detailMatch[2],
+        speed: detailMatch[3],
+        eta: detailMatch[4],
+      };
+    }
+
+    const simpleMatch = line.match(/\[download\]\s+([\d.]+)%/i);
+    if (!simpleMatch) return null;
     return {
-      percentage: parseFloat(progressMatch[1]),
-      totalSize: progressMatch[2],
-      speed: progressMatch[3],
-      eta: progressMatch[4],
+      percentage: Math.max(0, Math.min(100, parseFloat(simpleMatch[1]))),
+      totalSize: "",
+      speed: "",
+      eta: "ダウンロード中...",
     };
+  }
+
+  function parseCommentProgressFromLine(line, progressState, currentProgress) {
+    const sectionMatch = line.match(/\[youtube\]\s+Downloading comment section API JSON/i);
+    if (sectionMatch) {
+      return {
+        percentage: currentProgress?.percentage || 0,
+        totalSize: currentProgress?.totalSize || "",
+        speed: "",
+        eta: "コメント取得の準備中...",
+      };
+    }
+
+    const totalMatch = line.match(/\[youtube\]\s+Downloading\s+~?(\d+)\s+comments/i);
+    if (totalMatch) {
+      progressState.commentTotal = Number(totalMatch[1]);
+      progressState.commentCurrent = 0;
+      const total = progressState.commentTotal || 0;
+      return {
+        percentage: progressState.sawDownload ? 85 : 0,
+        totalSize: total > 0 ? `0/${total} comments` : "",
+        speed: "",
+        eta: total > 0 ? `コメント取得中 (0/${total})` : "コメント取得中...",
+      };
+    }
+
+    const pageMatch = line.match(
+      /\[youtube\]\s+Downloading comment API JSON page \d+\s+\((\d+)\/~?(\d+)\)/i,
+    );
+    if (pageMatch) {
+      const current = Number(pageMatch[1]);
+      const total = Number(pageMatch[2]);
+      progressState.commentCurrent = Number.isFinite(current) ? current : 0;
+      progressState.commentTotal = Number.isFinite(total) && total > 0 ? total : null;
+
+      const ratio =
+        progressState.commentTotal && progressState.commentTotal > 0
+          ? Math.max(0, Math.min(1, progressState.commentCurrent / progressState.commentTotal))
+          : 0;
+      const percentage = progressState.sawDownload
+        ? 85 + Math.round(ratio * 14)
+        : Math.round(ratio * 100);
+      const currentText = progressState.commentCurrent || 0;
+      const totalText = progressState.commentTotal || "?";
+      return {
+        percentage,
+        totalSize: `${currentText}/${totalText} comments`,
+        speed: "",
+        eta: `コメント取得中 (${currentText}/${totalText})`,
+      };
+    }
+
+    const extractedMatch = line.match(/\[youtube\]\s+Extracted\s+(\d+)\s+comments/i);
+    if (extractedMatch) {
+      const extracted = Number(extractedMatch[1]);
+      progressState.commentCurrent = Number.isFinite(extracted) ? extracted : 0;
+      if (!progressState.commentTotal || progressState.commentTotal < progressState.commentCurrent) {
+        progressState.commentTotal = progressState.commentCurrent;
+      }
+      const currentText = progressState.commentCurrent || 0;
+      const totalText = progressState.commentTotal || currentText || "?";
+      return {
+        percentage: progressState.sawDownload ? 99 : 100,
+        totalSize: `${currentText}/${totalText} comments`,
+        speed: "",
+        eta: `コメント抽出完了 (${currentText}件)`,
+      };
+    }
+
+    return null;
+  }
+
+  function parseProgressFromLine(line, progressState, currentProgress) {
+    const downloadProgress = parseDownloadProgressFromLine(line);
+    if (downloadProgress) {
+      progressState.sawDownload = true;
+      return downloadProgress;
+    }
+    return parseCommentProgressFromLine(line, progressState, currentProgress);
   }
 
   function getTitle(ytDlpPath, url, cookiePath, settings) {
@@ -276,6 +367,11 @@ function createDownloadJobService({
 
       let stderrOutput = "";
       let stdoutBuffer = "";
+      const progressState = {
+        sawDownload: false,
+        commentTotal: null,
+        commentCurrent: 0,
+      };
 
       ytDlp.stdout.on("data", (data) => {
         stdoutBuffer += data.toString();
@@ -284,9 +380,12 @@ function createDownloadJobService({
 
         for (const line of lines) {
           if (line.trim() === "") continue;
-          const progress = parseProgressFromLine(line);
+          const progress = parseProgressFromLine(line, progressState, job.progress);
           if (!progress) continue;
-          job.progress = progress;
+          job.progress = {
+            ...job.progress,
+            ...progress,
+          };
           broadcast("progress_update", { id: job.id, progress: job.progress });
         }
       });
