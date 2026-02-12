@@ -278,6 +278,49 @@ registerScheduleRoutes(app, {
   spawn,
 });
 
+app.post("/api/system/restart", (_req, res) => {
+  try {
+    const scriptPath = path.resolve(__dirname, "server.js");
+const helperCode = `
+const { spawn } = require("child_process");
+const nodePath = ${JSON.stringify(process.execPath)};
+const scriptPath = ${JSON.stringify(scriptPath)};
+const cwd = ${JSON.stringify(__dirname)};
+
+setTimeout(() => {
+  const child = spawn(nodePath, [scriptPath], {
+    cwd,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+    env: process.env,
+  });
+  child.unref();
+}, 1000);
+`;
+    const child = spawn(process.execPath, ["-e", helperCode], {
+      cwd: __dirname,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      env: { ...process.env },
+    });
+
+    child.unref();
+    apiOk(res, {
+      message: "サーバーを再起動しています。数秒後に再読み込みしてください。",
+    });
+
+    setTimeout(() => {
+      process.exit(0);
+    }, 300);
+  } catch (error) {
+    apiError(res, 500, "サーバー再起動に失敗しました。", {
+      detail: error.message,
+    });
+  }
+});
+
 // ■ サーバーの起動
 // --------------------------------------------------
 function startServer(listenPort = port) {
