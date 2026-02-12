@@ -180,11 +180,20 @@
     }
 
     function prependDashboardConnectionError() {
-      const jobQueueDiv = documentRef.getElementById("job-queue");
-      if (!jobQueueDiv) return;
-      jobQueueDiv.innerHTML =
-        '<div class="status-warn-text">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' +
-        jobQueueDiv.innerHTML;
+      const statusWrap = documentRef.getElementById("header-connection-status");
+      const statusText = documentRef.getElementById("header-connection-status-text");
+      if (!statusWrap || !statusText) return;
+      statusText.textContent =
+        "サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。";
+      statusWrap.classList.add("visible");
+    }
+
+    function clearDashboardConnectionError() {
+      const statusWrap = documentRef.getElementById("header-connection-status");
+      const statusText = documentRef.getElementById("header-connection-status-text");
+      if (!statusWrap || !statusText) return;
+      statusWrap.classList.remove("visible");
+      statusText.textContent = "";
     }
 
     function applyDashboardJobPatch({ id, patch, onJobUpdated, updateCounts }) {
@@ -199,12 +208,62 @@
     }
 
     function createSseController({ jobQueueElement, onJobUpdated }) {
+      const AUTO_RELOAD_KEY = "localtube.sseReloadAttempts";
+      const MAX_AUTO_RELOAD_ATTEMPTS = 10;
+      let reloadTimer = null;
       const netBuffer = [];
       const latencyBuffer = [];
       const avgWindow = 5;
       const networkChart = createDashboardNetworkChart();
 
       const eventSource = new EventSourceImpl("/events");
+      eventSource.onopen = () => {
+        if (reloadTimer) {
+          clearTimeout(reloadTimer);
+          reloadTimer = null;
+        }
+        try {
+          sessionStorage.removeItem(AUTO_RELOAD_KEY);
+        } catch {
+          // noop
+        }
+        clearDashboardConnectionError();
+      };
+
+      function scheduleAutoReloadOnDisconnect() {
+        if (reloadTimer) return;
+
+        let attempts = 0;
+        try {
+          attempts = Number(sessionStorage.getItem(AUTO_RELOAD_KEY) || "0");
+        } catch {
+          attempts = 0;
+        }
+
+        if (attempts >= MAX_AUTO_RELOAD_ATTEMPTS) return;
+
+        const nextAttempt = attempts + 1;
+        const delayMs = Math.min(15000, 3000 + (nextAttempt - 1) * 1000);
+        try {
+          sessionStorage.setItem(AUTO_RELOAD_KEY, String(nextAttempt));
+        } catch {
+          // noop
+        }
+
+        const statusWrap = documentRef.getElementById("header-connection-status");
+        const statusText = documentRef.getElementById("header-connection-status-text");
+        if (statusWrap && statusText) {
+          statusText.textContent =
+            `サーバーとの接続が切れました。${Math.ceil(delayMs / 1000)}秒後に再接続を試みます。`;
+          statusWrap.classList.add("visible");
+        }
+
+        reloadTimer = setTimeout(() => {
+          if (typeof global.location?.reload === "function") {
+            global.location.reload();
+          }
+        }, delayMs);
+      }
 
       eventSource.addEventListener("initial_state", (e) => {
         const jobs = JSON.parse(e.data);
@@ -254,6 +313,7 @@
       eventSource.onerror = (error) => {
         onSseError(error);
         prependDashboardConnectionError();
+        scheduleAutoReloadOnDisconnect();
         eventSource.close();
       };
 

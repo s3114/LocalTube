@@ -160,6 +160,27 @@
         font-size: 14px;
       }
 
+      .header-connection-status {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #7a3f00;
+        background: rgba(255, 152, 0, 0.14);
+        color: #ffd7a6;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        line-height: 1.2;
+        white-space: nowrap;
+        max-width: 520px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .header-connection-status.visible {
+        display: inline-flex;
+      }
+
       .header-search {
         width: 100%;
         background: transparent;
@@ -2109,6 +2130,11 @@
               </div>
             </div>
           </div>
+        </div>
+        <div id="header-connection-status" class="header-connection-status"
+          role="status" aria-live="polite">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="header-connection-status-text"></span>
         </div>
         <div class="header-buttons">
           <button
