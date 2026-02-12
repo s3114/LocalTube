@@ -341,6 +341,15 @@
     }) {
       let allLocalVideos = [];
 
+      function scheduleHomeInfoPrefetch() {
+        if (!onPrefetchHomeInfos) return;
+        if (typeof window.requestIdleCallback === "function") {
+          window.requestIdleCallback(() => onPrefetchHomeInfos());
+          return;
+        }
+        setTimeout(() => onPrefetchHomeInfos(), 0);
+      }
+
       function playLocalVideo(video, activeItem = null, shouldAutoplay = true) {
         const videoId = getVideoIdFromFilename(video.filename);
         activateLocalVideoListItem(activeItem);
@@ -362,7 +371,7 @@
 
           renderLocalVideoList(videoList, allLocalVideos, playLocalVideo);
           onRenderHomeVideos?.(allLocalVideos);
-          onPrefetchHomeInfos?.();
+          scheduleHomeInfoPrefetch();
 
           if (appState.pendingVideoId) {
             const matchedVideo = findLocalVideoById(allLocalVideos, appState.pendingVideoId);
@@ -395,4 +404,3 @@
 
   global.createLocalVideoModule = createLocalVideoModule;
 })(window);
-

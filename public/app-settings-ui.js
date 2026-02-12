@@ -1,4 +1,27 @@
 // Settings UI module extracted from app.js
+(function attachSettingsUi(global) {
+const defaultSettingsUiDependencies = {
+  fetchImpl: (...args) => global.fetch(...args),
+  parseApiResponseImpl: (response) => global.parseApiResponse(response),
+  alertImpl: (message) => global.alert?.(message),
+  confirmImpl: (message) => global.confirm?.(message) ?? true,
+  writeClipboardTextImpl: async (text) => {
+    if (global.navigator?.clipboard?.writeText) {
+      await global.navigator.clipboard.writeText(text);
+      return;
+    }
+    throw new Error("Clipboard API unavailable");
+  },
+};
+
+let settingsUiDeps = { ...defaultSettingsUiDependencies };
+
+function setSettingsUiDependencies(overrides = {}) {
+  settingsUiDeps = {
+    ...defaultSettingsUiDependencies,
+    ...overrides,
+  };
+}
 
 function clampNumberInRange(value, min, max, fallback) {
         const num = Number(value);
@@ -19,15 +42,23 @@ function clampNumberInRange(value, min, max, fallback) {
       function applyLocalVideoDirsFromServer(elements, settings) {
         const dirs = Array.isArray(settings.localVideoDirs) ? settings.localVideoDirs : [];
         elements.localVideoDirsInput.value = dirs.join("\n");
-        elements.localVideoDirsStatus.textContent =
+        setSettingStatus(
+          elements.localVideoDirsStatus,
           dirs.length > 0
             ? `${dirs.length} 件のフォルダーを登録中`
-            : "追加フォルダーは未設定です";
+            : "追加フォルダーは未設定です",
+          "muted",
+        );
       }
 
       function applyFallbackThumbnailSettingFromServer(elements, settings) {
         const fallbackEnabled = settings.enableFallbackThumbnails !== false;
         elements.optFallbackThumbnails.checked = fallbackEnabled;
+        setSettingStatus(
+          elements.fallbackThumbStatus,
+          fallbackEnabled ? "有効です" : "無効です",
+          "muted",
+        );
       }
 
       function getWallpaperStyleFromServerSettings(settings) {
@@ -41,8 +72,20 @@ function clampNumberInRange(value, min, max, fallback) {
         return { blurValue, brightnessValue };
       }
 
-      function setWallpaperStatusText(elements, message) {
-        elements.wallpaperStatus.textContent = message;
+      function setSettingStatus(targetElement, message, tone = "info") {
+        if (!targetElement) return;
+        targetElement.textContent = message;
+        const colorMap = {
+          info: "var(--blue)",
+          success: "var(--green)",
+          error: "var(--accent)",
+          muted: "var(--subtext)",
+        };
+        targetElement.style.color = colorMap[tone] || colorMap.info;
+      }
+
+      function setWallpaperStatusText(elements, message, tone = "info") {
+        setSettingStatus(elements.wallpaperStatus, message, tone);
       }
 
       function previewWallpaperFromRangeInputs(elements, bridge) {
@@ -115,17 +158,17 @@ function clampNumberInRange(value, min, max, fallback) {
 
       function initializeHistoryClearButton(elements) {
         elements.clearHistoryBtn.addEventListener("click", async () => {
-          if (!confirm("ダウンロード履歴を削除しますか？")) return;
+          if (!settingsUiDeps.confirmImpl("ダウンロード履歴を削除しますか？")) return;
           try {
-            const response = await fetch("/api/clear-history", {
+            const response = await settingsUiDeps.fetchImpl("/api/clear-history", {
               method: "POST",
             });
-            const result = await parseApiResponse(response);
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
             if (!result.ok) throw new Error(result.error || "履歴の削除に失敗しました。");
-            alert(result.data?.message || "履歴を削除しました。");
+            settingsUiDeps.alertImpl(result.data?.message || "履歴を削除しました。");
           } catch (error) {
             console.error("履歴削除エラー:", error);
-            alert("履歴の削除に失敗しました。");
+            settingsUiDeps.alertImpl("履歴の削除に失敗しました。");
           }
         });
       }
@@ -143,8 +186,8 @@ function clampNumberInRange(value, min, max, fallback) {
           try {
             autostartStatus.textContent = "処理中...";
             autostartStatus.style.color = "var(--blue)";
-            const response = await fetch(endpoint, { method: "POST" });
-            const result = await parseApiResponse(response);
+            const response = await settingsUiDeps.fetchImpl(endpoint, { method: "POST" });
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
 
             if (result.ok) {
               autostartStatus.textContent = result.data?.message || "完了しました。";
@@ -161,12 +204,12 @@ function clampNumberInRange(value, min, max, fallback) {
         }
 
         btnCreateAutostart?.addEventListener("click", () => {
-          if (confirm("PC起動時にこのアプリケーションを自動で起動するように設定しますか？")) {
+          if (settingsUiDeps.confirmImpl("PC起動時にこのアプリケーションを自動で起動するように設定しますか？")) {
             handleAutostart("/api/schedule/create");
           }
         });
         btnDeleteAutostart?.addEventListener("click", () => {
-          if (confirm("PC起動時の自動実行を解除しますか？")) {
+          if (settingsUiDeps.confirmImpl("PC起動時の自動実行を解除しますか？")) {
             handleAutostart("/api/schedule/delete");
           }
         });
@@ -219,12 +262,12 @@ function clampNumberInRange(value, min, max, fallback) {
           channelUrlError.textContent = "ハンドルを解決中...";
           resolveTimeout = setTimeout(async () => {
             try {
-              const response = await fetch("/api/resolve-handle", {
+              const response = await settingsUiDeps.fetchImpl("/api/resolve-handle", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url: channelUrl }),
               });
-              const result = await parseApiResponse(response);
+              const result = await settingsUiDeps.parseApiResponseImpl(response);
               if (result.ok) {
                 const channelId = result.data?.channelId;
                 if (!channelId) throw new Error("チャンネルIDの取得に失敗しました。");
@@ -245,15 +288,15 @@ function clampNumberInRange(value, min, max, fallback) {
         copyPlaylistUrlBtn.addEventListener("click", async () => {
           const playlistUrl = youtubePlaylistUrlOutput.value;
           if (!playlistUrl) {
-            alert("変換された再生リストURLがありません。");
+            settingsUiDeps.alertImpl("変換された再生リストURLがありません。");
             return;
           }
           try {
-            await navigator.clipboard.writeText(playlistUrl);
-            alert("再生リストURLをコピーしました！");
+            await settingsUiDeps.writeClipboardTextImpl(playlistUrl);
+            settingsUiDeps.alertImpl("再生リストURLをコピーしました！");
           } catch (err) {
             console.error("Failed to copy: ", err);
-            alert("コピーに失敗しました。手動でコピーしてください。");
+            settingsUiDeps.alertImpl("コピーに失敗しました。手動でコピーしてください。");
           }
         });
       }
@@ -292,18 +335,18 @@ function clampNumberInRange(value, min, max, fallback) {
         }
 
         async function postSettings(payload) {
-          const response = await fetch("/api/settings", {
+          const response = await settingsUiDeps.fetchImpl("/api/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          return parseApiResponse(response);
+          return settingsUiDeps.parseApiResponseImpl(response);
         }
 
         async function loadWallpaperMeta() {
           try {
-            const response = await fetch("/api/wallpaper-meta");
-            const result = await parseApiResponse(response);
+            const response = await settingsUiDeps.fetchImpl("/api/wallpaper-meta");
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
             if (!result.ok) return null;
             const data = result.data || {};
             applyWallpaperStyle(
@@ -311,21 +354,23 @@ function clampNumberInRange(value, min, max, fallback) {
               data.wallpaperBlur ?? 2,
               data.wallpaperBrightness ?? 50,
             );
-            elements.wallpaperStatus.textContent = data.exists
-              ? "壁紙を設定済み"
-              : "壁紙は未設定です";
+            setWallpaperStatusText(
+              elements,
+              data.exists ? "壁紙を設定済み" : "壁紙は未設定です",
+              "muted",
+            );
             return data;
           } catch (error) {
             console.error("壁紙情報の取得に失敗:", error);
-            elements.wallpaperStatus.textContent = "壁紙情報の取得に失敗しました";
+            setWallpaperStatusText(elements, "壁紙情報の取得に失敗しました", "error");
             return null;
           }
         }
 
         async function loadServerSettings() {
           try {
-            const response = await fetch("/api/settings");
-            const result = await parseApiResponse(response);
+            const response = await settingsUiDeps.fetchImpl("/api/settings");
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
             if (!result.ok) return null;
             const settings = result.data || {};
             applyCookieSettingsFromServer(
@@ -408,8 +453,8 @@ function clampNumberInRange(value, min, max, fallback) {
       }
 
       async function clearWallpaperSetting(elements, bridge) {
-        const response = await fetch("/api/wallpaper/clear", { method: "POST" });
-        const result = await parseApiResponse(response);
+        const response = await settingsUiDeps.fetchImpl("/api/wallpaper/clear", { method: "POST" });
+        const result = await settingsUiDeps.parseApiResponseImpl(response);
         if (!result.ok) {
           throw new Error(result.error || "壁紙のクリアに失敗しました。");
         }
@@ -428,11 +473,11 @@ function clampNumberInRange(value, min, max, fallback) {
           "wallpaperBrightness",
           elements.wallpaperBrightnessRange.value,
         );
-        const response = await fetch("/api/wallpaper", {
+        const response = await settingsUiDeps.fetchImpl("/api/wallpaper", {
           method: "POST",
           body: formData,
         });
-        const result = await parseApiResponse(response);
+        const result = await settingsUiDeps.parseApiResponseImpl(response);
         if (!result.ok) {
           throw new Error(result.error || "壁紙の保存に失敗しました。");
         }
@@ -464,13 +509,13 @@ function clampNumberInRange(value, min, max, fallback) {
               settingKey,
               Number(e.target.value),
               async () => {
-                setWallpaperStatusText(elements, successMessage);
+                setWallpaperStatusText(elements, successMessage, "success");
                 await bridge.loadWallpaperMeta();
               },
             );
           } catch (error) {
             console.error(`${settingKey} 設定の保存エラー:`, error);
-            setWallpaperStatusText(elements, failureMessage);
+            setWallpaperStatusText(elements, failureMessage, "error");
           }
         });
       }
@@ -540,10 +585,10 @@ function clampNumberInRange(value, min, max, fallback) {
         elements.wallpaperClearBtn.addEventListener("click", async () => {
           try {
             await clearWallpaperSetting(elements, bridge);
-            setWallpaperStatusText(elements, "壁紙をクリアしました。");
+            setWallpaperStatusText(elements, "壁紙をクリアしました。", "success");
           } catch (error) {
             console.error("壁紙クリアエラー:", error);
-            setWallpaperStatusText(elements, "壁紙のクリアに失敗しました。");
+            setWallpaperStatusText(elements, "壁紙のクリアに失敗しました。", "error");
           }
         });
 
@@ -553,12 +598,17 @@ function clampNumberInRange(value, min, max, fallback) {
 
           try {
             await uploadWallpaperFileSetting(elements, bridge, file);
-            setWallpaperStatusText(elements, `壁紙を保存しました: ${file.name}`);
+            setWallpaperStatusText(
+              elements,
+              `壁紙を保存しました: ${file.name}`,
+              "success",
+            );
           } catch (error) {
             console.error("壁紙の保存エラー:", error);
             setWallpaperStatusText(
               elements,
               "壁紙の保存に失敗しました。画像形式を確認してください。",
+              "error",
             );
           } finally {
             elements.wallpaperFileInput.value = "";
@@ -594,12 +644,16 @@ function clampNumberInRange(value, min, max, fallback) {
           const inputDirs = normalizeDirListForUi(
             elements.localVideoDirsInput.value.split("\n"),
           );
+          setSettingStatus(elements.localVideoDirsStatus, "保存中...", "info");
 
           try {
             const savedState = await saveLocalVideoDirsWithRecovery(bridge, inputDirs);
             const appliedDirs = savedState.dirs;
-            elements.localVideoDirsStatus.textContent =
-              buildLocalVideoDirsStatusText(appliedDirs);
+            setSettingStatus(
+              elements.localVideoDirsStatus,
+              buildLocalVideoDirsStatusText(appliedDirs),
+              "success",
+            );
             await onLocalVideosChanged?.();
           } catch (error) {
             console.error("ローカル動画フォルダー設定の保存に失敗:", error);
@@ -608,13 +662,19 @@ function clampNumberInRange(value, min, max, fallback) {
               inputDirs,
             );
             if (recoveredDirs) {
-              elements.localVideoDirsStatus.textContent =
-                buildLocalVideoDirsStatusText(recoveredDirs);
+              setSettingStatus(
+                elements.localVideoDirsStatus,
+                buildLocalVideoDirsStatusText(recoveredDirs),
+                "success",
+              );
               await onLocalVideosChanged?.();
               return;
             }
-            elements.localVideoDirsStatus.textContent =
-              "保存に失敗しました。パスを確認して再試行してください。";
+            setSettingStatus(
+              elements.localVideoDirsStatus,
+              "保存に失敗しました。パスを確認して再試行してください。",
+              "error",
+            );
           }
         });
       }
@@ -622,8 +682,14 @@ function clampNumberInRange(value, min, max, fallback) {
       function initializeFallbackThumbnailSettingUI(elements, bridge, onLocalVideosChanged) {
         elements.optFallbackThumbnails.addEventListener("change", async (e) => {
           const enabled = e.target.checked;
+          setSettingStatus(elements.fallbackThumbStatus, "保存中...", "info");
           try {
             await saveFallbackThumbnailSettingWithRecovery(bridge, enabled);
+            setSettingStatus(
+              elements.fallbackThumbStatus,
+              enabled ? "有効にしました" : "無効にしました",
+              "success",
+            );
             await onLocalVideosChanged?.();
           } catch (error) {
             console.error("仮サムネイル設定の保存に失敗:", error);
@@ -631,6 +697,11 @@ function clampNumberInRange(value, min, max, fallback) {
             if (!refreshed) {
               elements.optFallbackThumbnails.checked = !enabled;
             }
+            setSettingStatus(
+              elements.fallbackThumbStatus,
+              "保存に失敗しました。再試行してください。",
+              "error",
+            );
           }
         });
       }
@@ -639,7 +710,9 @@ function clampNumberInRange(value, min, max, fallback) {
 function initializeSettingsUiController({
         elements,
         onLocalVideosChanged,
+        dependencies = {},
       }) {
+        setSettingsUiDependencies(dependencies);
         initializeGeneralSettingStorageBindings(elements);
         initializeHistoryClearButton(elements);
         initializeAutostartTaskButtons();
@@ -660,4 +733,11 @@ function initializeSettingsUiController({
         );
       }
 
-      
+global.initializeSettingsUiController = initializeSettingsUiController;
+global.__settingsUiTestUtils = {
+    setSettingStatus,
+    buildLocalVideoDirsStatusText,
+    applyLocalVideoDirsFromServer,
+    applyFallbackThumbnailSettingFromServer,
+  };
+})(window);

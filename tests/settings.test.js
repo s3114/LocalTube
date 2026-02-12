@@ -168,3 +168,53 @@ test("POST /api/settings normalizes null browser to empty string", async () => {
   const loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
   assert.equal(loaded.body.data.selectedBrowser, "");
 });
+
+test("POST /api/settings response and reloaded settings stay consistent", async () => {
+  const payload = {
+    localVideoDirs: ["C:\\videos\\home", "C:\\videos\\archive"],
+    enableFallbackThumbnails: false,
+    wallpaperBlur: 4,
+    wallpaperBrightness: 70,
+    browser: "firefox",
+  };
+
+  const saved = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.ok, true);
+  assert.equal(typeof saved.body.data, "object");
+  assert.equal(typeof saved.body.data.settings, "object");
+
+  const fromSave = saved.body.data.settings;
+  const loadedOnce = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
+  const loadedTwice = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
+  const fromLoadOnce = loadedOnce.body.data;
+  const fromLoadTwice = loadedTwice.body.data;
+
+  assert.deepEqual(fromLoadOnce.localVideoDirs, fromSave.localVideoDirs);
+  assert.equal(
+    fromLoadOnce.enableFallbackThumbnails,
+    fromSave.enableFallbackThumbnails,
+  );
+  assert.equal(Number(fromLoadOnce.wallpaperBlur), Number(fromSave.wallpaperBlur));
+  assert.equal(
+    Number(fromLoadOnce.wallpaperBrightness),
+    Number(fromSave.wallpaperBrightness),
+  );
+  assert.equal(fromLoadOnce.selectedBrowser, fromSave.selectedBrowser);
+
+  assert.deepEqual(fromLoadTwice.localVideoDirs, fromLoadOnce.localVideoDirs);
+  assert.equal(
+    fromLoadTwice.enableFallbackThumbnails,
+    fromLoadOnce.enableFallbackThumbnails,
+  );
+  assert.equal(Number(fromLoadTwice.wallpaperBlur), Number(fromLoadOnce.wallpaperBlur));
+  assert.equal(
+    Number(fromLoadTwice.wallpaperBrightness),
+    Number(fromLoadOnce.wallpaperBrightness),
+  );
+  assert.equal(fromLoadTwice.selectedBrowser, fromLoadOnce.selectedBrowser);
+});
