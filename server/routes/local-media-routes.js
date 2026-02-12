@@ -1,3 +1,5 @@
+const { createLogger } = require("../services/logger-service");
+
 function registerLocalMediaRoutes(app, deps) {
   const {
     fs,
@@ -12,6 +14,7 @@ function registerLocalMediaRoutes(app, deps) {
     apiOk,
     apiError,
   } = deps;
+  const logger = deps.logger || createLogger("route-local-media");
 
   app.get("/api/local-media", async (req, res) => {
     try {
@@ -49,7 +52,7 @@ function registerLocalMediaRoutes(app, deps) {
 
       res.sendFile(path.resolve(targetPath));
     } catch (e) {
-      console.error("Failed to serve local media:", e);
+      logger.error("ローカルメディアの配信に失敗", { error: e.message });
       apiError(res, 500, "ローカルメディアの取得に失敗しました。");
     }
   });
@@ -90,7 +93,9 @@ function registerLocalMediaRoutes(app, deps) {
       }
       res.sendFile(path.resolve(thumbPath));
     } catch (error) {
-      console.warn("Fallback thumbnail creation skipped:", error.message);
+      logger.warn("フォールバックサムネイル生成をスキップ", {
+        error: error.message,
+      });
       res.redirect("/none_icon.jpg");
     }
   });
@@ -135,7 +140,7 @@ function registerLocalMediaRoutes(app, deps) {
       videos.sort((a, b) => b.mtime - a.mtime);
       apiOk(res, videos);
     } catch (e) {
-      console.error("Failed to scan local videos:", e);
+      logger.error("ローカル動画のスキャンに失敗", { error: e.message });
       apiError(res, 500, "動画一覧の取得に失敗しました。");
     }
   });

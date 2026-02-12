@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
+const { createLogger } = require("./logger-service");
 
 function createJobQueueService({
   rootDir,
@@ -12,6 +13,7 @@ function createJobQueueService({
   runScript,
   enableWatch = true,
 }) {
+  const logger = createLogger("job-queue");
   if (!rootDir) throw new Error("rootDir is required");
   if (!pendingChatDir) throw new Error("pendingChatDir is required");
 
@@ -22,10 +24,14 @@ function createJobQueueService({
 
   function defaultRunBatchScript(command) {
     return new Promise((resolve, reject) => {
-      console.log(`[EXEC] ${command}`);
+      logger.info("スクリプト実行", { command });
       const proc = exec(command, { shell: "powershell.exe" });
-      proc.stdout.on("data", (data) => console.log(data.toString()));
-      proc.stderr.on("data", (data) => console.error(data.toString()));
+      proc.stdout.on("data", (data) =>
+        logger.info("script stdout", { message: data.toString().trim() }),
+      );
+      proc.stderr.on("data", (data) =>
+        logger.warn("script stderr", { message: data.toString().trim() }),
+      );
       proc.on("close", (code) => {
         if (code === 0) resolve();
         else reject(new Error(`スクリプト終了コード: ${code}`));
@@ -60,22 +66,28 @@ function createJobQueueService({
 
         try {
           await fs.promises.rename(oldPath, newPath);
-          console.log(`Moved ${file} to ${newPath}`);
+          logger.info("ファイル移動", { file, to: newPath });
         } catch (err) {
-          console.error(`Failed to move ${file}: ${err}`);
+          logger.error("ファイル移動失敗", { file, error: err.message });
         }
       }
     } catch (err) {
-      console.error(`Error while sorting extra files in ${sourceDir}: ${err}`);
+      logger.error("追加ファイル仕分け失敗", {
+        sourceDir,
+        error: err.message,
+      });
     }
 
     try {
       if (sourceDir.startsWith(pendingChatDir)) {
-        console.log(`[A] 仮置きジョブフォルダを削除: ${sourceDir}`);
+        logger.info("仮置きジョブフォルダ削除", { sourceDir });
         fs.rmSync(sourceDir, { recursive: true, force: true });
       }
     } catch (err) {
-      console.error(`[A] 仮置きフォルダ削除に失敗: ${sourceDir}`, err);
+      logger.error("仮置きフォルダ削除失敗", {
+        sourceDir,
+        error: err.message,
+      });
     }
   }
 
@@ -84,7 +96,7 @@ function createJobQueueService({
     isProcessing = true;
     const jobPath = processingQueue.shift();
 
-    console.log(`[QUEUE] 処理開始: ${jobPath}`);
+    logger.info("処理開始", { jobPath });
     try {
       await runBatchScript(
         `node "${path.join(rootDir, "メンバーバッチ保存.js")}" "${jobPath}"`,
@@ -93,9 +105,9 @@ function createJobQueueService({
         `node "${path.join(rootDir, "メンバー絵文字保存.js")}" "${jobPath}"`,
       );
       await moveExtraFiles(jobPath);
-      console.log(`[QUEUE] 完了: ${jobPath}`);
+      logger.info("処理完了", { jobPath });
     } catch (err) {
-      console.error(`[QUEUE] エラー: ${jobPath}`, err);
+      logger.error("処理失敗", { jobPath, error: err.message });
       if (typeof broadcast === "function") {
         broadcast("status_update", {
           id: path.basename(jobPath),
@@ -113,7 +125,7 @@ function createJobQueueService({
     if (!jobPath) return;
     if (!processingQueue.includes(jobPath)) {
       processingQueue.push(jobPath);
-      console.log(`[QUEUE] ジョブ登録: ${jobPath}`);
+      logger.info("ジョブ登録", { jobPath });
     }
     setTimeout(processQueue, 300);
   }
@@ -124,11 +136,11 @@ function createJobQueueService({
       const jobPath = path.join(pendingChatDir, filename);
       try {
         if (fs.existsSync(jobPath) && fs.statSync(jobPath).isDirectory()) {
-          console.log(`[QUEUE] 新ジョブ検出: ${filename}`);
+          logger.info("新ジョブ検出", { filename });
           enqueueJob(jobPath);
         }
       } catch (err) {
-        console.warn(`[QUEUE] ジョブ検出失敗: ${jobPath}`, err.message);
+        logger.warn("ジョブ検出失敗", { jobPath, error: err.message });
       }
     });
   }

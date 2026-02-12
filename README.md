@@ -43,6 +43,8 @@ Server routes are split under `server/routes/`:
 - `network-routes.js`
 - `schedule-routes.js`
 - `info-routes.js`
+- `download-routes.js`
+- `live-chat-routes.js`
 
 Server services are split under `server/services/`:
 
@@ -53,6 +55,13 @@ Server services are split under `server/services/`:
 - `job-queue-service.js`
 - `download-job-service.js`
 - `download-queue-service.js`
+- `input-url-resolver.js`
+- `local-video-service.js`
+- `wallpaper-service.js`
+- `local-path-service.js`
+- `config-service.js`
+- `startup-service.js`
+- `logger-service.js`
 
 Frontend scripts are split under `public/`:
 

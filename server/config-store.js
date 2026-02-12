@@ -1,5 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { createLogger } = require("./services/logger-service");
+
+const logger = createLogger("config-store");
 
 const CONFIG_DEFAULTS = {
   selectedBrowser: "",
@@ -58,7 +61,7 @@ async function loadConfig(configPath) {
     const parsed = JSON.parse(configData);
     return normalizeConfig(parsed);
   } catch (error) {
-    console.error("設定ファイル読み込みエラー:", error);
+    logger.error("設定ファイル読み込みエラー", { error: error.message });
     return { ...CONFIG_DEFAULTS };
   }
 }

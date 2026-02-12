@@ -1,4 +1,5 @@
 const { execSync } = require("child_process");
+const { createLogger } = require("./logger-service");
 
 function createDownloadJobService({
   fs,
@@ -14,6 +15,8 @@ function createDownloadJobService({
   broadcast,
   loadConfig,
 }) {
+  const logger = createLogger("download-job");
+
   function buildArgs(job, paths, settings) {
     const { url, options } = job;
     const { movieDir: targetMovieDir, thumbnailDir: targetThumbDir, tempDir } = paths;
@@ -44,13 +47,11 @@ function createDownloadJobService({
     if (options.saveHistory) {
       args.push("--download-archive", path.join(baseDir, "finished.txt"));
     }
-
     if (job.cookieFile) {
       args.push("--cookies", job.cookieFile.path);
     } else if (settings && settings.selectedBrowser) {
       args.push("--cookies-from-browser", settings.selectedBrowser);
     }
-
     if (options.concurrentFragments && parseInt(options.concurrentFragments, 10) > 0) {
       args.push("--concurrent-fragments", options.concurrentFragments);
     }
@@ -60,7 +61,6 @@ function createDownloadJobService({
         "youtube:player-client=default,-tv,web_safari,web_embedded",
       );
     }
-
     if (options.commentOptions === "comments" || options.commentOptions === "both") {
       args.push("--get-comments");
     }
@@ -71,6 +71,53 @@ function createDownloadJobService({
     return args;
   }
 
+  async function loadSettingsSafe() {
+    try {
+      return (await loadConfig?.()) || {};
+    } catch (error) {
+      logger.error("設定読み込み失敗", { error: error.message });
+      return {};
+    }
+  }
+
+  function resolveOutputPaths(job) {
+    const customSavePath =
+      job.options.savePath && job.options.savePath.trim() !== ""
+        ? job.options.savePath
+        : null;
+    return {
+      customSavePath,
+      finalMovieDir: customSavePath || movieDir,
+      finalThumbnailDir: customSavePath
+        ? path.join(customSavePath, "サムネイル")
+        : thumbnailDir,
+      finalTempDir: customSavePath || downloadsDir,
+    };
+  }
+
+  function ensureCustomOutputDirs(job, paths) {
+    const { customSavePath, finalMovieDir, finalThumbnailDir } = paths;
+    if (!customSavePath) return;
+
+    if (!fs.existsSync(finalMovieDir)) {
+      fs.mkdirSync(finalMovieDir, { recursive: true });
+    }
+    if (job.options.downloadThumb && !fs.existsSync(finalThumbnailDir)) {
+      fs.mkdirSync(finalThumbnailDir, { recursive: true });
+    }
+  }
+
+  function parseProgressFromLine(line) {
+    const progressMatch = line.match(/\[download\]\s+([\d.]+)%/);
+    if (!progressMatch) return null;
+    return {
+      percentage: parseFloat(progressMatch[1]),
+      totalSize: progressMatch[2],
+      speed: progressMatch[3],
+      eta: progressMatch[4],
+    };
+  }
+
   function getTitle(ytDlpPath, url, cookiePath, settings) {
     return new Promise((resolve, reject) => {
       const args = [url, "--get-title", "--no-warnings"];
@@ -79,96 +126,152 @@ function createDownloadJobService({
       } else if (settings && settings.selectedBrowser) {
         args.push("--cookies-from-browser", settings.selectedBrowser);
       }
-      console.log(`[yt-dlp Title Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`);
+      logger.info("タイトル取得コマンド実行", { args: args.join(" ") });
+
       const ytDlpProcess = spawn(ytDlpPath, args);
       const stdoutChunks = [];
       const stderrChunks = [];
-      ytDlpProcess.stdout.on("data", (data) => {
-        stdoutChunks.push(data);
-      });
-      ytDlpProcess.stderr.on("data", (data) => {
-        stderrChunks.push(data);
-      });
+
+      ytDlpProcess.stdout.on("data", (data) => stdoutChunks.push(data));
+      ytDlpProcess.stderr.on("data", (data) => stderrChunks.push(data));
 
       ytDlpProcess.on("close", (code) => {
         const stdoutBuffer = Buffer.concat(stdoutChunks);
         const title = iconv.decode(stdoutBuffer, "cp932");
         if (code === 0 && title.trim() !== "") {
           resolve(title.trim());
-        } else {
-          const stderrBuffer = Buffer.concat(stderrChunks);
-          const stderr = iconv.decode(stderrBuffer, "cp932");
-          reject(new Error(`yt-dlp exited with code ${code}. Stderr: ${stderr}`));
+          return;
         }
+
+        const stderrBuffer = Buffer.concat(stderrChunks);
+        const stderr = iconv.decode(stderrBuffer, "cp932");
+        reject(new Error(`yt-dlp exited with code ${code}. Stderr: ${stderr}`));
       });
 
-      ytDlpProcess.on("error", (err) => {
-        reject(err);
-      });
+      ytDlpProcess.on("error", (err) => reject(err));
     });
   }
 
-  async function processDownloadJob(job) {
-    const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
-    let settings = {};
+  function enrichInfoWithChannelThumbnail(infoObj, job, settings) {
+    if (typeof infoObj.channel_url !== "string") return infoObj;
 
     try {
-      settings = (await loadConfig?.()) || {};
-    } catch (error) {
-      console.error("ダウンロード処理中に設定の読み込みに失敗しました:", error);
-    }
+      const channelArgs = ["-J", "--no-playlist", "--playlist-items", "0"];
+      if (job.cookieFile?.path) {
+        channelArgs.push("--cookies", job.cookieFile.path);
+      } else if (settings && settings.selectedBrowser) {
+        channelArgs.push("--cookies-from-browser", settings.selectedBrowser);
+      }
+      channelArgs.push(infoObj.channel_url);
 
-    try {
-      const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path, settings);
-      job.title = title;
-      broadcast("title_update", { id: job.id, title: job.title });
-    } catch (error) {
-      throw new Error(`タイトル取得失敗: ${error.message}`);
-    }
+      const fullCommand = `"${path.join(baseDir, "yt-dlp.exe")}" ${channelArgs
+        .map((a) => `"${a}"`)
+        .join(" ")}`;
 
-    const customSavePath =
-      job.options.savePath && job.options.savePath.trim() !== ""
-        ? job.options.savePath
-        : null;
-    const finalMovieDir = customSavePath || movieDir;
-    const finalThumbnailDir = customSavePath
-      ? path.join(customSavePath, "サムネイル")
-      : thumbnailDir;
-    const finalTempDir = customSavePath || downloadsDir;
+      const channelJson = execSync(fullCommand, {
+        encoding: "utf-8",
+        timeout: 3000,
+      });
+      const channelObj = JSON.parse(channelJson);
 
-    if (customSavePath) {
-      if (!fs.existsSync(finalMovieDir)) {
-        try {
-          fs.mkdirSync(finalMovieDir, { recursive: true });
-        } catch (error) {
-          throw new Error(
-            `カスタム保存先ディレクトリの作成に失敗しました ${finalMovieDir}: ${error.message}`,
-          );
+      try {
+        const channelSaveDir = path.join(downloadsDir, "チャンネル");
+        fs.mkdirSync(channelSaveDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(channelSaveDir, `${channelObj.channel_id}.channel.json`),
+          channelJson,
+          "utf-8",
+        );
+      } catch (err) {
+        logger.warn("チャンネルJSON保存失敗", { error: err.message });
+      }
+
+      let avatar = null;
+      if (Array.isArray(channelObj.thumbnails)) {
+        avatar = channelObj.thumbnails.find((t) => t.id === "avatar_uncropped");
+        if (!avatar) {
+          avatar = channelObj.thumbnails.reduce((best, cur) => {
+            if (!best) return cur;
+            if (
+              typeof cur.preference === "number" &&
+              typeof best.preference === "number"
+            ) {
+              return cur.preference > best.preference ? cur : best;
+            }
+            return best;
+          }, null);
+        }
+        if (!avatar && channelObj.thumbnails.length > 0) {
+          avatar = channelObj.thumbnails[0];
         }
       }
 
-      if (job.options.downloadThumb && !fs.existsSync(finalThumbnailDir)) {
+      if (avatar?.url) {
+        infoObj.channel_thumbnail = avatar.url;
+      }
+    } catch (err) {
+      logger.warn("チャンネル情報取得失敗", { error: err.message });
+    }
+
+    return infoObj;
+  }
+
+  function moveOptionalFile(src, dest, kind) {
+    if (!fs.existsSync(src)) {
+      logger.warn(`${kind} が見つかりません`, { path: src });
+      return false;
+    }
+    fs.renameSync(src, dest);
+    logger.info(`仮置きへ移動（${kind}）`, { path: dest });
+    return true;
+  }
+
+  function stageDownloadedExtraFiles(job, settings, finalMovieDir) {
+    const files = fs.readdirSync(finalMovieDir);
+    const infoFile = files.find((f) => f.endsWith(".info.json"));
+    const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
+
+    const jobPendingDir = path.join(pendingChatDir, `job_${Date.now()}`);
+    fs.mkdirSync(jobPendingDir, { recursive: true });
+    logger.info("仮置きジョブフォルダ作成", { path: jobPendingDir });
+
+    if (infoFile) {
+      const src = path.join(finalMovieDir, infoFile);
+      const dest = path.join(jobPendingDir, infoFile);
+      if (fs.existsSync(src)) {
         try {
-          fs.mkdirSync(finalThumbnailDir, { recursive: true });
+          const raw = fs.readFileSync(src, "utf-8");
+          const parsed = JSON.parse(raw);
+          const updated = enrichInfoWithChannelThumbnail(parsed, job, settings);
+          fs.writeFileSync(src, JSON.stringify(updated, null, 2), "utf-8");
         } catch (error) {
-          throw new Error(
-            `カスタムサムネイル保存先ディレクトリの作成に失敗しました ${finalThumbnailDir}: ${error.message}`,
-          );
+          logger.warn("info.json書き換え失敗", { error: error.message });
         }
+        moveOptionalFile(src, dest, "info");
       }
     }
 
+    if (chatFile) {
+      const src = path.join(finalMovieDir, chatFile);
+      const dest = path.join(jobPendingDir, chatFile);
+      moveOptionalFile(src, dest, "chat");
+    }
+
+    return { infoFile, jobPendingDir };
+  }
+
+  async function runYtDlpDownload(job, settings, ytDlpPath, paths) {
     return new Promise((resolve, reject) => {
       const args = buildArgs(
         job,
         {
-          movieDir: finalMovieDir,
-          thumbnailDir: finalThumbnailDir,
-          tempDir: finalTempDir,
+          movieDir: paths.finalMovieDir,
+          thumbnailDir: paths.finalThumbnailDir,
+          tempDir: paths.finalTempDir,
         },
         settings,
       );
-      console.log(`[yt-dlp Download Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`);
+      logger.info("ダウンロードコマンド実行", { args: args.join(" ") });
       const ytDlp = spawn(ytDlpPath, args);
 
       let stderrOutput = "";
@@ -181,189 +284,86 @@ function createDownloadJobService({
 
         for (const line of lines) {
           if (line.trim() === "") continue;
-          const progressMatch = line.match(/\[download\]\s+([\d.]+)%/);
-          if (progressMatch) {
-            job.progress = {
-              percentage: parseFloat(progressMatch[1]),
-              totalSize: progressMatch[2],
-              speed: progressMatch[3],
-              eta: progressMatch[4],
-            };
-            broadcast("progress_update", { id: job.id, progress: job.progress });
-          }
+          const progress = parseProgressFromLine(line);
+          if (!progress) continue;
+          job.progress = progress;
+          broadcast("progress_update", { id: job.id, progress: job.progress });
         }
       });
 
       ytDlp.stderr.on("data", (data) => {
         const errorMsg = data.toString().trim();
-        stderrOutput += errorMsg + "\n";
-        console.error(`yt-dlp stderr: ${errorMsg}`);
+        stderrOutput += `${errorMsg}\n`;
+        logger.warn("yt-dlp stderr", { message: errorMsg });
       });
 
-      ytDlp.on("close", async (code) => {
+      ytDlp.on("close", (code) => {
         if (code === 0) {
-          const isProcessingExtras =
-            job.options.commentOptions && job.options.commentOptions !== "none";
-
-          if (isProcessingExtras) {
-            job.progress.eta = "コメント/チャットを整理中...";
-            broadcast("status_update", {
-              id: job.id,
-              status: "downloading",
-              progress: job.progress,
-            });
-          }
-
-          const files = fs.readdirSync(finalMovieDir);
-          const infoFile = files.find((f) => f.endsWith(".info.json"));
-          const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
-
-          const jobPendingDir = path.join(pendingChatDir, `job_${Date.now()}`);
-          fs.mkdirSync(jobPendingDir, { recursive: true });
-          console.log("仮置きジョブフォルダ:", jobPendingDir);
-
-          if (infoFile) {
-            const src = path.join(finalMovieDir, infoFile);
-            const dest = path.join(jobPendingDir, infoFile);
-
-            if (fs.existsSync(src)) {
-              try {
-                const infoRaw = fs.readFileSync(src, "utf-8");
-                const infoObj = JSON.parse(infoRaw);
-                let channelThumbUrl = null;
-
-                if (typeof infoObj.channel_url === "string") {
-                  try {
-                    console.log("[INFO EDIT] チャンネル情報を取得:", infoObj.channel_url);
-                    const channelArgs = ["-J", "--no-playlist", "--playlist-items", "0"];
-
-                    if (job.cookieFile?.path) {
-                      channelArgs.push("--cookies", job.cookieFile.path);
-                    } else if (settings && settings.selectedBrowser) {
-                      channelArgs.push("--cookies-from-browser", settings.selectedBrowser);
-                    }
-
-                    channelArgs.push(infoObj.channel_url);
-                    const fullCommand = `"${path.join(baseDir, "yt-dlp.exe")}" ${channelArgs
-                      .map((a) => `"${a}"`)
-                      .join(" ")}`;
-                    console.log(`[yt-dlp Channel Info Command] Command: ${fullCommand}`);
-                    const channelJson = execSync(fullCommand, {
-                      encoding: "utf-8",
-                      timeout: 3000,
-                    });
-
-                    try {
-                      const channelSaveDir = path.join(downloadsDir, "チャンネル");
-                      fs.mkdirSync(channelSaveDir, { recursive: true });
-                      const channelObj = JSON.parse(channelJson);
-                      const channelJsonPath = path.join(
-                        channelSaveDir,
-                        `${channelObj.channel_id}.channel.json`,
-                      );
-                      fs.writeFileSync(channelJsonPath, channelJson, "utf-8");
-                      console.log("[INFO EDIT] チャンネルJSONを保存:", channelJsonPath);
-                    } catch (err) {
-                      console.error("[INFO EDIT] チャンネルJSONの保存に失敗:", err.message);
-                    }
-
-                    const channelObj = JSON.parse(channelJson);
-                    let foundAvatar = null;
-                    if (Array.isArray(channelObj.thumbnails)) {
-                      foundAvatar = channelObj.thumbnails.find(
-                        (t) => t.id === "avatar_uncropped",
-                      );
-                      if (!foundAvatar) {
-                        foundAvatar = channelObj.thumbnails.reduce((best, cur) => {
-                          if (!best) return cur;
-                          if (
-                            typeof cur.preference === "number" &&
-                            typeof best.preference === "number"
-                          ) {
-                            return cur.preference > best.preference ? cur : best;
-                          }
-                          return best;
-                        }, null);
-                      }
-                      if (!foundAvatar && channelObj.thumbnails.length > 0) {
-                        foundAvatar = channelObj.thumbnails[0];
-                      }
-                    }
-
-                    if (foundAvatar && foundAvatar.url) {
-                      channelThumbUrl = foundAvatar.url;
-                      console.log(
-                        "[INFO EDIT] channel_thumbnail（avatar_uncropped）を取得:",
-                        channelThumbUrl,
-                      );
-                    }
-                  } catch (err) {
-                    console.error("[INFO EDIT] チャンネル情報取得に失敗:", err.message);
-                  }
-                }
-
-                if (channelThumbUrl) {
-                  infoObj.channel_thumbnail = channelThumbUrl;
-                } else {
-                  console.log("[INFO EDIT] channel_thumbnail を取得できませんでした");
-                }
-
-                fs.writeFileSync(src, JSON.stringify(infoObj, null, 2), "utf-8");
-              } catch (e) {
-                console.error("[INFO EDIT] info.json の書き換えに失敗:", e);
-              }
-
-              fs.renameSync(src, dest);
-              console.log("仮置きへ移動（info）:", dest);
-            } else {
-              console.warn("info.json が見つかりません:", src);
-            }
-          }
-
-          if (chatFile) {
-            const src = path.join(finalMovieDir, chatFile);
-            const dest = path.join(jobPendingDir, chatFile);
-            if (fs.existsSync(src)) {
-              fs.renameSync(src, dest);
-              console.log("仮置きへ移動（chat）:", dest);
-            } else {
-              console.warn("live_chat.json が見つかりません:", src);
-            }
-          }
-
-          if (!infoFile) {
-            console.warn("[QUEUE] info.json が無いため登録不可:", jobPendingDir);
-            broadcast("status_update", {
-              id: job.id,
-              status: "completed",
-              progress: {
-                percent: 100,
-                eta: "スキップ完了（info.jsonなし）",
-              },
-            });
-            resolve();
-            return;
-          }
-
-          jobQueueService.enqueueJob(jobPendingDir);
-          broadcast("status_update", {
-            id: job.id,
-            status: "completed",
-            progress: {
-              percent: 100,
-              eta: "完了",
-            },
-          });
           resolve();
           return;
         }
-
         reject(new Error(`yt-dlpがエラーコード${code}で終了しました。Stderr: ${stderrOutput}`));
       });
 
       ytDlp.on("error", (err) => {
         reject(new Error(`yt-dlpプロセスの起動に失敗: ${err.message}`));
       });
+    });
+  }
+
+  async function processDownloadJob(job) {
+    const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
+    const settings = await loadSettingsSafe();
+
+    try {
+      const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path, settings);
+      job.title = title;
+      broadcast("title_update", { id: job.id, title: job.title });
+    } catch (error) {
+      throw new Error(`タイトル取得失敗: ${error.message}`);
+    }
+
+    const paths = resolveOutputPaths(job);
+    try {
+      ensureCustomOutputDirs(job, paths);
+    } catch (error) {
+      throw new Error(`保存先準備失敗: ${error.message}`);
+    }
+
+    await runYtDlpDownload(job, settings, ytDlpPath, paths);
+
+    const isProcessingExtras =
+      job.options.commentOptions && job.options.commentOptions !== "none";
+    if (isProcessingExtras) {
+      job.progress.eta = "コメント/チャットを整理中...";
+      broadcast("status_update", {
+        id: job.id,
+        status: "downloading",
+        progress: job.progress,
+      });
+    }
+
+    const { infoFile, jobPendingDir } = stageDownloadedExtraFiles(
+      job,
+      settings,
+      paths.finalMovieDir,
+    );
+
+    if (!infoFile) {
+      logger.warn("info.json が無いため登録不可", { jobPendingDir });
+      broadcast("status_update", {
+        id: job.id,
+        status: "completed",
+        progress: { percent: 100, eta: "スキップ完了（info.jsonなし）" },
+      });
+      return;
+    }
+
+    jobQueueService.enqueueJob(jobPendingDir);
+    broadcast("status_update", {
+      id: job.id,
+      status: "completed",
+      progress: { percent: 100, eta: "完了" },
     });
   }
 

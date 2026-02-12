@@ -1,10 +1,14 @@
+const { createLogger } = require("./logger-service");
+
 function createSseBus({
   sseExpress,
   jobHistory,
   serverStartTime,
   measureNetworkMbps,
   apiOk,
+  logger,
 }) {
+  const serviceLogger = logger || createLogger("sse-bus");
   const sseClients = new Set();
 
   function broadcast(event, data) {
@@ -16,7 +20,7 @@ function createSseBus({
   function registerRoutes(app) {
     app.get("/events", sseExpress, (req, res) => {
       sseClients.add(res);
-      console.log("New SSE client connected.");
+      serviceLogger.info("new SSE client connected");
       res.sse("initial_state", Array.from(jobHistory.values()));
 
       async function broadcastSystemInfo() {
@@ -36,7 +40,7 @@ function createSseBus({
         try {
           net = await measureNetworkMbps();
         } catch (e) {
-          console.error("measureNetworkMbps error:", e.message);
+          serviceLogger.warn("measureNetworkMbps error", { error: e.message });
         }
 
         res.sse("system_info", {
@@ -52,7 +56,7 @@ function createSseBus({
       req.on("close", () => {
         sseClients.delete(res);
         clearInterval(sysInfoInterval);
-        console.log("SSE client disconnected.");
+        serviceLogger.info("SSE client disconnected");
       });
     });
 

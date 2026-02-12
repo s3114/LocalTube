@@ -1,7 +1,10 @@
-function createInputUrlResolver({ spawn, path, baseDir }) {
+const { createLogger } = require("./logger-service");
+
+function createInputUrlResolver({ spawn, path, baseDir, logger }) {
   if (typeof spawn !== "function") throw new Error("spawn is required");
   if (!path) throw new Error("path is required");
   if (!baseDir) throw new Error("baseDir is required");
+  const serviceLogger = logger || createLogger("input-url-resolver");
 
   function getUrlsFromInput(url, cookiePath) {
     return new Promise((resolve, reject) => {
@@ -30,9 +33,10 @@ function createInputUrlResolver({ spawn, path, baseDir }) {
         return;
       }
 
-      console.log(
-        `[yt-dlp getUrlsFromInput Command] Path: ${ytDlpPath}, Args: ${args.join(" ")}`,
-      );
+      serviceLogger.info("yt-dlp input resolve command", {
+        ytDlpPath,
+        args: args.join(" "),
+      });
       const ytDlp = spawn(ytDlpPath, args);
       let videoUrls = "";
       ytDlp.stdout.on("data", (data) => {
@@ -40,7 +44,7 @@ function createInputUrlResolver({ spawn, path, baseDir }) {
       });
 
       ytDlp.stderr.on("data", (data) => {
-        console.error(`[${url}] yt-dlp stderr: ${data}`);
+        serviceLogger.warn("yt-dlp stderr", { url, message: String(data).trim() });
       });
 
       ytDlp.on("close", (code) => {
