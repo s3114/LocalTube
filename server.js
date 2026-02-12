@@ -24,6 +24,7 @@ const { registerLiveChatRoutes } = require("./server/routes/live-chat-routes");
 const { registerInfoRoutes } = require("./server/routes/info-routes");
 const { registerNetworkRoutes } = require("./server/routes/network-routes");
 const { registerScheduleRoutes } = require("./server/routes/schedule-routes");
+const { registerLogRoutes } = require("./server/routes/log-routes");
 const { createSseBus } = require("./server/services/sse-bus");
 const { apiOk, apiError } = require("./server/services/http-utils");
 const {
@@ -276,6 +277,10 @@ registerScheduleRoutes(app, {
   path,
   os,
   spawn,
+});
+
+registerLogRoutes(app, {
+  ...routeBaseDeps,
 });
 
 app.post("/api/system/restart", (_req, res) => {

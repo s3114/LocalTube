@@ -276,6 +276,90 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
+      function initializeConsoleLogViewer() {
+        const logOutput = document.getElementById("console-log-output");
+        const logStatus = document.getElementById("console-log-status");
+        const clearButton = document.getElementById("console-log-clear-btn");
+        const pauseToggle = document.getElementById("console-log-pause");
+        if (!logOutput || !logStatus || !clearButton || !pauseToggle) return;
+
+        let sinceId = 0;
+        let pollTimer = null;
+        const MAX_LINES = 800;
+
+        function appendLogLine(entry) {
+          const line = document.createElement("div");
+          line.className = `console-log-line level-${entry.level || "info"}`;
+          line.textContent = `${entry.timestamp} [${entry.level}] [${entry.scope}] ${entry.message}`;
+          logOutput.appendChild(line);
+        }
+
+        function trimLogLines() {
+          while (logOutput.children.length > MAX_LINES) {
+            logOutput.removeChild(logOutput.firstChild);
+          }
+        }
+
+        function scrollLogToBottom() {
+          logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        async function pollLogs() {
+          if (pauseToggle.checked) {
+            logStatus.textContent = "一時停止中";
+            logStatus.style.color = "var(--warn)";
+            return;
+          }
+
+          try {
+            const response = await settingsUiDeps.fetchImpl(
+              `/api/logs?sinceId=${encodeURIComponent(sinceId)}&limit=250`,
+            );
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
+            if (!result.ok) {
+              throw new Error(result.error || "ログ取得に失敗しました。");
+            }
+            const logs = Array.isArray(result.data?.logs) ? result.data.logs : [];
+            logs.forEach((entry) => appendLogLine(entry));
+            trimLogLines();
+            if (logs.length > 0) {
+              sinceId = Number(result.data?.lastId || sinceId);
+              scrollLogToBottom();
+            }
+            logStatus.textContent = logs.length > 0
+              ? `更新: ${logs.length}件`
+              : "接続中（更新待ち）";
+            logStatus.style.color = "var(--green)";
+          } catch (error) {
+            console.error("ログ取得エラー:", error);
+            logStatus.textContent = `エラー: ${error.message || "ログ取得に失敗しました。"}`;
+            logStatus.style.color = "var(--accent)";
+          }
+        }
+
+        clearButton.addEventListener("click", () => {
+          logOutput.innerHTML = "";
+          logStatus.textContent = "表示をクリアしました";
+          logStatus.style.color = "var(--subtext)";
+        });
+
+        pauseToggle.addEventListener("change", () => {
+          if (!pauseToggle.checked) {
+            pollLogs();
+          }
+        });
+
+        pollLogs();
+        pollTimer = setInterval(pollLogs, 1000);
+
+        global.addEventListener("beforeunload", () => {
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
+        });
+      }
+
       function initializeYoutubePlaylistConverterUI() {
         const youtubeChannelUrlInput = document.getElementById(
           "youtubeChannelUrlInput",
@@ -778,6 +862,7 @@ function initializeSettingsUiController({
         initializeHistoryClearButton(elements);
         initializeAutostartTaskButtons();
         initializeServerRestartButton();
+        initializeConsoleLogViewer();
         initializeYoutubePlaylistConverterUI();
 
         const bridge = createSettingsServerBridge(elements);
