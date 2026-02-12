@@ -86,7 +86,8 @@
       select,
       input[type="text"],
       textarea {
-        background: var(--black-panel);
+        /* background: var(--black-panel); */
+        background: rgb(255 255 255 / 5%);
         border: 1px solid var(--border);
         color: var(--text);
         padding: 10px;
@@ -173,7 +174,23 @@
         flex-shrink: 0;
       }
 
+      .header-sort-container {
+        position: relative;
+        flex-shrink: 0;
+      }
+
       .header-filter-btn {
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .header-sort-btn {
         height: 28px;
         border-radius: 999px;
         border: 1px solid var(--border);
@@ -195,6 +212,60 @@
         padding: 12px;
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
         z-index: 50;
+      }
+
+      .home-sort-panel {
+        position: absolute;
+        top: 38px;
+        right: 0;
+        width: min(92vw, 320px);
+        background: #121212;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+        z-index: 50;
+      }
+
+      .home-sort-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .home-sort-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .home-sort-label {
+        font-size: 12px;
+        color: var(--subtext);
+        min-width: 64px;
+      }
+
+      .home-sort-inline {
+        display: flex;
+        gap: 6px;
+      }
+
+      .home-sort-key-btn,
+      .home-sort-order-btn {
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .home-sort-key-btn.active,
+      .home-sort-order-btn.active {
+        border-color: rgba(58, 141, 222, 0.8);
+        background: rgba(58, 141, 222, 0.2);
       }
 
       .home-filter-row {
@@ -313,6 +384,7 @@
       /* ページ切替 */
       .page {
         display: none;
+        padding-top: 20px;
       }
 
       .page.active-page {
@@ -331,8 +403,7 @@
 
       .card-side {
         flex: 1;
-        background: var(--black-panel);
-        border: 1px solid var(--border);
+        /* background: var(--black-panel); */
         border-radius: 10px;
         padding: 12px;
         color: var(--text);
@@ -364,7 +435,7 @@
       .url-box textarea,
       .url-box input {
         flex: 1;
-        background: var(--black-panel);
+        background: rgb(255 255 255 / 5%);
         border: 1px solid var(--border);
         color: var(--text);
         padding: 12px;
@@ -396,6 +467,7 @@
       .field-row select,
       .field-row input {
         flex: 1;
+        background: rgb(255 255 255 / 5%);
       }
 
       .options {
@@ -430,8 +502,9 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: var(--black-panel);
-        border: 1px solid var(--border);
+        /* background: var(--black-panel); */
+        /* background: rgb(255 255 255 / 5%); */
+        /* border: 1px solid var(--border); */
         border-radius: 8px;
         padding: 12px;
       }
@@ -586,7 +659,7 @@
 
       .info-value {
         font-weight: bold;
-        background: #111;
+        /* background: #111; */
         padding: 2px 8px;
         border-radius: 8px;
       }
@@ -744,10 +817,9 @@
       .player-video-wrap {
         position: relative;
         width: 100%;
-        /* 16:9を維持 */
         aspect-ratio: 16 / 9;
         background: black;
-        border-radius: 8px 8px 0 0;
+        border-radius: 8px;
         overflow: hidden;
       }
 
@@ -1258,6 +1330,42 @@
 
       .status-subtext {
         color: var(--subtext);
+      }
+
+      .app-feedback {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      .app-feedback-item {
+        min-width: 240px;
+        max-width: 420px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--text);
+        background: rgba(15, 20, 26, 0.88);
+        border: 1px solid var(--card-border);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .app-feedback-item.tone-info {
+        border-color: rgba(58, 141, 222, 0.65);
+      }
+
+      .app-feedback-item.tone-success {
+        border-color: rgba(44, 145, 108, 0.65);
+      }
+
+      .app-feedback-item.tone-error {
+        border-color: rgba(239, 83, 80, 0.75);
       }
 
       .info-value-wide {
@@ -1947,6 +2055,15 @@
                     placeholder="チャンネル名で絞り込み" />
                 </div>
               </div>
+              <div class="home-filter-row">
+                <div class="home-filter-label">ファイルパス</div>
+                <div class="home-filter-inline">
+                  <input
+                    id="filter-filepath"
+                    type="text"
+                    placeholder="ファイルパスで絞り込み" />
+                </div>
+              </div>
               <div class="home-filter-actions">
                 <button
                   id="filter-clear-btn"
@@ -1954,6 +2071,44 @@
                   type="button">
                   クリア
                 </button>
+              </div>
+            </div>
+          </div>
+          <div class="header-sort-container">
+            <button id="home-sort-btn" class="header-sort-btn"
+              type="button">
+              並べ替え
+            </button>
+            <div id="home-sort-panel" class="home-sort-panel hidden">
+              <div class="home-sort-row">
+                <div class="home-sort-label">種類</div>
+                <div class="home-sort-inline">
+                  <button class="home-sort-key-btn" data-sort-key="popular"
+                    type="button">
+                    人気順
+                  </button>
+                  <button class="home-sort-key-btn" data-sort-key="kana"
+                    type="button">
+                    50音順
+                  </button>
+                  <button class="home-sort-key-btn active"
+                    data-sort-key="published" type="button">
+                    投稿日
+                  </button>
+                </div>
+              </div>
+              <div class="home-sort-row">
+                <div class="home-sort-label">順序</div>
+                <div class="home-sort-inline">
+                  <button class="home-sort-order-btn" data-sort-order="asc"
+                    type="button">
+                    昇順
+                  </button>
+                  <button class="home-sort-order-btn active"
+                    data-sort-order="desc" type="button">
+                    降順
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2388,8 +2543,8 @@
               <div class="info-label">エラー</div>
               <div id="info-error-count" class="info-value">0 件</div>
             </div>
-              <div class="info-item">
-                <div class="info-label">完了率</div>
+            <div class="info-item">
+              <div class="info-label">完了率</div>
               <div class="info-value info-value-wide">
                 <div class="completion-bar-container">
                   <div id="completion-bar" class="completion-bar"></div>
@@ -2412,7 +2567,8 @@
                   メン限のプレイリストURLを取得
                   <small>チャンネルURLから自動的に再生リストURLを生成します。</small>
                 </div>
-                <div class="settings-stack settings-stack-8 settings-stack-tool">
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-tool">
                   <input
                     type="text"
                     id="youtubeChannelUrlInput"
@@ -2463,7 +2619,8 @@
                   <small id="local-video-dirs-status"
                     class="settings-hint-blue"></small>
                 </div>
-                <div class="settings-stack settings-stack-8 settings-stack-wide">
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-wide">
                   <textarea
                     id="local-video-dirs-input"
                     placeholder="追加したいフォルダを1行ずつ入力"
@@ -2484,7 +2641,8 @@
                   <small id="wallpaper-status"
                     class="settings-hint-blue"></small>
                 </div>
-                <div class="settings-stack settings-stack-10 settings-stack-wide">
+                <div
+                  class="settings-stack settings-stack-10 settings-stack-wide">
                   <div class="settings-inline-row settings-gap-8">
                     <input
                       type="file"
@@ -2564,7 +2722,20 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/app-core.js"></script>
+    <script src="/app-feedback.js"></script>
+    <script src="/app-home-cards.js"></script>
+    <script src="/app-renderers.js"></script>
+    <script src="/app-comments.js"></script>
+    <script src="/app-home-browser.js"></script>
+    <script src="/app-dashboard.js"></script>
+    <script src="/app-settings-ui.js"></script>
+    <script src="/app-player-ui.js"></script>
+    <script src="/app-player-page.js"></script>
+    <script src="/app-local-video.js"></script>
+    <script src="/app-state.js"></script>
+    <script src="/app-actions.js"></script>
+    <script src="/app-routing.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>
-
