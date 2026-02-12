@@ -100,3 +100,15 @@ Typical keys:
 
 Use these values (especially `p50` / `p95`) before and after changes to
 compare performance impact.
+
+## CPU Profile (Node.js)
+
+You can capture a CPU profile for server-side bottlenecks:
+
+```bash
+npm run profile:server
+```
+
+Then reproduce your heavy scenario (local video scan, home load, info requests),
+stop the server, and open generated `.cpuprofile` files under `profiles/`
+in Chrome DevTools Performance tab.

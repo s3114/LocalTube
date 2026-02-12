@@ -15,6 +15,27 @@ function registerLocalMediaRoutes(app, deps) {
     apiError,
   } = deps;
   const logger = deps.logger || createLogger("route-local-media");
+  const LOCAL_VIDEOS_CACHE_TTL_MS = 5000;
+  let localVideosCache = {
+    expiresAt: 0,
+    signature: "",
+    data: null,
+  };
+
+  async function buildLocalVideoDirsSignature(sourceDirs) {
+    const stats = await Promise.all(
+      sourceDirs.map(async (dir) => {
+        try {
+          if (!fs.existsSync(dir)) return `${dir}:missing`;
+          const stat = await fs.promises.stat(dir);
+          return `${dir}:${Math.round(stat.mtimeMs)}`;
+        } catch (_error) {
+          return `${dir}:error`;
+        }
+      }),
+    );
+    return stats.join("|");
+  }
 
   app.get("/api/local-media", async (req, res) => {
     try {
@@ -60,6 +81,7 @@ function registerLocalMediaRoutes(app, deps) {
   app.get("/api/local-thumb-fallback", async (req, res) => {
     try {
       const videoPath = String(req.query.videoPath || "");
+      const priority = String(req.query.priority || "normal").toLowerCase();
       if (!videoPath) {
         return apiError(res, 400, "videoPath が必要です。");
       }
@@ -87,7 +109,8 @@ function registerLocalMediaRoutes(app, deps) {
       }
 
       const existingThumbPath = findExistingThumbnailPath(videoPath, true);
-      const thumbPath = existingThumbPath || (await ensureFallbackThumbnail(videoPath));
+      const thumbPath =
+        existingThumbPath || (await ensureFallbackThumbnail(videoPath, priority));
       if (!thumbPath) {
         return res.redirect("/none_icon.jpg");
       }
@@ -106,6 +129,19 @@ function registerLocalMediaRoutes(app, deps) {
       const sourceDirs = await getLocalVideoDirs();
       const settings = await loadConfig();
       const fallbackEnabled = settings.enableFallbackThumbnails !== false;
+      const signature = await buildLocalVideoDirsSignature(sourceDirs);
+      const now = Date.now();
+      if (
+        localVideosCache.data &&
+        localVideosCache.expiresAt > now &&
+        localVideosCache.signature === signature
+      ) {
+        logger.info("local videos cache hit", {
+          count: localVideosCache.data.length,
+          elapsedMs: Date.now() - startedAt,
+        });
+        return apiOk(res, localVideosCache.data);
+      }
 
       const videoExt = [".mp4", ".mkv", ".webm", ".mov"];
       const videos = [];
@@ -134,7 +170,7 @@ function registerLocalMediaRoutes(app, deps) {
             thumb: thumbPath
               ? `/api/local-media?type=thumb&path=${encodeURIComponent(thumbPath)}`
               : fallbackEnabled
-                ? `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}`
+                ? `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}&priority=low`
                 : null,
             filename: file,
             mtime: stat.mtimeMs,
@@ -147,6 +183,11 @@ function registerLocalMediaRoutes(app, deps) {
       }
 
       videos.sort((a, b) => b.mtime - a.mtime);
+      localVideosCache = {
+        expiresAt: Date.now() + LOCAL_VIDEOS_CACHE_TTL_MS,
+        signature,
+        data: videos,
+      };
       logger.info("local videos scanned", {
         count: videos.length,
         sourceDirs: sourceDirs.length,

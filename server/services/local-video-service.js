@@ -19,6 +19,9 @@ function createLocalVideoService(deps) {
   let ffmpegCommandCache;
   let ffprobeCommandCache;
   const fallbackThumbnailJobs = new Map();
+  const fallbackThumbnailQueue = [];
+  let activeFallbackThumbnailJobs = 0;
+  const FALLBACK_THUMBNAIL_CONCURRENCY = 2;
   const failedFallbackThumbnails = new Set();
   const provisionalInfoJobs = new Map();
   const provisionalJobQueue = [];
@@ -373,13 +376,13 @@ function createLocalVideoService(deps) {
     return provisionalInfoJobs.get(provisionalPath);
   }
 
-  async function ensureFallbackThumbnail(videoPath) {
+  async function ensureFallbackThumbnail(videoPath, priority = "normal") {
     const outputPath = getFallbackThumbPath(videoPath);
     if (fs.existsSync(outputPath)) return outputPath;
     if (failedFallbackThumbnails.has(outputPath)) return null;
 
     if (!fallbackThumbnailJobs.has(outputPath)) {
-      const job = (async () => {
+      const job = enqueueFallbackThumbnailJob(async () => {
         const ffmpegCmd = await resolveFfmpegCommand();
         if (!ffmpegCmd) {
           failedFallbackThumbnails.add(outputPath);
@@ -443,7 +446,7 @@ function createLocalVideoService(deps) {
         }
 
         return outputPath;
-      })();
+      }, priority);
 
       fallbackThumbnailJobs.set(outputPath, job);
       job.then(
@@ -468,3 +471,39 @@ function createLocalVideoService(deps) {
 module.exports = {
   createLocalVideoService,
 };
+  function fallbackPriorityToScore(priority) {
+    if (priority === "high") return 2;
+    if (priority === "low") return 0;
+    return 1;
+  }
+
+  function pumpFallbackThumbnailQueue() {
+    while (
+      activeFallbackThumbnailJobs < FALLBACK_THUMBNAIL_CONCURRENCY &&
+      fallbackThumbnailQueue.length > 0
+    ) {
+      fallbackThumbnailQueue.sort((a, b) => b.priorityScore - a.priorityScore);
+      const next = fallbackThumbnailQueue.shift();
+      if (!next) break;
+      activeFallbackThumbnailJobs += 1;
+      next.run()
+        .then(next.resolve)
+        .catch(next.reject)
+        .finally(() => {
+          activeFallbackThumbnailJobs = Math.max(0, activeFallbackThumbnailJobs - 1);
+          pumpFallbackThumbnailQueue();
+        });
+    }
+  }
+
+  function enqueueFallbackThumbnailJob(run, priority = "normal") {
+    return new Promise((resolve, reject) => {
+      fallbackThumbnailQueue.push({
+        run,
+        resolve,
+        reject,
+        priorityScore: fallbackPriorityToScore(priority),
+      });
+      pumpFallbackThumbnailQueue();
+    });
+  }

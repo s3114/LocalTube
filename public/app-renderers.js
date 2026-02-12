@@ -46,6 +46,15 @@ function parseNdjsonMessages(text) {
   return messages;
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function extractChatRenderer(msg) {
   const item = msg?.replayChatItemAction?.actions?.[0]?.addChatItemAction?.item;
   return (
@@ -178,4 +187,3 @@ function createChatLineElementFromMessage(msg) {
   line.appendChild(msgEl);
   return line;
 }
-

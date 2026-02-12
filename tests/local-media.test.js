@@ -39,3 +39,16 @@ test("GET /api/local-videos returns list payload", async () => {
   assert.equal(res.body.ok, true);
   assert.equal(Array.isArray(res.body.data), true);
 });
+
+test("GET /api/info-lite/:videoId returns API envelope", async () => {
+  const res = await ctx.fetchJson(`${ctx.baseUrl}/api/info-lite/non-existent-video-id-for-test`);
+  assert.ok([200, 404].includes(res.status));
+  assert.equal(typeof res.body, "object");
+  assert.equal(typeof res.body.ok, "boolean");
+});
+
+test("GET /api/home-info rejects empty ids", async () => {
+  const res = await ctx.fetchJson(`${ctx.baseUrl}/api/home-info`);
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
+});
