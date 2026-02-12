@@ -3,9 +3,21 @@ const path = require("node:path");
 const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
+const { CONFIG_DEFAULTS } = require("../../server/config-store");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const CONFIG_PATH = path.join(ROOT, "config.json");
+
+async function readSeedConfigText() {
+  try {
+    return await fs.readFile(CONFIG_PATH, "utf8");
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return `${JSON.stringify(CONFIG_DEFAULTS, null, 2)}\n`;
+    }
+    throw error;
+  }
+}
 
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,7 +68,7 @@ function createTestServerContext() {
     if (started) return;
     started = true;
 
-    const originalConfigText = await fs.readFile(CONFIG_PATH, "utf8");
+    const originalConfigText = await readSeedConfigText();
     const testPort = await getFreePort();
     baseUrl = `http://127.0.0.1:${testPort}`;
     testConfigPath = path.join(
