@@ -55,6 +55,54 @@ function registerScheduleRoutes(app, deps) {
     });
   }
 
+  function runSchtasks(args) {
+    return new Promise((resolve) => {
+      const child = spawn("schtasks", args, {
+        shell: false,
+        windowsHide: false,
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.on("data", (chunk) => {
+        stdout += String(chunk);
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on("error", (error) => {
+        resolve({ error, stdout, stderr, code: 1 });
+      });
+      child.on("close", (code) => {
+        resolve({ error: null, stdout, stderr, code: Number(code) || 0 });
+      });
+    });
+  }
+
+  app.get("/api/schedule/status", async (_req, res) => {
+    const taskName = "YoutubeDL-AutoStart";
+    const { error, code, stderr } = await runSchtasks([
+      "/query",
+      "/tn",
+      taskName,
+      "/fo",
+      "list",
+    ]);
+
+    if (error) {
+      return apiError(res, 500, "タスク状態の取得に失敗しました。", {
+        detail: stderr || error.message,
+      });
+    }
+
+    if (code === 0) {
+      return apiOk(res, { enabled: true });
+    }
+
+    return apiOk(res, { enabled: false });
+  });
+
   app.post("/api/schedule/create", async (_req, res) => {
     const taskName = "YoutubeDL-AutoStart";
     const batPath = path.resolve(baseDir, "起動.bat");
