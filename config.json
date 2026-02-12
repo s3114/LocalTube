@@ -1,26 +1,7 @@
 {
-  "selectedBrowser": "firefox",
-  "localVideoDirs": [
-    "\\\\SOMANISHI2\\youtube-dl\\youtube\\動画\\Mimi",
-    "\\\\SOMANISHI2\\youtube-dl\\youtube\\動画\\沙花又クロヱ",
-    "\\\\SOMANISHI2\\youtube-dl\\youtube\\動画\\桃鈴ねね、メン限",
-    "\\\\SOMANISHI2\\youtube-dl\\youtube\\動画\\猫又おかゆ",
-    "\\\\SOMANISHI2\\youtube-dl\\youtube\\動画\\猫又おかゆ　ASMR",
-    "\\\\SOMANISHI2\\youtube-dl\\youtube\\サムネイル",
-    "\\\\SOMANISHI2\\nas擬き\\ソロライブ保存用フォルダ",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\エロマンガ先生",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\ソードアート・オンライン",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\ソードアート・オンライン\\1期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\ソードアート・オンライン\\2期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\ソードアート・オンライン\\3期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\ソードアート・オンライン\\4期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\よう実\\1期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\よう実\\2期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\よう実\\3期",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\リゼロ",
-    "\\\\SOMANISHI2\\youtube-dl\\ABEMA\\リゼロ\\劇場版"
-  ],
+  "selectedBrowser": "",
+  "localVideoDirs": [],
   "enableFallbackThumbnails": true,
-  "wallpaperBlur": 0,
+  "wallpaperBlur": 2,
   "wallpaperBrightness": 50
 }
