@@ -11,6 +11,7 @@ Environment variables:
 - `PORT`: server listen port (default: `3000`)
 - `YTDL_CONFIG_PATH`: custom config file path
 - `YTDL_PUBLIC_DIR`: custom public directory path (useful for tests)
+- `LOG_LEVEL`: log verbosity (`info` / `warn` / `error`, default: `info`)
 
 ## Test
 
@@ -66,6 +67,15 @@ Server services are split under `server/services/`:
 Frontend scripts are split under `public/`:
 
 - `app.js` (bootstrap/orchestration)
+- `app-core.js` (shared helpers: API envelope parsing, job UI rendering, localStorage utils)
+- `app-home-cards.js` (home video card DOM builders)
 - `app-renderers.js` (home/comment/chat renderers)
+- `app-home-browser.js` (home search/filter panel + browser state)
+- `app-dashboard.js` (SSE dashboard updates/system info)
 - `app-settings-ui.js` (settings UI logic)
 - `app-player-ui.js` (player UI logic)
+- `app-player-page.js` (player page composition/bootstrap)
+- `app-local-video.js` (local video list + side data loading)
+- `app-state.js` (shared app state)
+- `app-actions.js` (download form actions)
+- `app-routing.js` (header/hash routing)
