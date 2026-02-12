@@ -237,10 +237,12 @@
     roots,
     linkify,
     defaultCommentAvatar,
+    shouldContinue = () => true,
     chunkSize = 24,
   }) {
     let offset = 0;
     const renderChunk = () => {
+      if (!shouldContinue()) return;
       const fragment = document.createDocumentFragment();
       const end = Math.min(roots.length, offset + chunkSize);
       for (let i = offset; i < end; i += 1) {
@@ -274,11 +276,15 @@
   }
 
   function createCommentRenderer(linkify) {
+    let renderToken = 0;
+
     function renderComments(comments) {
       const list = document.getElementById("comment-list");
       const countDisplay = document.getElementById("comment-count-display");
       const empty = document.querySelector(".comment-empty");
       if (!list) return;
+      renderToken += 1;
+      const currentToken = renderToken;
 
       list.style.display = "block";
       list.innerHTML = "";
@@ -293,11 +299,13 @@
 
       const roots = buildCommentTreeFromList(comments);
       scheduleTask(() => {
+        if (currentToken !== renderToken) return;
         renderCommentRootsInBatches({
           list,
           roots,
           linkify,
           defaultCommentAvatar: DEFAULT_COMMENT_AVATAR,
+          shouldContinue: () => currentToken === renderToken,
         });
       });
     }
