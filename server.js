@@ -259,12 +259,14 @@ async function loadConfig() {
         typeof parsed.enableFallbackThumbnails === "boolean"
           ? parsed.enableFallbackThumbnails
           : true,
-      wallpaperBlur: Number.isFinite(Number(parsed.wallpaperBlur))
-        ? Math.max(0, Math.min(30, Number(parsed.wallpaperBlur)))
-        : 2,
-      wallpaperBrightness: Number.isFinite(Number(parsed.wallpaperBrightness))
-        ? Math.max(30, Math.min(200, Number(parsed.wallpaperBrightness)))
-        : 50,
+      wallpaperBlur:
+        Number.isFinite(Number(parsed.wallpaperBlur))
+          ? Math.max(0, Math.min(30, Number(parsed.wallpaperBlur)))
+          : 2,
+      wallpaperBrightness:
+        Number.isFinite(Number(parsed.wallpaperBrightness))
+          ? Math.max(30, Math.min(200, Number(parsed.wallpaperBrightness)))
+          : 50,
     };
   } catch (error) {
     console.error("設定ファイル読み込みエラー:", error);
@@ -288,12 +290,14 @@ async function saveConfig(config) {
       typeof config.enableFallbackThumbnails === "boolean"
         ? config.enableFallbackThumbnails
         : true,
-    wallpaperBlur: Number.isFinite(Number(config.wallpaperBlur))
-      ? Math.max(0, Math.min(30, Number(config.wallpaperBlur)))
-      : 2,
-    wallpaperBrightness: Number.isFinite(Number(config.wallpaperBrightness))
-      ? Math.max(30, Math.min(200, Number(config.wallpaperBrightness)))
-      : 50,
+    wallpaperBlur:
+      Number.isFinite(Number(config.wallpaperBlur))
+        ? Math.max(0, Math.min(30, Number(config.wallpaperBlur)))
+        : 2,
+    wallpaperBrightness:
+      Number.isFinite(Number(config.wallpaperBrightness))
+        ? Math.max(30, Math.min(200, Number(config.wallpaperBrightness)))
+        : 50,
   };
 
   await fs.promises.writeFile(CONFIG_PATH, JSON.stringify(normalized, null, 2));
@@ -456,14 +460,11 @@ async function resolveFfprobeCommand() {
 }
 
 function getFallbackThumbPath(videoPath) {
-  const hash = crypto
-    .createHash("sha1")
-    .update(videoPath)
-    .digest("hex")
-    .slice(0, 12);
+  const hash = crypto.createHash("sha1").update(videoPath).digest("hex").slice(0, 12);
   const baseName = path
     .parse(videoPath)
-    .name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
+    .name
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
   return path.join(fallbackThumbnailDir, `${baseName}_${hash}.png`);
 }
 
@@ -505,11 +506,7 @@ function makeSafeFileStem(input) {
 
 function getProvisionalInfoPath(videoId) {
   const safeStem = makeSafeFileStem(videoId);
-  const hash = crypto
-    .createHash("sha1")
-    .update(String(videoId))
-    .digest("hex")
-    .slice(0, 10);
+  const hash = crypto.createHash("sha1").update(String(videoId)).digest("hex").slice(0, 10);
   return path.join(provisionalInfoDir, `${safeStem}_${hash}.info.json`);
 }
 
@@ -551,9 +548,7 @@ function formatDateYYYYMMDD(date) {
 
 function extractLikelyYoutubeId(text) {
   const source = String(text || "");
-  const m = source.match(
-    /(^|[^A-Za-z0-9_-])([A-Za-z0-9_-]{11})(?=$|[^A-Za-z0-9_-])/,
-  );
+  const m = source.match(/(^|[^A-Za-z0-9_-])([A-Za-z0-9_-]{11})(?=$|[^A-Za-z0-9_-])/);
   return m ? m[2] : null;
 }
 
@@ -916,9 +911,7 @@ app.post("/api/settings", async (req, res) => {
     }
 
     if (typeof enableFallbackThumbnails !== "undefined") {
-      currentConfig.enableFallbackThumbnails = Boolean(
-        enableFallbackThumbnails,
-      );
+      currentConfig.enableFallbackThumbnails = Boolean(enableFallbackThumbnails);
     }
 
     if (typeof wallpaperBlur !== "undefined") {
@@ -1791,10 +1784,7 @@ app.get("/info/:videoId", async (req, res) => {
     if (!match) {
       if (fs.existsSync(provisionalPath)) {
         try {
-          const cachedRaw = await fs.promises.readFile(
-            provisionalPath,
-            "utf-8",
-          );
+          const cachedRaw = await fs.promises.readFile(provisionalPath, "utf-8");
           const cached = JSON.parse(cachedRaw);
           if (cached?._provisional_info_version >= 3) {
             res.type("application/json; charset=utf-8");
@@ -1811,10 +1801,7 @@ app.get("/info/:videoId", async (req, res) => {
         return res.status(404).json({ error: "info.json が見つかりません" });
       }
 
-      const provisionalInfo = await createProvisionalInfoFromVideo(
-        videoPath,
-        videoId,
-      );
+      const provisionalInfo = await createProvisionalInfoFromVideo(videoPath, videoId);
       await fs.promises.writeFile(
         provisionalPath,
         JSON.stringify(provisionalInfo, null, 2),
@@ -1847,11 +1834,7 @@ app.get("/api/local-media", async (req, res) => {
     }
 
     const allowedVideoDirs = await getLocalVideoDirs();
-    const allowedThumbDirs = [
-      thumbnailDir,
-      fallbackThumbnailDir,
-      ...allowedVideoDirs,
-    ];
+    const allowedThumbDirs = [thumbnailDir, fallbackThumbnailDir, ...allowedVideoDirs];
     const allowedDirs = type === "video" ? allowedVideoDirs : allowedThumbDirs;
 
     const isAllowed = allowedDirs.some((dir) => isPathWithin(targetPath, dir));
@@ -1890,9 +1873,7 @@ app.get("/api/local-thumb-fallback", async (req, res) => {
     }
 
     const allowedVideoDirs = await getLocalVideoDirs();
-    const isAllowed = allowedVideoDirs.some((dir) =>
-      isPathWithin(videoPath, dir),
-    );
+    const isAllowed = allowedVideoDirs.some((dir) => isPathWithin(videoPath, dir));
     if (!isAllowed) {
       return apiError(res, 403, "アクセスが許可されていません。");
     }
@@ -1914,8 +1895,7 @@ app.get("/api/local-thumb-fallback", async (req, res) => {
     }
 
     const existingThumbPath = findExistingThumbnailPath(videoPath, true);
-    const thumbPath =
-      existingThumbPath || (await ensureFallbackThumbnail(videoPath));
+    const thumbPath = existingThumbPath || (await ensureFallbackThumbnail(videoPath));
     if (!thumbPath) {
       return res.redirect("/none_icon.jpg");
     }
@@ -1984,8 +1964,8 @@ app.get("/api/validate-url", async (req, res) => {
     const response = await fetchWithTimeout(
       url,
       {
-        method: "HEAD",
-        redirect: "follow", // リダイレクトを追跡
+      method: "HEAD",
+      redirect: "follow", // リダイレクトを追跡
       },
       5000,
     );
@@ -1994,10 +1974,7 @@ app.get("/api/validate-url", async (req, res) => {
       // 2xx のステータスコードは成功
       apiOk(res, { isValid: true });
     } else {
-      apiOk(res, {
-        isValid: false,
-        error: `HTTPステータス: ${response.status}`,
-      });
+      apiOk(res, { isValid: false, error: `HTTPステータス: ${response.status}` });
     }
   } catch (error) {
     if (error.name === "AbortError") {
@@ -2031,11 +2008,7 @@ app.post("/api/resolve-handle", async (req, res) => {
     } catch (fetchError) {
       if (fetchError.name === "AbortError") {
         console.error(`Fetch timeout for URL: ${url}`);
-        return apiError(
-          res,
-          504,
-          "YouTubeページへの接続がタイムアウトしました。",
-        );
+        return apiError(res, 504, "YouTubeページへの接続がタイムアウトしました。");
       }
       console.error(`Error fetching YouTube page for URL ${url}:`, fetchError);
       return apiError(res, 500, "YouTubeページの取得に失敗しました。");
