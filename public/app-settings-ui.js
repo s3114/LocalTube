@@ -324,8 +324,8 @@ function clampNumberInRange(value, min, max, fallback) {
             trimLogLines();
             if (logs.length > 0) {
               sinceId = Number(result.data?.lastId || sinceId);
-              scrollLogToBottom();
             }
+            scrollLogToBottom();
             logStatus.textContent = logs.length > 0
               ? `更新: ${logs.length}件`
               : "接続中（更新待ち）";
