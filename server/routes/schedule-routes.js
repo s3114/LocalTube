@@ -19,10 +19,43 @@ function buildScheduleResultFromStdout(stdout) {
 }
 
 function registerScheduleRoutes(app, deps) {
-  const { path, os, exec, baseDir, apiOk, apiError } = deps;
+  const { path, os, spawn, baseDir, apiOk, apiError } = deps;
   const logger = deps.logger || createLogger("route-schedule");
 
-  app.post("/api/schedule/create", (_req, res) => {
+  function runPowerShellScript(scriptPath, args) {
+    return new Promise((resolve) => {
+      const psArgs = [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        scriptPath,
+        ...args,
+      ];
+      const child = spawn("powershell.exe", psArgs, {
+        shell: false,
+        windowsHide: false,
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.on("data", (chunk) => {
+        stdout += String(chunk);
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on("error", (error) => {
+        resolve({ error, stdout, stderr, code: 1 });
+      });
+      child.on("close", (code) => {
+        resolve({ error: null, stdout, stderr, code: Number(code) || 0 });
+      });
+    });
+  }
+
+  app.post("/api/schedule/create", async (_req, res) => {
     const taskName = "YoutubeDL-AutoStart";
     const batPath = path.resolve(baseDir, "起動.bat");
     const psScriptPath = path.resolve(baseDir, "create_autostart_task.ps1");
@@ -31,32 +64,42 @@ function registerScheduleRoutes(app, deps) {
       `autostart_result_create_${Date.now()}.txt`,
     );
 
-    const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -BatPath "${batPath}" -ResultFilePath "${resultFilePath}"`;
-    logger.info("executing PowerShell command", { command });
-
-    exec(command, { shell: "powershell.exe" }, (error, stdout, stderr) => {
-      const result = buildScheduleResultFromStdout(stdout);
-      if (result?.ok) {
-        return apiOk(res, { message: result.message });
-      }
-      if (result && !result.ok) {
-        return apiError(res, 500, result.message, { detail: result.detail });
-      }
-      if (error) {
-        return apiError(res, 500, "コマンド実行に失敗しました。", {
-          detail: stderr || error.message,
-        });
-      }
-      return apiError(
-        res,
-        500,
-        "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
-        { detail: `stdout: ${stdout}, stderr: ${stderr}` },
-      );
+    logger.info("executing PowerShell script", {
+      psScriptPath,
+      taskName,
+      batPath,
     });
+
+    const { error, stdout, stderr } = await runPowerShellScript(psScriptPath, [
+      "-TaskName",
+      taskName,
+      "-BatPath",
+      batPath,
+      "-ResultFilePath",
+      resultFilePath,
+    ]);
+
+    const result = buildScheduleResultFromStdout(stdout);
+    if (result?.ok) {
+      return apiOk(res, { message: result.message });
+    }
+    if (result && !result.ok) {
+      return apiError(res, 500, result.message, { detail: result.detail });
+    }
+    if (error) {
+      return apiError(res, 500, "コマンド実行に失敗しました。", {
+        detail: stderr || error.message,
+      });
+    }
+    return apiError(
+      res,
+      500,
+      "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
+      { detail: `stdout: ${stdout}, stderr: ${stderr}` },
+    );
   });
 
-  app.post("/api/schedule/delete", (_req, res) => {
+  app.post("/api/schedule/delete", async (_req, res) => {
     const taskName = "YoutubeDL-AutoStart";
     const psScriptPath = path.resolve(baseDir, "delete_autostart_task.ps1");
     const resultFilePath = path.join(
@@ -64,29 +107,33 @@ function registerScheduleRoutes(app, deps) {
       `autostart_result_delete_${Date.now()}.txt`,
     );
 
-    const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -ResultFilePath "${resultFilePath}"`;
-    logger.info("executing PowerShell command", { command });
+    logger.info("executing PowerShell script", { psScriptPath, taskName });
 
-    exec(command, { shell: "powershell.exe" }, (error, stdout, stderr) => {
-      const result = buildScheduleResultFromStdout(stdout);
-      if (result?.ok) {
-        return apiOk(res, { message: result.message });
-      }
-      if (result && !result.ok) {
-        return apiError(res, 500, result.message, { detail: result.detail });
-      }
-      if (error) {
-        return apiError(res, 500, "コマンド実行に失敗しました。", {
-          detail: stderr || error.message,
-        });
-      }
-      return apiError(
-        res,
-        500,
-        "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
-        { detail: `stdout: ${stdout}, stderr: ${stderr}` },
-      );
-    });
+    const { error, stdout, stderr } = await runPowerShellScript(psScriptPath, [
+      "-TaskName",
+      taskName,
+      "-ResultFilePath",
+      resultFilePath,
+    ]);
+
+    const result = buildScheduleResultFromStdout(stdout);
+    if (result?.ok) {
+      return apiOk(res, { message: result.message });
+    }
+    if (result && !result.ok) {
+      return apiError(res, 500, result.message, { detail: result.detail });
+    }
+    if (error) {
+      return apiError(res, 500, "コマンド実行に失敗しました。", {
+        detail: stderr || error.message,
+      });
+    }
+    return apiError(
+      res,
+      500,
+      "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
+      { detail: `stdout: ${stdout}, stderr: ${stderr}` },
+    );
   });
 }
 
