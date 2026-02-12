@@ -363,6 +363,53 @@
     return a.every((value, index) => value === b[index]);
   }
 
+  function shouldUseHomeVirtualization(videoCount) {
+    return Number(videoCount) > 400;
+  }
+
+  function estimateHomeVirtualColumns(homeVideoGrid) {
+    const minCardWidth = 260;
+    const gap = 18;
+    const width = Math.max(1, Number(homeVideoGrid?.clientWidth || 0));
+    return Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
+  }
+
+  function computeHomeVirtualRange(homeVideoGrid, totalItems) {
+    const columns = estimateHomeVirtualColumns(homeVideoGrid);
+    const rowHeight = 245;
+    const totalRows = Math.ceil(totalItems / columns);
+    const gridRect = homeVideoGrid.getBoundingClientRect();
+    const viewportTopInGrid = Math.max(0, -gridRect.top);
+    const viewportHeight = Math.max(1, window.innerHeight || 1);
+    const overscanRows = 3;
+    const startRow = Math.max(0, Math.floor(viewportTopInGrid / rowHeight) - overscanRows);
+    const visibleRows = Math.ceil(viewportHeight / rowHeight) + overscanRows * 2;
+    const endRow = Math.min(totalRows, startRow + visibleRows);
+    return {
+      startIndex: startRow * columns,
+      endIndex: Math.min(totalItems, endRow * columns),
+      topSpacerHeight: startRow * rowHeight,
+      bottomSpacerHeight: Math.max(0, (totalRows - endRow) * rowHeight),
+    };
+  }
+
+  function withFallbackThumbPriority(video, priority) {
+    if (!video || !video.thumb || !video.thumb.includes("/api/local-thumb-fallback?")) {
+      return video;
+    }
+    try {
+      const base = window.location.origin || "http://localhost";
+      const url = new URL(video.thumb, base);
+      url.searchParams.set("priority", priority);
+      return {
+        ...video,
+        thumb: `${url.pathname}${url.search}`,
+      };
+    } catch (_error) {
+      return video;
+    }
+  }
+
   async function renderHomeVideoCardsStaged({
     homeVideoGrid,
     videos,
@@ -379,14 +426,18 @@
       if (renderTokenRef.current !== renderToken) return false;
       const fragment = document.createDocumentFragment();
       for (let i = start; i < end; i += 1) {
-        const video = videos[i];
+        const sourceVideo = videos[i];
+        const priority = i < initialBatchSize ? "high" : "low";
+        const video = withFallbackThumbPriority(sourceVideo, priority);
         const { item, refs } = createCard(video);
         const videoId = getVideoIdFromFilename(video.filename);
         if (videoId) {
           cardRefsByVideoId.set(videoId, { video, refs });
         }
         fragment.appendChild(item);
-        enrichCardInfo(video, refs);
+        if (i < initialBatchSize) {
+          enrichCardInfo(video, refs);
+        }
       }
       homeVideoGrid.appendChild(fragment);
       return true;
@@ -410,8 +461,9 @@
     if (!videoId) return null;
     if (homeInfoData.has(videoId)) return homeInfoData.get(videoId);
     if (!homeInfoCache.has(videoId)) {
-      const request = fetch(`/info/${encodeURIComponent(videoId)}`)
+      const request = fetch(`/api/info-lite/${encodeURIComponent(videoId)}`)
         .then((r) => (r.ok ? r.json() : null))
+        .then((payload) => payload?.data || null)
         .then((info) => {
           if (info) homeInfoData.set(videoId, info);
           return info;
@@ -420,6 +472,36 @@
       homeInfoCache.set(videoId, request);
     }
     return homeInfoCache.get(videoId);
+  }
+
+  async function fetchHomeInfoBatch(homeInfoData, homeInfoCache, videos) {
+    const ids = videos
+      .map((video) => getVideoIdFromFilename(video.filename))
+      .filter((id) => id && !homeInfoData.has(id));
+    if (ids.length === 0) return;
+
+    const uncachedIds = ids.filter((id) => !homeInfoCache.has(id));
+    if (uncachedIds.length > 0) {
+      const request = fetch(`/api/home-info?ids=${encodeURIComponent(uncachedIds.join(","))}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((payload) => payload?.data || {})
+        .catch(() => ({}));
+
+      uncachedIds.forEach((id) => {
+        homeInfoCache.set(
+          id,
+          request.then((map) => map[id] || null),
+        );
+      });
+    }
+
+    const resolved = await Promise.all(
+      ids.map((id) => homeInfoCache.get(id)?.catch(() => null) || Promise.resolve(null)),
+    );
+    ids.forEach((id, index) => {
+      const info = resolved[index];
+      if (info) homeInfoData.set(id, info);
+    });
   }
 
   function applyHomeCardInfoFromInfo(video, refs, info) {
@@ -457,6 +539,7 @@
     cardRefsByVideoId,
     renderedKeysRef,
     renderTokenRef,
+    virtualStateRef,
     onMetric,
   }) {
     if (!homeVideoGrid) return;
@@ -480,24 +563,78 @@
 
     const nextKeys = filteredVideos.map((video) => buildVideoStableKey(video));
     if (areStringArraysEqual(nextKeys, renderedKeysRef.current)) {
+      if (virtualStateRef.current.enabled) {
+        virtualStateRef.current.schedule?.();
+      }
       return;
     }
     renderedKeysRef.current = nextKeys;
     cardRefsByVideoId.clear();
     homeVideoGrid.innerHTML = "";
     renderTokenRef.current += 1;
+    virtualStateRef.current.videos = filteredVideos;
+    virtualStateRef.current.enabled = shouldUseHomeVirtualization(filteredVideos.length);
 
-    await renderHomeVideoCardsStaged({
-      homeVideoGrid,
-      videos: filteredVideos,
-      createCard: createHomeVideoCard,
-      enrichCardInfo: enrichHomeCardInfo,
-      cardRefsByVideoId,
-      renderTokenRef,
-    });
+    if (virtualStateRef.current.enabled) {
+      const state = virtualStateRef.current;
+      state.lastRangeKey = "";
+      const renderVirtualWindow = async () => {
+        if (!state.enabled || !homeVideoGrid.isConnected) return;
+        const range = computeHomeVirtualRange(homeVideoGrid, state.videos.length);
+        const rangeKey = `${range.startIndex}:${range.endIndex}:${range.topSpacerHeight}:${range.bottomSpacerHeight}`;
+        if (state.lastRangeKey === rangeKey) return;
+        state.lastRangeKey = rangeKey;
+
+        const visible = state.videos.slice(range.startIndex, range.endIndex);
+        homeVideoGrid.innerHTML = "";
+        const topSpacer = document.createElement("div");
+        topSpacer.style.height = `${range.topSpacerHeight}px`;
+        topSpacer.style.gridColumn = "1 / -1";
+        const bottomSpacer = document.createElement("div");
+        bottomSpacer.style.height = `${range.bottomSpacerHeight}px`;
+        bottomSpacer.style.gridColumn = "1 / -1";
+        homeVideoGrid.appendChild(topSpacer);
+
+        await renderHomeVideoCardsStaged({
+          homeVideoGrid,
+          videos: visible,
+          createCard: createHomeVideoCard,
+          enrichCardInfo: enrichHomeCardInfo,
+          cardRefsByVideoId,
+          renderTokenRef,
+          initialBatchSize: 16,
+          chunkSize: 16,
+        });
+
+        homeVideoGrid.appendChild(bottomSpacer);
+      };
+
+      state.schedule = (() => {
+        let rafId = null;
+        return () => {
+          if (rafId !== null) return;
+          rafId = requestAnimationFrame(async () => {
+            rafId = null;
+            await renderVirtualWindow();
+          });
+        };
+      })();
+
+      state.schedule();
+    } else {
+      await renderHomeVideoCardsStaged({
+        homeVideoGrid,
+        videos: filteredVideos,
+        createCard: createHomeVideoCard,
+        enrichCardInfo: enrichHomeCardInfo,
+        cardRefsByVideoId,
+        renderTokenRef,
+      });
+    }
     onMetric?.("home_render_ms", performance.now() - renderStart, {
       total: allVideos.length,
       rendered: filteredVideos.length,
+      virtualized: virtualStateRef.current.enabled,
     });
   }
 
@@ -601,6 +738,14 @@
     const cardRefsByVideoId = new Map();
     const renderedKeysRef = { current: [] };
     const renderTokenRef = { current: 0 };
+    const virtualStateRef = {
+      current: {
+        enabled: false,
+        videos: [],
+        lastRangeKey: "",
+        schedule: null,
+      },
+    };
     let lastFilteredVideos = [];
     const createHomeVideoCard = createHomeVideoCardFactory(onSelectVideo);
     const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData, homeInfoCache);
@@ -653,6 +798,7 @@
         cardRefsByVideoId,
         renderedKeysRef,
         renderTokenRef,
+        virtualStateRef,
         onMetric,
       });
     }
@@ -674,6 +820,19 @@
         syncAndRender,
         updateDurationCustomInputState,
       });
+
+      let virtualTicking = false;
+      const scheduleVirtualRerender = () => {
+        if (!virtualStateRef.current.enabled || !virtualStateRef.current.schedule) return;
+        if (virtualTicking) return;
+        virtualTicking = true;
+        requestAnimationFrame(() => {
+          virtualTicking = false;
+          virtualStateRef.current.schedule();
+        });
+      };
+      window.addEventListener("scroll", scheduleVirtualRerender, { passive: true });
+      window.addEventListener("resize", scheduleVirtualRerender);
     }
 
     function initializeHomeVideoBrowser() {
@@ -687,7 +846,6 @@
 
     async function prefetch() {
       const maxPrefetch = 120;
-      const concurrency = 6;
       const prioritized = [
         ...lastFilteredVideos,
         ...allVideos.filter((video) => !lastFilteredVideos.includes(video)),
@@ -696,11 +854,10 @@
       if (targets.length === 0) return;
 
       const startedAt = performance.now();
-      for (let i = 0; i < targets.length; i += concurrency) {
-        const batch = targets
-          .slice(i, i + concurrency)
-          .map((video) => getCachedHomeInfo(homeInfoData, homeInfoCache, video));
-        await Promise.allSettled(batch);
+      const batchSize = 40;
+      for (let i = 0; i < targets.length; i += batchSize) {
+        const batch = targets.slice(i, i + batchSize);
+        await fetchHomeInfoBatch(homeInfoData, homeInfoCache, batch);
       }
       onMetric?.("home_prefetch_ms", performance.now() - startedAt, {
         targetCount: targets.length,

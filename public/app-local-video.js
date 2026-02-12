@@ -365,8 +365,17 @@
         activateLocalVideoListItem(activeItem);
         setupLocalVideoPlayerSource(videoPlayer, titleEl, onResetSeekBar, video);
         tryAutoplayLocalVideo(videoPlayer, shouldAutoplay);
-        onLoadSideData?.(videoId);
         navigateToPlayerPageFromVideoId(videoId, onAfterNavigate);
+        // 再生開始の体感を優先して、重いサイド情報処理は次フレームへ遅延
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(() => {
+            onLoadSideData?.(videoId);
+          });
+        } else {
+          setTimeout(() => {
+            onLoadSideData?.(videoId);
+          }, 0);
+        }
       }
 
       async function loadLocalVideos() {

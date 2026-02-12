@@ -188,13 +188,25 @@
       updateToggleText(isCollapsed);
     };
 
+    const ensureRepliesRendered = () => {
+      if (renderedReplies) return;
+      renderNestedReplyTreeNodes(
+        parentNode.children,
+        replyContainer,
+        linkify,
+        defaultCommentAvatar,
+      );
+      renderedReplies = true;
+    };
+
     toggleBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      ensureRepliesRendered();
       toggleReplies();
     });
 
-    renderNestedReplyTreeNodes(parentNode.children, replyContainer, linkify, defaultCommentAvatar);
     replyContainer.classList.add("collapsed");
+    let renderedReplies = false;
 
     const bodyEl = parentEl.querySelector(".comment-body");
     bodyEl.appendChild(toggleBtn);
@@ -206,9 +218,59 @@
     threadHitbox.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      ensureRepliesRendered();
       toggleReplies();
     });
     parentEl.appendChild(threadHitbox);
+  }
+
+  function scheduleTask(callback) {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(callback);
+      return;
+    }
+    setTimeout(callback, 0);
+  }
+
+  function renderCommentRootsInBatches({
+    list,
+    roots,
+    linkify,
+    defaultCommentAvatar,
+    chunkSize = 24,
+  }) {
+    let offset = 0;
+    const renderChunk = () => {
+      const fragment = document.createDocumentFragment();
+      const end = Math.min(roots.length, offset + chunkSize);
+      for (let i = offset; i < end; i += 1) {
+        const parentNode = roots[i];
+        const parentEl = createCommentElementNode(
+          parentNode,
+          false,
+          linkify,
+          defaultCommentAvatar,
+        );
+        parentEl.querySelector(".comment-text")?.classList.add("clamped");
+        fragment.appendChild(parentEl);
+
+        if (parentNode.children.length > 0) {
+          createReplyControlsForComment(
+            parentNode,
+            parentEl,
+            linkify,
+            defaultCommentAvatar,
+          );
+        }
+      }
+      list.appendChild(fragment);
+      offset = end;
+      if (offset < roots.length) {
+        scheduleTask(renderChunk);
+      }
+    };
+
+    renderChunk();
   }
 
   function createCommentRenderer(linkify) {
@@ -230,24 +292,13 @@
       if (empty) empty.style.display = "none";
 
       const roots = buildCommentTreeFromList(comments);
-      roots.forEach((parentNode) => {
-        const parentEl = createCommentElementNode(
-          parentNode,
-          false,
+      scheduleTask(() => {
+        renderCommentRootsInBatches({
+          list,
+          roots,
           linkify,
-          DEFAULT_COMMENT_AVATAR,
-        );
-        parentEl.querySelector(".comment-text")?.classList.add("clamped");
-        list.appendChild(parentEl);
-
-        if (parentNode.children.length > 0) {
-          createReplyControlsForComment(
-            parentNode,
-            parentEl,
-            linkify,
-            DEFAULT_COMMENT_AVATAR,
-          );
-        }
+          defaultCommentAvatar: DEFAULT_COMMENT_AVATAR,
+        });
       });
     }
 
@@ -259,4 +310,3 @@
 
   global.createCommentRenderer = createCommentRenderer;
 })(window);
-
