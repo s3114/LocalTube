@@ -173,7 +173,23 @@
         flex-shrink: 0;
       }
 
+      .header-sort-container {
+        position: relative;
+        flex-shrink: 0;
+      }
+
       .header-filter-btn {
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .header-sort-btn {
         height: 28px;
         border-radius: 999px;
         border: 1px solid var(--border);
@@ -195,6 +211,60 @@
         padding: 12px;
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
         z-index: 50;
+      }
+
+      .home-sort-panel {
+        position: absolute;
+        top: 38px;
+        right: 0;
+        width: min(92vw, 320px);
+        background: #121212;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+        z-index: 50;
+      }
+
+      .home-sort-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .home-sort-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .home-sort-label {
+        font-size: 12px;
+        color: var(--subtext);
+        min-width: 64px;
+      }
+
+      .home-sort-inline {
+        display: flex;
+        gap: 6px;
+      }
+
+      .home-sort-key-btn,
+      .home-sort-order-btn {
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .home-sort-key-btn.active,
+      .home-sort-order-btn.active {
+        border-color: rgba(58, 141, 222, 0.8);
+        background: rgba(58, 141, 222, 0.2);
       }
 
       .home-filter-row {
@@ -1982,6 +2052,15 @@
                     placeholder="チャンネル名で絞り込み" />
                 </div>
               </div>
+              <div class="home-filter-row">
+                <div class="home-filter-label">ファイルパス</div>
+                <div class="home-filter-inline">
+                  <input
+                    id="filter-filepath"
+                    type="text"
+                    placeholder="ファイルパスで絞り込み" />
+                </div>
+              </div>
               <div class="home-filter-actions">
                 <button
                   id="filter-clear-btn"
@@ -1989,6 +2068,44 @@
                   type="button">
                   クリア
                 </button>
+              </div>
+            </div>
+          </div>
+          <div class="header-sort-container">
+            <button id="home-sort-btn" class="header-sort-btn"
+              type="button">
+              並べ替え
+            </button>
+            <div id="home-sort-panel" class="home-sort-panel hidden">
+              <div class="home-sort-row">
+                <div class="home-sort-label">種類</div>
+                <div class="home-sort-inline">
+                  <button class="home-sort-key-btn" data-sort-key="popular"
+                    type="button">
+                    人気順
+                  </button>
+                  <button class="home-sort-key-btn" data-sort-key="kana"
+                    type="button">
+                    50音順
+                  </button>
+                  <button class="home-sort-key-btn active"
+                    data-sort-key="published" type="button">
+                    投稿日
+                  </button>
+                </div>
+              </div>
+              <div class="home-sort-row">
+                <div class="home-sort-label">順序</div>
+                <div class="home-sort-inline">
+                  <button class="home-sort-order-btn" data-sort-order="asc"
+                    type="button">
+                    昇順
+                  </button>
+                  <button class="home-sort-order-btn active"
+                    data-sort-order="desc" type="button">
+                    降順
+                  </button>
+                </div>
               </div>
             </div>
           </div>

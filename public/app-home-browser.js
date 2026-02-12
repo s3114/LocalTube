@@ -1,6 +1,24 @@
 (function attachHomeVideoBrowser(global) {
+  const ALLOWED_SORT_MODES = new Set([
+    "popular_asc",
+    "popular_desc",
+    "kana_asc",
+    "kana_desc",
+    "published_asc",
+    "published_desc",
+  ]);
+
+  function composeSortMode(sortKey, sortOrder) {
+    const key = ["popular", "kana", "published"].includes(sortKey)
+      ? sortKey
+      : "published";
+    const order = sortOrder === "asc" ? "asc" : "desc";
+    return `${key}_${order}`;
+  }
+
   function getHomeFilterStateFromInputs({
     filterChannel,
+    filterFilepath,
     filterDateFromText,
     filterDateFrom,
     filterDateToText,
@@ -11,6 +29,9 @@
   }) {
     return {
       channelKeyword: String(filterChannel?.value || "")
+        .trim()
+        .toLowerCase(),
+      filePathKeyword: String(filterFilepath?.value || "")
         .trim()
         .toLowerCase(),
       fromYmd: normalizeYyyymmdd(filterDateFromText?.value || filterDateFrom?.value),
@@ -24,6 +45,7 @@
   function getHomeSearchStateForUrlFromInputs({
     homeSearchInput,
     filterChannel,
+    filterFilepath,
     filterDateFromText,
     filterDateFrom,
     filterDateToText,
@@ -35,6 +57,7 @@
     return {
       q: String(homeSearchInput?.value || "").trim(),
       ch: String(filterChannel?.value || "").trim(),
+      fp: String(filterFilepath?.value || "").trim(),
       df: normalizeYyyymmdd(filterDateFromText?.value || filterDateFrom?.value),
       dt: normalizeYyyymmdd(filterDateToText?.value || filterDateTo?.value),
       dr: String(filterDurationRange?.value || "all"),
@@ -46,6 +69,7 @@
   function applyHomeSearchStateFromUrlToInputs({
     homeSearchInput,
     filterChannel,
+    filterFilepath,
     filterDateFromText,
     filterDateFrom,
     filterDateToText,
@@ -59,6 +83,7 @@
 
     if (homeSearchInput) homeSearchInput.value = params.get("q") || "";
     if (filterChannel) filterChannel.value = params.get("ch") || "";
+    if (filterFilepath) filterFilepath.value = params.get("fp") || "";
 
     const fromYmd = normalizeYyyymmdd(params.get("df") || "");
     const toYmd = normalizeYyyymmdd(params.get("dt") || "");
@@ -88,6 +113,7 @@
 
     assignOrDelete("q", state.q);
     assignOrDelete("ch", state.ch);
+    assignOrDelete("fp", state.fp);
     assignOrDelete("df", state.df);
     assignOrDelete("dt", state.dt);
     assignOrDelete("dr", state.dr !== "all" ? state.dr : "");
@@ -118,6 +144,7 @@
     filterDurationMin,
     filterDurationMax,
     filterChannel,
+    filterFilepath,
   }) {
     if (filterDateFrom) filterDateFrom.value = "";
     if (filterDateFromText) filterDateFromText.value = "";
@@ -127,6 +154,7 @@
     if (filterDurationMin) filterDurationMin.value = "";
     if (filterDurationMax) filterDurationMax.value = "";
     if (filterChannel) filterChannel.value = "";
+    if (filterFilepath) filterFilepath.value = "";
   }
 
   function bindHomeDatePair(dateEl, textEl, onChanged) {
@@ -230,6 +258,20 @@
     return channelSource.includes(channelKeyword);
   }
 
+  function matchesHomeFilePathFilter(video, filePathKeyword) {
+    if (!filePathKeyword) return true;
+    const sourceDir = String(video?.sourceDir || "");
+    const filename = String(video?.filename || "");
+    const fullPathLike = `${sourceDir}/${filename}`.toLowerCase();
+    const terms = String(filePathKeyword)
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (terms.length === 0) return true;
+    return terms.every((term) => fullPathLike.includes(term));
+  }
+
   function matchesHomeDateFilter(video, info, fromYmd, toYmd) {
     if (!fromYmd && !toYmd) return true;
     const uploadYmd = getHomeVideoUploadDateYmd(video, info);
@@ -275,6 +317,7 @@
 
   function matchesHomeAdvancedFiltersWithState(video, info, filterState) {
     if (!matchesHomeChannelFilter(info, filterState.channelKeyword)) return false;
+    if (!matchesHomeFilePathFilter(video, filterState.filePathKeyword)) return false;
     if (!matchesHomeDateFilter(video, info, filterState.fromYmd, filterState.toYmd)) {
       return false;
     }
@@ -289,10 +332,57 @@
     });
   }
 
+  function getViewCountForSort(info) {
+    const value = Number(info?.view_count);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function getTitleForSort(video, info) {
+    return String(info?.title || video?.title || "").trim();
+  }
+
+  function getUploadDateNumberForSort(video, info) {
+    const ymd = getHomeVideoUploadDateYmd(video, info);
+    const num = Number(ymd);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  function sortHomeVideosWithMode(videos, homeInfoData, sortMode) {
+    const mode = ALLOWED_SORT_MODES.has(sortMode) ? sortMode : "published_desc";
+    const sorted = [...videos];
+    sorted.sort((a, b) => {
+      const infoA = getHomeVideoInfoFromMap(a, homeInfoData);
+      const infoB = getHomeVideoInfoFromMap(b, homeInfoData);
+
+      if (mode === "popular_asc" || mode === "popular_desc") {
+        const diff = getViewCountForSort(infoA) - getViewCountForSort(infoB);
+        if (diff !== 0) return mode === "popular_asc" ? -diff : diff;
+      } else if (mode === "kana_asc" || mode === "kana_desc") {
+        const titleA = getTitleForSort(a, infoA);
+        const titleB = getTitleForSort(b, infoB);
+        const diff = titleA.localeCompare(titleB, "ja");
+        if (diff !== 0) return mode === "kana_asc" ? diff : -diff;
+      } else {
+        const diff = getUploadDateNumberForSort(a, infoA) - getUploadDateNumberForSort(b, infoB);
+        if (diff !== 0) return mode === "published_asc" ? diff : -diff;
+      }
+
+      return String(a?.filename || "").localeCompare(String(b?.filename || ""), "ja");
+    });
+    return sorted;
+  }
+
   function bindHomeFilterPanelToggle(homeFilterBtn, homeFilterPanel) {
     homeFilterBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       homeFilterPanel?.classList.toggle("hidden");
+    });
+  }
+
+  function bindHomeSortPanelToggle(homeSortBtn, homeSortPanel) {
+    homeSortBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      homeSortPanel?.classList.toggle("hidden");
     });
   }
 
@@ -304,12 +394,32 @@
     });
   }
 
+  function bindCloseHomeSortPanelOnOutsideClick(homeSortBtn, homeSortPanel) {
+    document.addEventListener("click", (e) => {
+      if (!homeSortPanel || homeSortPanel.classList.contains("hidden")) return;
+      if (homeSortPanel.contains(e.target) || homeSortBtn?.contains(e.target)) return;
+      homeSortPanel.classList.add("hidden");
+    });
+  }
+
+  function applySortButtonsUi(homeSortKeyButtons, homeSortOrderButtons, sortKey, sortOrder) {
+    homeSortKeyButtons?.forEach((button) => {
+      if (button.dataset.sortKey === sortKey) button.classList.add("active");
+      else button.classList.remove("active");
+    });
+    homeSortOrderButtons?.forEach((button) => {
+      if (button.dataset.sortOrder === sortOrder) button.classList.add("active");
+      else button.classList.remove("active");
+    });
+  }
+
   function bindHomeFilterInputEvents(
     {
       filterDurationRange,
       filterDurationMin,
       filterDurationMax,
       filterChannel,
+      filterFilepath,
       filterDateFrom,
       filterDateFromText,
       filterDateTo,
@@ -325,6 +435,7 @@
     filterDurationMin?.addEventListener("input", () => onChanged?.());
     filterDurationMax?.addEventListener("input", () => onChanged?.());
     filterChannel?.addEventListener("input", () => onChanged?.());
+    filterFilepath?.addEventListener("input", () => onChanged?.());
     bindHomeDatePair(filterDateFrom, filterDateFromText, () => onChanged?.());
     bindHomeDatePair(filterDateTo, filterDateToText, () => onChanged?.());
   }
@@ -364,7 +475,7 @@
   }
 
   function shouldUseHomeVirtualization(videoCount) {
-    return Number(videoCount) > 400;
+    return false;
   }
 
   function estimateHomeVirtualColumns(homeVideoGrid) {
@@ -641,10 +752,15 @@
   function bindHomeVideoBrowserEvents({
     homeFilterBtn,
     homeFilterPanel,
+    homeSortBtn,
+    homeSortPanel,
+    homeSortKeyButtons,
+    homeSortOrderButtons,
     filterDurationRange,
     filterDurationMin,
     filterDurationMax,
     filterChannel,
+    filterFilepath,
     filterDateFrom,
     filterDateFromText,
     filterDateTo,
@@ -653,15 +769,20 @@
     homeSearchInputs,
     syncAndRender,
     updateDurationCustomInputState,
+    getSortState,
+    setSortState,
   }) {
     bindHomeFilterPanelToggle(homeFilterBtn, homeFilterPanel);
+    bindHomeSortPanelToggle(homeSortBtn, homeSortPanel);
     bindCloseHomeFilterPanelOnOutsideClick(homeFilterBtn, homeFilterPanel);
+    bindCloseHomeSortPanelOnOutsideClick(homeSortBtn, homeSortPanel);
     bindHomeFilterInputEvents(
       {
         filterDurationRange,
         filterDurationMin,
         filterDurationMax,
         filterChannel,
+        filterFilepath,
         filterDateFrom,
         filterDateFromText,
         filterDateTo,
@@ -675,6 +796,56 @@
       clearHomeFiltersInputs(homeSearchInputs);
       updateDurationCustomInputState();
       syncAndRender();
+    });
+
+    homeSortKeyButtons?.forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextKey = String(button.dataset.sortKey || "");
+        if (!nextKey) return;
+        const current = getSortState();
+        if (current.sortKey === nextKey) {
+          homeSortPanel?.classList.add("hidden");
+          return;
+        }
+        const next = {
+          ...current,
+          sortKey: nextKey,
+        };
+        setSortState(next);
+        applySortButtonsUi(
+          homeSortKeyButtons,
+          homeSortOrderButtons,
+          next.sortKey,
+          next.sortOrder,
+        );
+        syncAndRender();
+        homeSortPanel?.classList.add("hidden");
+      });
+    });
+
+    homeSortOrderButtons?.forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextOrder = String(button.dataset.sortOrder || "");
+        if (!nextOrder) return;
+        const current = getSortState();
+        if (current.sortOrder === nextOrder) {
+          homeSortPanel?.classList.add("hidden");
+          return;
+        }
+        const next = {
+          ...current,
+          sortOrder: nextOrder === "asc" ? "asc" : "desc",
+        };
+        setSortState(next);
+        applySortButtonsUi(
+          homeSortKeyButtons,
+          homeSortOrderButtons,
+          next.sortKey,
+          next.sortOrder,
+        );
+        syncAndRender();
+        homeSortPanel?.classList.add("hidden");
+      });
     });
   }
 
@@ -720,6 +891,10 @@
     homeSearchInput,
     homeFilterBtn,
     homeFilterPanel,
+    homeSortBtn,
+    homeSortPanel,
+    homeSortKeyButtons,
+    homeSortOrderButtons,
     filterDateFrom,
     filterDateFromText,
     filterDateTo,
@@ -728,6 +903,7 @@
     filterDurationMin,
     filterDurationMax,
     filterChannel,
+    filterFilepath,
     filterClearBtn,
     onSelectVideo,
     onMetric = (_name, _value, _meta) => {},
@@ -747,11 +923,16 @@
       },
     };
     let lastFilteredVideos = [];
+    let currentSortState = {
+      sortKey: "published",
+      sortOrder: "desc",
+    };
     const createHomeVideoCard = createHomeVideoCardFactory(onSelectVideo);
     const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData, homeInfoCache);
     const homeSearchInputs = {
       homeSearchInput,
       filterChannel,
+      filterFilepath,
       filterDateFromText,
       filterDateFrom,
       filterDateToText,
@@ -781,15 +962,20 @@
     async function render() {
       const filterState = getHomeFilterStateFromInputs(homeSearchInputs);
       const terms = getHomeSearchTermsFromInput(homeSearchInput);
-      lastFilteredVideos = filterHomeVideosWithInputs(
+      const filtered = filterHomeVideosWithInputs(
         allVideos,
         homeInfoData,
         filterState,
         terms,
       );
+      const sortMode = composeSortMode(
+        currentSortState.sortKey,
+        currentSortState.sortOrder,
+      );
+      lastFilteredVideos = sortHomeVideosWithMode(filtered, homeInfoData, sortMode);
       await renderHomeVideoBrowserGrid({
         homeVideoGrid,
-        allVideos,
+        allVideos: lastFilteredVideos,
         homeInfoData,
         homeSearchInputs,
         homeSearchInput,
@@ -807,10 +993,15 @@
       bindHomeVideoBrowserEvents({
         homeFilterBtn,
         homeFilterPanel,
+        homeSortBtn,
+        homeSortPanel,
+        homeSortKeyButtons,
+        homeSortOrderButtons,
         filterDurationRange,
         filterDurationMin,
         filterDurationMax,
         filterChannel,
+        filterFilepath,
         filterDateFrom,
         filterDateFromText,
         filterDateTo,
@@ -819,6 +1010,15 @@
         homeSearchInputs,
         syncAndRender,
         updateDurationCustomInputState,
+        getSortState: () => ({ ...currentSortState }),
+        setSortState: (nextState) => {
+          currentSortState = {
+            sortKey: ["popular", "kana", "published"].includes(nextState.sortKey)
+              ? nextState.sortKey
+              : "published",
+            sortOrder: nextState.sortOrder === "asc" ? "asc" : "desc",
+          };
+        },
       });
 
       let virtualTicking = false;
@@ -837,6 +1037,12 @@
 
     function initializeHomeVideoBrowser() {
       applyHomeSearchStateFromUrlToInputs(homeSearchInputs);
+      applySortButtonsUi(
+        homeSortKeyButtons,
+        homeSortOrderButtons,
+        currentSortState.sortKey,
+        currentSortState.sortOrder,
+      );
       homeSearchInput?.addEventListener("input", () => {
         syncAndRender();
       });

@@ -179,9 +179,7 @@
     }
 
     function tryAutoplayLocalVideo(videoPlayer, shouldAutoplay) {
-      const hasUserActivation =
-        document.userActivation?.hasBeenActive || document.userActivation?.isActive;
-      if (!shouldAutoplay || !hasUserActivation) return;
+      if (!shouldAutoplay) return;
       videoPlayer.play().catch((err) => {
         if (err?.name !== "NotAllowedError") {
           onError("Play failed:", err);
@@ -191,6 +189,7 @@
 
     function navigateToPlayerPageFromVideoId(videoId, onAfterNavigate) {
       history.pushState(null, "", `#player/${encodeURIComponent(videoId)}`);
+      window.scrollTo(0, 0);
       document
         .querySelectorAll(".page")
         .forEach((page) => page.classList.remove("active-page"));
