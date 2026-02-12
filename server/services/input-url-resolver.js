@@ -37,7 +37,7 @@ function createInputUrlResolver({ spawn, path, baseDir, logger }) {
         ytDlpPath,
         args: args.join(" "),
       });
-      const ytDlp = spawn(ytDlpPath, args);
+      const ytDlp = spawn(ytDlpPath, args, { windowsHide: true });
       let videoUrls = "";
       ytDlp.stdout.on("data", (data) => {
         videoUrls += data.toString();

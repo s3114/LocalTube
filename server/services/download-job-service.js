@@ -1,4 +1,4 @@
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const { createLogger } = require("./logger-service");
 
 function createDownloadJobService({
@@ -219,7 +219,7 @@ function createDownloadJobService({
       }
       logger.info("タイトル取得コマンド実行", { args: args.join(" ") });
 
-      const ytDlpProcess = spawn(ytDlpPath, args);
+      const ytDlpProcess = spawn(ytDlpPath, args, { windowsHide: true });
       const stdoutChunks = [];
       const stderrChunks = [];
 
@@ -255,13 +255,10 @@ function createDownloadJobService({
       }
       channelArgs.push(infoObj.channel_url);
 
-      const fullCommand = `"${path.join(baseDir, "yt-dlp.exe")}" ${channelArgs
-        .map((a) => `"${a}"`)
-        .join(" ")}`;
-
-      const channelJson = execSync(fullCommand, {
+      const channelJson = execFileSync(path.join(baseDir, "yt-dlp.exe"), channelArgs, {
         encoding: "utf-8",
         timeout: 3000,
+        windowsHide: true,
       });
       const channelObj = JSON.parse(channelJson);
 
@@ -363,7 +360,7 @@ function createDownloadJobService({
         settings,
       );
       logger.info("ダウンロードコマンド実行", { args: args.join(" ") });
-      const ytDlp = spawn(ytDlpPath, args);
+      const ytDlp = spawn(ytDlpPath, args, { windowsHide: true });
 
       let stderrOutput = "";
       let stdoutBuffer = "";
