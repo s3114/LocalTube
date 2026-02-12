@@ -175,15 +175,34 @@ function clampNumberInRange(value, min, max, fallback) {
       }
 
       function initializeAutostartTaskButtons() {
-        const btnCreateAutostart = document.getElementById(
-          "btn-create-autostart-task",
-        );
-        const btnDeleteAutostart = document.getElementById(
-          "btn-delete-autostart-task",
-        );
+        const autostartToggle = document.getElementById("opt-autostart-task");
         const autostartStatus = document.getElementById("autostart-status");
 
-        async function handleAutostart(endpoint) {
+        if (!autostartToggle || !autostartStatus) return;
+
+        async function syncAutostartStatus() {
+          autostartStatus.textContent = "状態を確認中...";
+          autostartStatus.style.color = "var(--blue)";
+          try {
+            const response = await settingsUiDeps.fetchImpl("/api/schedule/status");
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
+            if (!result.ok) {
+              throw new Error(result.error || "状態の取得に失敗しました。");
+            }
+            const enabled = Boolean(result.data?.enabled);
+            autostartToggle.checked = enabled;
+            autostartStatus.textContent = enabled
+              ? "現在: 有効"
+              : "現在: 無効";
+            autostartStatus.style.color = enabled ? "var(--green)" : "var(--main-txt)";
+          } catch (error) {
+            console.error("自動起動タスク状態取得エラー:", error);
+            autostartStatus.textContent = "状態の取得に失敗しました。";
+            autostartStatus.style.color = "var(--accent)";
+          }
+        }
+
+        async function handleAutostart(endpoint, nextCheckedState) {
           try {
             autostartStatus.textContent = "処理中...";
             autostartStatus.style.color = "var(--blue)";
@@ -194,26 +213,38 @@ function clampNumberInRange(value, min, max, fallback) {
               autostartStatus.textContent = result.data?.message || "完了しました。";
               autostartStatus.style.color = "var(--green)";
             } else {
+              autostartToggle.checked = !nextCheckedState;
               autostartStatus.textContent = `エラー: ${result.error || "処理に失敗しました。"}`;
               autostartStatus.style.color = "var(--accent)";
             }
           } catch (error) {
             console.error("自動起動タスク操作エラー:", error);
+            autostartToggle.checked = !nextCheckedState;
             autostartStatus.textContent = "通信エラーが発生しました。";
             autostartStatus.style.color = "var(--accent)";
           }
         }
 
-        btnCreateAutostart?.addEventListener("click", () => {
-          if (settingsUiDeps.confirmImpl("PC起動時にこのアプリケーションを自動で起動するように設定しますか？")) {
-            handleAutostart("/api/schedule/create");
+        autostartToggle.addEventListener("change", () => {
+          const nextCheckedState = autostartToggle.checked;
+          const confirmed = nextCheckedState
+            ? settingsUiDeps.confirmImpl(
+              "PC起動時にこのアプリケーションを自動で起動するように設定しますか？",
+            )
+            : settingsUiDeps.confirmImpl("PC起動時の自動実行を解除しますか？");
+
+          if (!confirmed) {
+            autostartToggle.checked = !nextCheckedState;
+            return;
           }
+
+          const endpoint = nextCheckedState
+            ? "/api/schedule/create"
+            : "/api/schedule/delete";
+          handleAutostart(endpoint, nextCheckedState);
         });
-        btnDeleteAutostart?.addEventListener("click", () => {
-          if (settingsUiDeps.confirmImpl("PC起動時の自動実行を解除しますか？")) {
-            handleAutostart("/api/schedule/delete");
-          }
-        });
+
+        syncAutostartStatus();
       }
 
       function initializeYoutubePlaylistConverterUI() {

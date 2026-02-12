@@ -2658,7 +2658,7 @@
                     </button>
                   </div>
                   <div class="settings-inline-row">
-                    <div class="wallpaper-label">Blur</div>
+                    <div class="wallpaper-label">画像のぼかし</div>
                     <input
                       type="range"
                       id="wallpaper-blur-range"
@@ -2668,7 +2668,7 @@
                     <span id="wallpaper-blur-value">0 px</span>
                   </div>
                   <div class="settings-inline-row">
-                    <div class="wallpaper-label">Brightness</div>
+                    <div class="wallpaper-label">画像の明るさ</div>
                     <input
                       type="range"
                       id="wallpaper-brightness-range"
@@ -2699,18 +2699,10 @@
                   <small id="autostart-status"
                     class="settings-hint-blue"></small>
                 </div>
-                <div class="settings-inline-row settings-gap-10">
-                  <button
-                    id="btn-create-autostart-task"
-                    class="btn-ui btn-green">
-                    有効化
-                  </button>
-                  <button
-                    id="btn-delete-autostart-task"
-                    class="btn-ui btn-red">
-                    無効化
-                  </button>
-                </div>
+                <label class="switch">
+                  <input type="checkbox" id="opt-autostart-task" />
+                  <span class="slider"></span>
+                </label>
               </div>
             </div> <!-- Close options div for settings -->
           </div> <!-- Close card-main for settings -->
