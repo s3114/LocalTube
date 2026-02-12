@@ -65,6 +65,7 @@ const appState = window.AppState || {
           optFallbackThumbnails: document.getElementById(
             "opt-fallback-thumbnails",
           ),
+          fallbackThumbStatus: document.getElementById("fallback-thumb-status"),
           wallpaperStatus: document.getElementById("wallpaper-status"),
           wallpaperFileInput: document.getElementById("wallpaper-file-input"),
           wallpaperSelectBtn: document.getElementById("wallpaper-select-btn"),
@@ -82,6 +83,13 @@ const appState = window.AppState || {
           elements,
           onLocalVideosChanged: async () => {
             await window.refreshLocalVideos?.();
+          },
+          dependencies: {
+            parseApiResponseImpl: parseApiResponse,
+            fetchImpl: (...args) => fetch(...args),
+            alertImpl: (message) => alert(message),
+            confirmImpl: (message) => confirm(message),
+            writeClipboardTextImpl: (text) => navigator.clipboard.writeText(text),
           },
         });
 

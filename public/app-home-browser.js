@@ -595,10 +595,17 @@
     }
 
     async function prefetch() {
-      const requests = allVideos.map((video) =>
-        getCachedHomeInfo(homeInfoData, homeInfoCache, video),
-      );
-      await Promise.allSettled(requests);
+      const maxPrefetch = 120;
+      const concurrency = 6;
+      const targets = allVideos.slice(0, maxPrefetch);
+      if (targets.length === 0) return;
+
+      for (let i = 0; i < targets.length; i += concurrency) {
+        const batch = targets
+          .slice(i, i + concurrency)
+          .map((video) => getCachedHomeInfo(homeInfoData, homeInfoCache, video));
+        await Promise.allSettled(batch);
+      }
       render();
     }
 
@@ -613,5 +620,13 @@
   }
 
   global.createHomeVideoBrowserController = createHomeVideoBrowserController;
+  global.__homeBrowserTestUtils = {
+    normalizeYyyymmdd,
+    parseDurationInput,
+    matchesHomeChannelFilter,
+    matchesHomeDateFilter,
+    matchesHomeDurationFilter,
+    filterHomeVideosWithInputs,
+    getHomeFilterStateFromInputs,
+  };
 })(window);
-

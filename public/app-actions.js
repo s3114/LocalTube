@@ -1,4 +1,22 @@
 (function attachAppActions(global) {
+  function parseUrlsFromInputValue(value) {
+    const rawUrls = String(value || "").trim();
+    if (rawUrls === "") {
+      return { ok: false, errorCode: "EMPTY_URLS", urls: [] };
+    }
+
+    const urls = rawUrls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
+    if (urls.length === 0) {
+      return { ok: false, errorCode: "EMPTY_URLS", urls: [] };
+    }
+
+    return { ok: true, errorCode: null, urls };
+  }
+
+  function isHttpsUrl(url) {
+    return String(url || "").startsWith("https://");
+  }
+
   function createDownloadActions({
     parseApiResponse,
     fetchImpl = fetch,
@@ -12,22 +30,16 @@
     }
 
     function parseInputUrls(urlsInput) {
-      const rawUrls = String(urlsInput?.value || "").trim();
-      if (rawUrls === "") {
+      const parsed = parseUrlsFromInputValue(urlsInput?.value);
+      if (!parsed.ok) {
         alertImpl("URLを入力してください。");
         return null;
       }
-
-      const urls = rawUrls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
-      if (urls.length === 0) {
-        alertImpl("URLを入力してください。");
-        return null;
-      }
-      return urls;
+      return parsed.urls;
     }
 
     async function validateSingleUrl(url) {
-      if (!url.startsWith("https://")) {
+      if (!isHttpsUrl(url)) {
         alertImpl(
           `「${url}」は有効なURLではありません。https:// で始まるURLを入力してください。`,
         );
@@ -124,5 +136,8 @@
   }
 
   global.createDownloadActions = createDownloadActions;
+  global.__appActionsTestUtils = {
+    parseUrlsFromInputValue,
+    isHttpsUrl,
+  };
 })(window);
-

@@ -744,10 +744,9 @@
       .player-video-wrap {
         position: relative;
         width: 100%;
-        /* 16:9を維持 */
         aspect-ratio: 16 / 9;
         background: black;
-        border-radius: 8px 8px 0 0;
+        border-radius: 8px;
         overflow: hidden;
       }
 
@@ -2388,8 +2387,8 @@
               <div class="info-label">エラー</div>
               <div id="info-error-count" class="info-value">0 件</div>
             </div>
-              <div class="info-item">
-                <div class="info-label">完了率</div>
+            <div class="info-item">
+              <div class="info-label">完了率</div>
               <div class="info-value info-value-wide">
                 <div class="completion-bar-container">
                   <div id="completion-bar" class="completion-bar"></div>
@@ -2412,7 +2411,8 @@
                   メン限のプレイリストURLを取得
                   <small>チャンネルURLから自動的に再生リストURLを生成します。</small>
                 </div>
-                <div class="settings-stack settings-stack-8 settings-stack-tool">
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-tool">
                   <input
                     type="text"
                     id="youtubeChannelUrlInput"
@@ -2463,7 +2463,8 @@
                   <small id="local-video-dirs-status"
                     class="settings-hint-blue"></small>
                 </div>
-                <div class="settings-stack settings-stack-8 settings-stack-wide">
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-wide">
                   <textarea
                     id="local-video-dirs-input"
                     placeholder="追加したいフォルダを1行ずつ入力"
@@ -2484,7 +2485,8 @@
                   <small id="wallpaper-status"
                     class="settings-hint-blue"></small>
                 </div>
-                <div class="settings-stack settings-stack-10 settings-stack-wide">
+                <div
+                  class="settings-stack settings-stack-10 settings-stack-wide">
                   <div class="settings-inline-row settings-gap-8">
                     <input
                       type="file"
@@ -2567,6 +2569,7 @@
     <script src="/app-core.js"></script>
     <script src="/app-home-cards.js"></script>
     <script src="/app-renderers.js"></script>
+    <script src="/app-comments.js"></script>
     <script src="/app-home-browser.js"></script>
     <script src="/app-dashboard.js"></script>
     <script src="/app-settings-ui.js"></script>
