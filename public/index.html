@@ -1250,7 +1250,13 @@
 
       .settings-stack-wide {
         min-width: 460px;
-        max-width: 700px;
+        max-width: 1000px;
+        width: 100%;
+      }
+
+      .settings-stack-log {
+        min-width: 0;
+        max-width: none;
         width: 100%;
       }
 
@@ -1294,6 +1300,35 @@
       .settings-toggle-top {
         align-items: flex-start;
         gap: 16px;
+      }
+
+      .console-log-panel {
+        border-radius: 10px;
+        background: rgb(255 255 255 / 5%);
+        min-height: 260px;
+        max-height: 420px;
+        overflow: auto;
+        padding: 10px;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .console-log-line {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .console-log-line.level-error {
+        color: #ff8a80;
+      }
+
+      .console-log-line.level-warn {
+        color: #ffd180;
+      }
+
+      .console-log-line.level-info {
+        color: #b9f6ca;
       }
 
       .btn-ui {
@@ -2746,6 +2781,38 @@
             </div> <!-- Close options div for settings -->
           </div> <!-- Close card-main for settings -->
         </div> <!-- Close card card-layout for settings -->
+
+        <div class="card card-layout card-margin-top-20">
+          <div class="card-main">
+            <h2>コンソールログ</h2>
+            <div>
+              <small>このページを開いている間、サーバー側のログを追跡表示します。</small>
+              <small id="console-log-status"
+                class="settings-hint-blue">待機中...</small>
+            </div>
+            <div class="options">
+              <div class="toggle settings-toggle-top">
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-log">
+                  <div class="settings-inline-row settings-gap-8">
+                    <button id="console-log-clear-btn"
+                      class="btn-ui btn-gray">
+                      表示をクリア
+                    </button>
+                    <label class="switch" title="自動追従を一時停止">
+                      <input type="checkbox" id="console-log-pause" />
+                      <span class="slider"></span>
+                    </label>
+                    <small>一時停止</small>
+                  </div>
+                  <div id="console-log-output"
+                    class="console-log-panel"
+                    aria-live="polite"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
 

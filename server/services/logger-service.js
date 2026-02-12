@@ -3,6 +3,7 @@ const LOG_LEVEL_ORDER = {
   warn: 1,
   info: 2,
 };
+const { appendLogEntry } = require("./log-stream-service");
 
 function formatMeta(meta) {
   if (!meta || typeof meta !== "object") return "";
@@ -30,17 +31,23 @@ function createLogger(scope = "app", options = {}) {
 
   function info(message, meta) {
     if (!canLog("info")) return;
-    console.log(`[${scope}] ${message}${formatMeta(meta)}`);
+    const line = `[${scope}] ${message}${formatMeta(meta)}`;
+    console.log(line);
+    appendLogEntry({ level: "info", scope, message: `${message}${formatMeta(meta)}` });
   }
 
   function warn(message, meta) {
     if (!canLog("warn")) return;
-    console.warn(`[${scope}] ${message}${formatMeta(meta)}`);
+    const line = `[${scope}] ${message}${formatMeta(meta)}`;
+    console.warn(line);
+    appendLogEntry({ level: "warn", scope, message: `${message}${formatMeta(meta)}` });
   }
 
   function error(message, meta) {
     if (!canLog("error")) return;
-    console.error(`[${scope}] ${message}${formatMeta(meta)}`);
+    const line = `[${scope}] ${message}${formatMeta(meta)}`;
+    console.error(line);
+    appendLogEntry({ level: "error", scope, message: `${message}${formatMeta(meta)}` });
   }
 
   return {
