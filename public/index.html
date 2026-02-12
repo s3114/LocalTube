@@ -1250,14 +1250,24 @@
 
       .settings-stack-wide {
         min-width: 460px;
-        max-width: 1000px;
+        max-width: 700px;
         width: 100%;
+        margin-left: auto;
       }
 
       .settings-stack-log {
         min-width: 0;
         max-width: none;
         width: 100%;
+      }
+
+      .settings-actions-right {
+        width: 100%;
+        text-align: right;
+      }
+
+      .settings-inline-right {
+        justify-content: flex-end;
       }
 
       .settings-stack-tool {
@@ -2683,7 +2693,7 @@
                     id="local-video-dirs-input"
                     placeholder="追加したいフォルダを1行ずつ入力"
                     class="settings-textarea-lg"></textarea>
-                  <div>
+                  <div class="settings-actions-right">
                     <button
                       id="save-local-video-dirs-btn"
                       class="btn-ui btn-blue">
@@ -2701,7 +2711,7 @@
                 </div>
                 <div
                   class="settings-stack settings-stack-10 settings-stack-wide">
-                  <div class="settings-inline-row settings-gap-8">
+                  <div class="settings-inline-row settings-gap-8 settings-inline-right">
                     <input
                       type="file"
                       id="wallpaper-file-input"
@@ -2718,7 +2728,7 @@
                       クリア
                     </button>
                   </div>
-                  <div class="settings-inline-row">
+                  <div class="settings-inline-row settings-inline-right">
                     <div class="wallpaper-label">画像のぼかし</div>
                     <input
                       type="range"
@@ -2728,7 +2738,7 @@
                       value="0" />
                     <span id="wallpaper-blur-value">0 px</span>
                   </div>
-                  <div class="settings-inline-row">
+                  <div class="settings-inline-row settings-inline-right">
                     <div class="wallpaper-label">画像の明るさ</div>
                     <input
                       type="range"
@@ -2773,10 +2783,16 @@
                   <small id="server-restart-status"
                     class="settings-hint-blue"></small>
                 </div>
-                <button id="btn-restart-server"
-                  class="btn-ui btn-red">
-                  再起動
-                </button>
+                <div class="settings-inline-row settings-gap-8">
+                  <button id="btn-restart-server"
+                    class="btn-ui btn-red">
+                    再起動
+                  </button>
+                  <button id="btn-shutdown-server"
+                    class="btn-ui btn-gray">
+                    強制終了
+                  </button>
+                </div>
               </div>
             </div> <!-- Close options div for settings -->
           </div> <!-- Close card-main for settings -->

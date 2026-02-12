@@ -249,8 +249,9 @@ function clampNumberInRange(value, min, max, fallback) {
 
       function initializeServerRestartButton() {
         const restartButton = document.getElementById("btn-restart-server");
+        const shutdownButton = document.getElementById("btn-shutdown-server");
         const restartStatus = document.getElementById("server-restart-status");
-        if (!restartButton || !restartStatus) return;
+        if (!restartButton || !shutdownButton || !restartStatus) return;
 
         restartButton.addEventListener("click", async () => {
           if (!settingsUiDeps.confirmImpl("localhost:3000 を再起動しますか？")) return;
@@ -272,6 +273,34 @@ function clampNumberInRange(value, min, max, fallback) {
             restartStatus.textContent = `エラー: ${error.message || "再起動に失敗しました。"}`;
             restartStatus.style.color = "var(--accent)";
             restartButton.disabled = false;
+          }
+        });
+
+        shutdownButton.addEventListener("click", async () => {
+          const confirmed = settingsUiDeps.confirmImpl(
+            "localhost:3000 を強制終了しますか？（再起動はされません）",
+          );
+          if (!confirmed) return;
+          restartStatus.textContent = "強制終了リクエストを送信中...";
+          restartStatus.style.color = "var(--warn)";
+          restartButton.disabled = true;
+          shutdownButton.disabled = true;
+          try {
+            const response = await settingsUiDeps.fetchImpl("/api/system/shutdown", {
+              method: "POST",
+            });
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
+            if (!result.ok) {
+              throw new Error(result.error || "強制終了に失敗しました。");
+            }
+            restartStatus.textContent = "サーバーを終了しました。必要に応じて起動.batから再起動してください。";
+            restartStatus.style.color = "var(--green)";
+          } catch (error) {
+            console.error("サーバー強制終了エラー:", error);
+            restartStatus.textContent = `エラー: ${error.message || "強制終了に失敗しました。"}`;
+            restartStatus.style.color = "var(--accent)";
+            restartButton.disabled = false;
+            shutdownButton.disabled = false;
           }
         });
       }

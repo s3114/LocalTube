@@ -326,6 +326,15 @@ setTimeout(() => {
   }
 });
 
+app.post("/api/system/shutdown", (_req, res) => {
+  apiOk(res, {
+    message: "サーバーを強制終了しています。",
+  });
+  setTimeout(() => {
+    process.exit(0);
+  }, 150);
+});
+
 // ■ サーバーの起動
 // --------------------------------------------------
 function startServer(listenPort = port) {

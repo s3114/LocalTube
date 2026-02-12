@@ -25,7 +25,7 @@ function createJobQueueService({
   function defaultRunBatchScript(command) {
     return new Promise((resolve, reject) => {
       logger.info("スクリプト実行", { command });
-      const proc = exec(command, { shell: "powershell.exe" });
+      const proc = exec(command, { shell: "powershell.exe", windowsHide: true });
       proc.stdout.on("data", (data) =>
         logger.info("script stdout", { message: data.toString().trim() }),
       );
