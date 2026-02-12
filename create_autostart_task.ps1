@@ -1,57 +1,86 @@
 # Parameters
 param (
-    [string]$TaskName,
-    [string]$BatPath,
-    [string]$ResultFilePath
+    [string]$TaskName = "YoutubeDL-AutoStart",
+    [string]$BatPath = "",
+    [string]$ResultFilePath = (Join-Path $env:TEMP ("autostart_result_create_{0}.txt" -f [DateTimeOffset]::Now.ToUnixTimeMilliseconds()))
 )
 
-# --- Main Logic ---
+function Resolve-BatPath([string]$candidate) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    $batCandidates = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "*.bat" -File -ErrorAction SilentlyContinue
+    $preferred = $batCandidates | Where-Object { $_.Name -eq "起動.bat" } | Select-Object -First 1
+    if (-not $preferred) {
+        $preferred = $batCandidates | Where-Object { $_.Name -eq "起動最小構成.bat" } | Select-Object -First 1
+    }
+    if (-not $preferred) {
+        $preferred = $batCandidates | Select-Object -First 1
+    }
+    if ($preferred) {
+        return $preferred.FullName
+    }
+
+    return ""
+}
+
+$BatPath = Resolve-BatPath $BatPath
+if ([string]::IsNullOrWhiteSpace($BatPath)) {
+    $message = "ERROR: BatPath not found."
+    if (-not [string]::IsNullOrWhiteSpace($ResultFilePath)) {
+        Set-Content -Path $ResultFilePath -Value $message
+    }
+    Write-Output $message
+    exit 1
+}
 
 # Check if running as administrator
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-
 if (-not $isAdmin) {
-    # Not admin, so re-launch with UAC
-    $childCommand = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -TaskName `"$TaskName`" -BatPath `"$BatPath`" -ResultFilePath `"$ResultFilePath`""
-    $process = Start-Process powershell.exe -ArgumentList $childCommand -Verb RunAs -Wait -PassThru
-    
-    if (Test-Path $ResultFilePath) {
+    $childArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $PSCommandPath,
+        "-TaskName", $TaskName,
+        "-BatPath", $BatPath,
+        "-ResultFilePath", $ResultFilePath
+    )
+    $process = Start-Process powershell.exe -ArgumentList $childArgs -Verb RunAs -Wait -PassThru
+
+    if (-not [string]::IsNullOrWhiteSpace($ResultFilePath) -and (Test-Path -LiteralPath $ResultFilePath)) {
         $fileContent = Get-Content $ResultFilePath -Raw
         Write-Output $fileContent
         Remove-Item $ResultFilePath
         exit $process.ExitCode
-    } else {
-        Write-Output "ERROR: Task operation was cancelled or failed to produce a result file."
-        exit 1
     }
+
+    Write-Output "ERROR: Task operation was cancelled or failed to produce a result file."
+    exit 1
 }
 
 # --- Admin-only code starts here ---
-
 $output = ""
 $exitCode = 1
 
 try {
-    # バッチファイルの親フォルダ（開始ディレクトリ）を取得
-    $workingDir = Split-Path -Parent $BatPath
+    $resolvedBat = (Resolve-Path -LiteralPath $BatPath -ErrorAction Stop).Path
+    $workingDir = Split-Path -Parent $resolvedBat
 
-    # タスクのアクションを作成（開始ディレクトリを指定）
-    $action = New-ScheduledTaskAction -Execute $BatPath -WorkingDirectory $workingDir
-    
-    # トリガーを作成（システム起動時）
+    $action = New-ScheduledTaskAction -Execute $resolvedBat -WorkingDirectory $workingDir
     $trigger = New-ScheduledTaskTrigger -AtStartup
-    
-    # タスクの登録（最上位の特権で実行 / 既存があれば上書き）
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest -Force | Out-Null
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest -Force -ErrorAction Stop | Out-Null
+    Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop | Out-Null
 
-    $output = "SUCCESS: Auto-start task created successfully.`nWorking Directory set to: $workingDir"
+    $output = "SUCCESS: Auto-start task created successfully.`nBatPath: $resolvedBat`nWorking Directory set to: $workingDir"
     $exitCode = 0
 } catch {
     $output = "ERROR: An exception occurred: $($_.Exception.Message)"
     $exitCode = 1
 }
 
-# Write result to the specified file
-Set-Content -Path $ResultFilePath -Value $output
+if (-not [string]::IsNullOrWhiteSpace($ResultFilePath)) {
+    Set-Content -Path $ResultFilePath -Value $output
+}
 
 exit $exitCode

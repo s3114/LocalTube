@@ -9,7 +9,6 @@ const os = require("os"); // OS情報（一時ディレクトリなど）を取�
 const sseExpress = require("sse-express"); // Server-Sent Eventsを扱うため
 const crypto = require("crypto"); // ユニークIDを生成するため
 const iconv = require("iconv-lite"); // 文字コード変換のため
-const { exec } = require("child_process");
 const {
   normalizeDirList,
   normalizeConfig,
@@ -276,7 +275,7 @@ registerScheduleRoutes(app, {
   ...routeBaseDeps,
   path,
   os,
-  exec,
+  spawn,
 });
 
 // ■ サーバーの起動
