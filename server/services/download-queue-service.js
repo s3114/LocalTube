@@ -1,3 +1,5 @@
+const { createLogger } = require("./logger-service");
+
 function createDownloadQueueService({
   jobHistory,
   broadcast,
@@ -5,6 +7,7 @@ function createDownloadQueueService({
   maxRetries = 3,
   retryDelayMs = 5000,
 }) {
+  const logger = createLogger("download-queue");
   if (!jobHistory) throw new Error("jobHistory is required");
   if (typeof processJob !== "function") throw new Error("processJob is required");
 
@@ -60,9 +63,11 @@ function createDownloadQueueService({
         });
         return;
       } catch (error) {
-        console.error(
-          `[Attempt ${attempt}/${maxRetries}] Job ${job.id} failed: ${error.message}`,
-        );
+        logger.error("ジョブ失敗", {
+          attempt: `${attempt}/${maxRetries}`,
+          jobId: job.id,
+          error: error.message,
+        });
 
         if (attempt === maxRetries) {
           job.status = "error";

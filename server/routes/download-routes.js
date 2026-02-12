@@ -1,3 +1,5 @@
+const { createLogger } = require("../services/logger-service");
+
 function registerDownloadRoutes(
   app,
   {
@@ -12,16 +14,19 @@ function registerDownloadRoutes(
     baseDir,
     apiOk,
     apiError,
+    logger,
   },
 ) {
+  const routeLogger = logger || createLogger("route-download");
+
   app.post("/api/clear-history", async (_req, res) => {
     try {
       const historyPath = path.join(baseDir, "finished.txt");
       await fs.promises.writeFile(historyPath, "", "utf-8");
-      console.log("ダウンロード履歴を削除しました。");
+      routeLogger.info("ダウンロード履歴を削除");
       apiOk(res, { message: "履歴を削除しました。" });
     } catch (error) {
-      console.error("履歴の削除に失敗しました:", error);
+      routeLogger.error("履歴の削除に失敗", { error: error.message });
       apiError(res, 500, "履歴の削除に失敗しました。");
     }
   });
@@ -84,7 +89,7 @@ function registerDownloadRoutes(
           newJobs.push(job);
         }
       } catch (error) {
-        console.error(`URLの解析に失敗しました: ${url}`, error);
+        routeLogger.warn("URLの解析に失敗", { url, error: error.message });
       }
     }
 

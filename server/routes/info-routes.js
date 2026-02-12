@@ -1,3 +1,5 @@
+const { createLogger } = require("../services/logger-service");
+
 function registerInfoRoutes(app, deps) {
   const {
     fs,
@@ -7,6 +9,7 @@ function registerInfoRoutes(app, deps) {
     findLocalVideoPathById,
     createProvisionalInfoFromVideo,
   } = deps;
+  const logger = deps.logger || createLogger("route-info");
 
   app.get("/info/:videoId", async (req, res) => {
     try {
@@ -14,7 +17,7 @@ function registerInfoRoutes(app, deps) {
       const commentDir = path.join(baseDir, "downloads", "コメント");
       const provisionalPath = getProvisionalInfoPath(videoId);
 
-      console.log("[INFO] looking for base:", videoId);
+      logger.info("info lookup start", { videoId });
 
       const files = await fs.promises.readdir(commentDir);
       const match = files.find(
@@ -37,7 +40,7 @@ function registerInfoRoutes(app, deps) {
 
         const videoPath = await findLocalVideoPathById(videoId);
         if (!videoPath) {
-          console.error("[INFO] Not found for:", videoId);
+          logger.warn("info not found and no local video", { videoId });
           return res.status(404).json({ error: "info.json が見つかりません" });
         }
 
@@ -47,19 +50,19 @@ function registerInfoRoutes(app, deps) {
           JSON.stringify(provisionalInfo, null, 2),
           "utf-8",
         );
-        console.log("[INFO] generated provisional info:", provisionalPath);
+        logger.info("generated provisional info", { provisionalPath });
 
         res.type("application/json; charset=utf-8");
         return res.sendFile(provisionalPath);
       }
 
       const infoPath = path.join(commentDir, match);
-      console.log("[INFO] serving:", infoPath);
+      logger.info("serving existing info", { infoPath });
 
       res.type("application/json; charset=utf-8");
       res.sendFile(infoPath);
     } catch (e) {
-      console.error("Failed to serve info.json:", e);
+      logger.error("failed to serve info.json", { error: e.message });
       res.status(500).json({ error: "info.json の取得に失敗しました" });
     }
   });

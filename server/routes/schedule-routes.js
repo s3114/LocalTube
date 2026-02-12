@@ -1,3 +1,5 @@
+const { createLogger } = require("../services/logger-service");
+
 function buildScheduleResultFromStdout(stdout) {
   const resultContent = stdout.trim();
 
@@ -18,6 +20,7 @@ function buildScheduleResultFromStdout(stdout) {
 
 function registerScheduleRoutes(app, deps) {
   const { path, os, exec, baseDir, apiOk, apiError } = deps;
+  const logger = deps.logger || createLogger("route-schedule");
 
   app.post("/api/schedule/create", (_req, res) => {
     const taskName = "YoutubeDL-AutoStart";
@@ -29,7 +32,7 @@ function registerScheduleRoutes(app, deps) {
     );
 
     const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -BatPath "${batPath}" -ResultFilePath "${resultFilePath}"`;
-    console.log(`Executing PowerShell command: ${command}`);
+    logger.info("executing PowerShell command", { command });
 
     exec(command, { shell: "powershell.exe" }, (error, stdout, stderr) => {
       const result = buildScheduleResultFromStdout(stdout);
@@ -62,7 +65,7 @@ function registerScheduleRoutes(app, deps) {
     );
 
     const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psScriptPath}" -TaskName "${taskName}" -ResultFilePath "${resultFilePath}"`;
-    console.log(`Executing PowerShell command: ${command}`);
+    logger.info("executing PowerShell command", { command });
 
     exec(command, { shell: "powershell.exe" }, (error, stdout, stderr) => {
       const result = buildScheduleResultFromStdout(stdout);

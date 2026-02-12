@@ -1,3 +1,5 @@
+const { createLogger } = require("../services/logger-service");
+
 function registerSettingsWallpaperRoutes(app, deps) {
   const {
     fs,
@@ -5,6 +7,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
     publicDir,
     upload,
     WALLPAPER_EXTS,
+    clearWallpaperFiles,
     loadConfig,
     saveConfig,
     normalizeDirList,
@@ -12,13 +15,14 @@ function registerSettingsWallpaperRoutes(app, deps) {
     apiOk,
     apiError,
   } = deps;
+  const logger = deps.logger || createLogger("route-settings");
 
   app.get("/api/settings", async (_req, res) => {
     try {
       const settings = await loadConfig();
       apiOk(res, settings);
     } catch (error) {
-      console.error("設定の読み込みに失敗しました:", error);
+      logger.error("設定の読み込みに失敗", { error: error.message });
       apiError(res, 500, "設定の読み込みに失敗しました。");
     }
   });
@@ -34,7 +38,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         wallpaperBrightness: settings.wallpaperBrightness ?? 50,
       });
     } catch (error) {
-      console.error("壁紙メタ情報の取得に失敗しました:", error);
+      logger.error("壁紙メタ情報の取得に失敗", { error: error.message });
       apiError(res, 500, "壁紙メタ情報の取得に失敗しました。");
     }
   });
@@ -51,10 +55,14 @@ function registerSettingsWallpaperRoutes(app, deps) {
         return apiError(res, 400, "対応していない画像形式です。");
       }
 
-      for (const oldExt of WALLPAPER_EXTS) {
-        const oldPath = path.join(publicDir, `wallpaper${oldExt}`);
-        if (fs.existsSync(oldPath)) {
-          await fs.promises.unlink(oldPath);
+      if (clearWallpaperFiles) {
+        await clearWallpaperFiles();
+      } else {
+        for (const oldExt of WALLPAPER_EXTS) {
+          const oldPath = path.join(publicDir, `wallpaper${oldExt}`);
+          if (fs.existsSync(oldPath)) {
+            await fs.promises.unlink(oldPath);
+          }
         }
       }
 
@@ -77,7 +85,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         wallpaperBrightness: config.wallpaperBrightness ?? 50,
       });
     } catch (error) {
-      console.error("壁紙の保存に失敗しました:", error);
+      logger.error("壁紙の保存に失敗", { error: error.message });
       apiError(res, 500, "壁紙の保存に失敗しました。");
     } finally {
       if (tempPath && fs.existsSync(tempPath)) {
@@ -92,10 +100,14 @@ function registerSettingsWallpaperRoutes(app, deps) {
 
   app.post("/api/wallpaper/clear", async (_req, res) => {
     try {
-      for (const ext of WALLPAPER_EXTS) {
-        const target = path.join(publicDir, `wallpaper${ext}`);
-        if (fs.existsSync(target)) {
-          await fs.promises.unlink(target);
+      if (clearWallpaperFiles) {
+        await clearWallpaperFiles();
+      } else {
+        for (const ext of WALLPAPER_EXTS) {
+          const target = path.join(publicDir, `wallpaper${ext}`);
+          if (fs.existsSync(target)) {
+            await fs.promises.unlink(target);
+          }
         }
       }
 
@@ -104,7 +116,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         url: null,
       });
     } catch (error) {
-      console.error("壁紙クリアに失敗しました:", error);
+      logger.error("壁紙クリアに失敗", { error: error.message });
       apiError(res, 500, "壁紙クリアに失敗しました。");
     }
   });
@@ -151,10 +163,15 @@ function registerSettingsWallpaperRoutes(app, deps) {
 
       const savedConfig = await saveConfig(currentConfig);
 
-      console.log("設定を保存しました:", savedConfig);
+      logger.info("設定を保存", {
+        selectedBrowser: savedConfig.selectedBrowser || "",
+        localVideoDirs: Array.isArray(savedConfig.localVideoDirs)
+          ? savedConfig.localVideoDirs.length
+          : 0,
+      });
       apiOk(res, { message: "設定を保存しました。", settings: savedConfig });
     } catch (error) {
-      console.error("設定の保存に失敗しました:", error);
+      logger.error("設定の保存に失敗", { error: error.message });
       apiError(res, 500, "設定の保存に失敗しました。");
     }
   });
