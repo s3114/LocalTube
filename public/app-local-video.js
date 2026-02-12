@@ -9,6 +9,7 @@
     getVideoIdFromFilename,
     createCommentRenderer,
     createChatLineElementFromMessage,
+    onMetric = (_name, _value, _meta) => {},
     onError = (message, error) => console.error(message, error),
   }) {
     function createLocalVideoListItemElement(video, onClick) {
@@ -258,6 +259,7 @@
       }
 
       async function loadLiveChat(videoBaseName) {
+        const startedAt = performance.now();
         chatRequestToken += 1;
         const currentChatToken = chatRequestToken;
         if (chatAbortController) {
@@ -283,12 +285,18 @@
 
           if (messages.length === 0) {
             if (ui.chatEmpty) ui.chatEmpty.textContent = "チャットがありません";
+            onMetric("chat_load_ms", performance.now() - startedAt, {
+              count: 0,
+            });
             return;
           }
 
           if (ui.chatEmpty) ui.chatEmpty.style.display = "none";
           renderVideoLiveChatMessages(ui.chatContainer, messages);
           ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
+          onMetric("chat_load_ms", performance.now() - startedAt, {
+            count: messages.length,
+          });
         } catch (error) {
           if (error?.name === "AbortError") return;
           onError("loadLiveChat error:", error);
@@ -297,6 +305,7 @@
       }
 
       function loadCurrentVideoSideData(videoId) {
+        const startedAt = performance.now();
         infoRequestToken += 1;
         const currentInfoToken = infoRequestToken;
         if (infoAbortController) {
@@ -311,6 +320,7 @@
           .then((info) => {
             if (currentInfoToken !== infoRequestToken) return;
             applyVideoInfo(info);
+            onMetric("info_load_ms", performance.now() - startedAt, { videoId });
           })
           .catch((error) => {
             if (error?.name === "AbortError") return;
@@ -360,6 +370,7 @@
       }
 
       async function loadLocalVideos() {
+        const startedAt = performance.now();
         try {
           const res = await fetch("/api/local-videos");
           const result = await parseApiResponse(res);
@@ -384,6 +395,9 @@
               appState.pendingVideoId = null;
             }
           }
+          onMetric("local_videos_load_ms", performance.now() - startedAt, {
+            count: allLocalVideos.length,
+          });
         } catch (error) {
           onError("Failed to load local videos:", error);
           showLocalVideoListLoadError(videoList, homeVideoGrid);

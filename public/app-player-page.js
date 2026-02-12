@@ -130,6 +130,8 @@
         filterDurationMax: elements.filterDurationMax,
         filterChannel: elements.filterChannel,
         filterClearBtn: elements.filterClearBtn,
+        onMetric: (name, value, meta) =>
+          global.recordPerfMetric?.(name, value, meta),
         onSelectVideo: (selectedVideo) => {
           localVideoController?.playLocalVideo(selectedVideo);
         },
@@ -189,4 +191,3 @@
 
   global.createPlayerPageController = createPlayerPageController;
 })(window);
-

@@ -102,6 +102,7 @@ function registerLocalMediaRoutes(app, deps) {
 
   app.get("/api/local-videos", async (_req, res) => {
     try {
+      const startedAt = Date.now();
       const sourceDirs = await getLocalVideoDirs();
       const settings = await loadConfig();
       const fallbackEnabled = settings.enableFallbackThumbnails !== false;
@@ -112,17 +113,22 @@ function registerLocalMediaRoutes(app, deps) {
       for (const sourceDir of sourceDirs) {
         if (!fs.existsSync(sourceDir)) continue;
 
-        const files = await fs.promises.readdir(sourceDir);
+        const entries = await fs.promises.readdir(sourceDir, { withFileTypes: true });
+        const files = entries
+          .filter((entry) => entry.isFile())
+          .map((entry) => entry.name);
 
-        for (const file of files) {
+        const scanned = await Promise.all(
+          files.map(async (file) => {
           const ext = path.extname(file).toLowerCase();
-          if (!videoExt.includes(ext)) continue;
+          if (!videoExt.includes(ext)) return null;
 
           const fullPath = path.join(sourceDir, file);
           const base = path.parse(file).name;
           const thumbPath = findExistingThumbnailPath(fullPath, fallbackEnabled);
+          const stat = await fs.promises.stat(fullPath);
 
-          videos.push({
+          return {
             title: base,
             video: `/api/local-media?type=video&path=${encodeURIComponent(fullPath)}`,
             thumb: thumbPath
@@ -131,13 +137,21 @@ function registerLocalMediaRoutes(app, deps) {
                 ? `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}`
                 : null,
             filename: file,
-            mtime: (await fs.promises.stat(fullPath)).mtimeMs,
+            mtime: stat.mtimeMs,
             sourceDir,
-          });
-        }
+          };
+        }),
+        );
+
+        videos.push(...scanned.filter(Boolean));
       }
 
       videos.sort((a, b) => b.mtime - a.mtime);
+      logger.info("local videos scanned", {
+        count: videos.length,
+        sourceDirs: sourceDirs.length,
+        elapsedMs: Date.now() - startedAt,
+      });
       apiOk(res, videos);
     } catch (e) {
       logger.error("ローカル動画のスキャンに失敗", { error: e.message });

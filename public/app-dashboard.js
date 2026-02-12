@@ -4,6 +4,10 @@
     renderJob,
     updateJobElement,
     onSseError = (error) => console.error("EventSource failed:", error),
+    documentRef = document,
+    EventSourceImpl = EventSource,
+    ChartImpl = global.Chart,
+    nowProvider = () => new Date(),
   }) {
     function countJobsByStatus() {
       let completed = 0;
@@ -26,24 +30,24 @@
     }
 
     function renderDashboardJobCounts(jobCounts) {
-      const totalEl = document.getElementById("info-total-count");
-      const completedEl = document.getElementById("info-completed-count");
-      const runningEl = document.getElementById("info-running-count");
-      const errorEl = document.getElementById("info-error-count");
+      const totalEl = documentRef.getElementById("info-total-count");
+      const completedEl = documentRef.getElementById("info-completed-count");
+      const runningEl = documentRef.getElementById("info-running-count");
+      const errorEl = documentRef.getElementById("info-error-count");
       if (totalEl) totalEl.textContent = `${jobCounts.total} 件`;
       if (completedEl) completedEl.textContent = `${jobCounts.completed} 件`;
       if (runningEl) runningEl.textContent = `${jobCounts.running} 件`;
       if (errorEl) errorEl.textContent = `${jobCounts.error} 件`;
 
-      const bar = document.getElementById("completion-bar");
-      const text = document.getElementById("completion-text");
+      const bar = documentRef.getElementById("completion-bar");
+      const text = documentRef.getElementById("completion-text");
       if (bar) bar.style.width = `${jobCounts.completionRate}%`;
       if (text) text.textContent = `${jobCounts.completionRate}%`;
     }
 
     function updateDashboardServerClock(serverTime) {
       if (!serverTime) return;
-      const clockEl = document.getElementById("info-clock");
+      const clockEl = documentRef.getElementById("info-clock");
       if (!clockEl) return;
       clockEl.textContent =
         `${serverTime.yyyy}/${serverTime.MM}/${serverTime.dd} ` +
@@ -51,18 +55,18 @@
     }
 
     function updateDashboardNetworkLatency(data) {
-      const netEl = document.getElementById("info-network");
+      const netEl = documentRef.getElementById("info-network");
       if (netEl && data.network_mbps != null) {
         netEl.textContent = `${data.network_mbps} Mbps (推定)`;
       }
-      const latEl = document.getElementById("info-latency");
+      const latEl = documentRef.getElementById("info-latency");
       if (latEl && data.latency_ms != null) {
         latEl.textContent = `${data.latency_ms} ms`;
       }
     }
 
     function updateDashboardUptime(uptimeSec) {
-      const upEl = document.getElementById("info-uptime");
+      const upEl = documentRef.getElementById("info-uptime");
       if (!upEl || typeof uptimeSec !== "number") return;
 
       const h = Math.floor(uptimeSec / 3600);
@@ -72,11 +76,12 @@
     }
 
     function createDashboardNetworkChart() {
-      const canvas = document.getElementById("networkChart");
+      const canvas = documentRef.getElementById("networkChart");
       if (!canvas) return null;
       const ctx = canvas.getContext("2d");
       if (!ctx) return null;
-      return new Chart(ctx, {
+      if (!ChartImpl) return null;
+      return new ChartImpl(ctx, {
         type: "line",
         data: {
           labels: [],
@@ -136,7 +141,7 @@
         latencyBuffer.reduce((a, b) => a + b, 0) / latencyBuffer.length,
       );
 
-      const now = new Date();
+      const now = nowProvider();
       const timeLabel = `${now.getMinutes()}:${now
         .getSeconds()
         .toString()
@@ -158,7 +163,7 @@
     function replaceDashboardJobs(jobQueueElement, jobs) {
       if (!jobQueueElement) return;
       jobQueueElement.innerHTML = "";
-      const frag = document.createDocumentFragment();
+      const frag = documentRef.createDocumentFragment();
       jobs.forEach((job) => {
         frag.appendChild(renderJob(job));
       });
@@ -167,7 +172,7 @@
 
     function appendDashboardJobs(jobQueueElement, jobs) {
       if (!jobQueueElement) return;
-      const frag = document.createDocumentFragment();
+      const frag = documentRef.createDocumentFragment();
       jobs.forEach((job) => {
         frag.appendChild(renderJob(job));
       });
@@ -175,7 +180,7 @@
     }
 
     function prependDashboardConnectionError() {
-      const jobQueueDiv = document.getElementById("job-queue");
+      const jobQueueDiv = documentRef.getElementById("job-queue");
       if (!jobQueueDiv) return;
       jobQueueDiv.innerHTML =
         '<div class="status-warn-text">サーバーとの接続が切れました。起動.batが正常に動作しているか確認してください。</div>' +
@@ -199,7 +204,7 @@
       const avgWindow = 5;
       const networkChart = createDashboardNetworkChart();
 
-      const eventSource = new EventSource("/events");
+      const eventSource = new EventSourceImpl("/events");
 
       eventSource.addEventListener("initial_state", (e) => {
         const jobs = JSON.parse(e.data);
@@ -281,4 +286,3 @@
 
   global.createDashboardController = createDashboardController;
 })(window);
-

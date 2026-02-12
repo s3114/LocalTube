@@ -8,11 +8,13 @@ function registerInfoRoutes(app, deps) {
     getProvisionalInfoPath,
     findLocalVideoPathById,
     createProvisionalInfoFromVideo,
+    ensureProvisionalInfo,
   } = deps;
   const logger = deps.logger || createLogger("route-info");
 
   app.get("/info/:videoId", async (req, res) => {
     try {
+      const startedAt = Date.now();
       const videoId = decodeURIComponent(req.params.videoId);
       const commentDir = path.join(baseDir, "downloads", "コメント");
       const provisionalPath = getProvisionalInfoPath(videoId);
@@ -44,20 +46,35 @@ function registerInfoRoutes(app, deps) {
           return res.status(404).json({ error: "info.json が見つかりません" });
         }
 
-        const provisionalInfo = await createProvisionalInfoFromVideo(videoPath, videoId);
-        await fs.promises.writeFile(
-          provisionalPath,
-          JSON.stringify(provisionalInfo, null, 2),
-          "utf-8",
-        );
-        logger.info("generated provisional info", { provisionalPath });
+        if (typeof ensureProvisionalInfo === "function") {
+          const generated = await ensureProvisionalInfo(videoPath, videoId);
+          logger.info("provisional info resolved", {
+            provisionalPath: generated?.path || provisionalPath,
+            fromCache: Boolean(generated?.fromCache),
+            elapsedMs: Date.now() - startedAt,
+          });
+        } else {
+          const provisionalInfo = await createProvisionalInfoFromVideo(videoPath, videoId);
+          await fs.promises.writeFile(
+            provisionalPath,
+            JSON.stringify(provisionalInfo, null, 2),
+            "utf-8",
+          );
+          logger.info("generated provisional info", {
+            provisionalPath,
+            elapsedMs: Date.now() - startedAt,
+          });
+        }
 
         res.type("application/json; charset=utf-8");
         return res.sendFile(provisionalPath);
       }
 
       const infoPath = path.join(commentDir, match);
-      logger.info("serving existing info", { infoPath });
+      logger.info("serving existing info", {
+        infoPath,
+        elapsedMs: Date.now() - startedAt,
+      });
 
       res.type("application/json; charset=utf-8");
       res.sendFile(infoPath);
