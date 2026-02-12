@@ -247,6 +247,35 @@ function clampNumberInRange(value, min, max, fallback) {
         syncAutostartStatus();
       }
 
+      function initializeServerRestartButton() {
+        const restartButton = document.getElementById("btn-restart-server");
+        const restartStatus = document.getElementById("server-restart-status");
+        if (!restartButton || !restartStatus) return;
+
+        restartButton.addEventListener("click", async () => {
+          if (!settingsUiDeps.confirmImpl("localhost:3000 を再起動しますか？")) return;
+          restartStatus.textContent = "再起動リクエストを送信中...";
+          restartStatus.style.color = "var(--blue)";
+          restartButton.disabled = true;
+          try {
+            const response = await settingsUiDeps.fetchImpl("/api/system/restart", {
+              method: "POST",
+            });
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
+            if (!result.ok) {
+              throw new Error(result.error || "再起動に失敗しました。");
+            }
+            restartStatus.textContent = "再起動中です。数秒後にページを再読み込みしてください。";
+            restartStatus.style.color = "var(--green)";
+          } catch (error) {
+            console.error("サーバー再起動エラー:", error);
+            restartStatus.textContent = `エラー: ${error.message || "再起動に失敗しました。"}`;
+            restartStatus.style.color = "var(--accent)";
+            restartButton.disabled = false;
+          }
+        });
+      }
+
       function initializeYoutubePlaylistConverterUI() {
         const youtubeChannelUrlInput = document.getElementById(
           "youtubeChannelUrlInput",
@@ -748,6 +777,7 @@ function initializeSettingsUiController({
         initializeGeneralSettingStorageBindings(elements);
         initializeHistoryClearButton(elements);
         initializeAutostartTaskButtons();
+        initializeServerRestartButton();
         initializeYoutubePlaylistConverterUI();
 
         const bridge = createSettingsServerBridge(elements);
