@@ -59,10 +59,10 @@
 
     function buildVideoDescriptionHeaderHtml(info) {
       const views = info.view_count
-        ? `<b>${info.view_count.toLocaleString()}回視聴</b>`
-        : "<b>視聴回数不明</b>";
+        ? `${info.view_count.toLocaleString()}回視聴`
+        : "視聴回数不明";
       if (!info.upload_date) return views;
-      return `${views} • <b>${formatUploadDateForDescription(info.upload_date)}</b>`;
+      return `${views} • ${formatUploadDateForDescription(info.upload_date)}`;
     }
 
     function updateVideoDataPlayerHeader(ui, info) {
@@ -121,8 +121,7 @@
     function updateVideoDataDescription(ui, info, linkify, updateDescButton) {
       if (!ui.descEl) return;
       const descContent = info.description ? linkify(info.description) : "（概要欄なし）";
-      ui.descEl.innerHTML = `${buildVideoDescriptionHeaderHtml(info)}<br><br>${descContent}`;
-      ui.descEl.classList.add("collapsed");
+      ui.descEl.innerHTML = `<div class="yt-description-content collapsed">${buildVideoDescriptionHeaderHtml(info)}<br>${descContent}</div><button type="button" class="yt-desc-collapse-btn">折りたたむ</button>`;
       updateDescButton();
     }
 
