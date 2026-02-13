@@ -330,7 +330,15 @@ setTimeout(() => {
   child.unref();
 }
 
-app.post("/api/system/restart", (_req, res) => {
+function isLoopbackRequest(req) {
+  const remote = String(req.socket?.remoteAddress || "").toLowerCase();
+  return remote === "::1" || remote === "127.0.0.1" || remote === "::ffff:127.0.0.1";
+}
+
+app.post("/api/system/restart", (req, res) => {
+  if (!isLoopbackRequest(req)) {
+    return apiError(res, 403, "この操作はサーバー本体PC（localhost）からのみ実行できます。");
+  }
   try {
     scheduleServerRestart({ preferStartupBat: true });
     apiOk(res, {
@@ -347,7 +355,10 @@ app.post("/api/system/restart", (_req, res) => {
   }
 });
 
-app.post("/api/system/restart-node", (_req, res) => {
+app.post("/api/system/restart-node", (req, res) => {
+  if (!isLoopbackRequest(req)) {
+    return apiError(res, 403, "この操作はサーバー本体PC（localhost）からのみ実行できます。");
+  }
   try {
     scheduleServerRestart({ preferStartupBat: false });
     apiOk(res, {
@@ -364,7 +375,10 @@ app.post("/api/system/restart-node", (_req, res) => {
   }
 });
 
-app.post("/api/system/shutdown", (_req, res) => {
+app.post("/api/system/shutdown", (req, res) => {
+  if (!isLoopbackRequest(req)) {
+    return apiError(res, 403, "この操作はサーバー本体PC（localhost）からのみ実行できます。");
+  }
   apiOk(res, {
     message: "サーバーを強制終了しています。",
   });
