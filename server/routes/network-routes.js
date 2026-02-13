@@ -1,7 +1,7 @@
 const { createLogger } = require("../services/logger-service");
 
 function registerNetworkRoutes(app, deps) {
-  const { fetchWithTimeout, apiOk, apiError } = deps;
+  const { fetchWithTimeout, apiOk, apiError, os } = deps;
   const logger = deps.logger || createLogger("route-network");
 
   app.get("/api/validate-url", async (req, res) => {
@@ -100,6 +100,37 @@ function registerNetworkRoutes(app, deps) {
     } catch (error) {
       logger.error("handle resolution error", { error: error.message });
       apiError(res, 500, "ハンドルの解決中に予期せぬエラーが発生しました。");
+    }
+  });
+
+  app.get("/api/network/local-ip", (_req, res) => {
+    try {
+      const interfaces = typeof os?.networkInterfaces === "function"
+        ? os.networkInterfaces()
+        : {};
+      const localIps = [];
+
+      Object.values(interfaces || {}).forEach((entries) => {
+        if (!Array.isArray(entries)) return;
+        entries.forEach((entry) => {
+          if (!entry) return;
+          const family = String(entry.family || "").toLowerCase();
+          const isIpv4 = family === "ipv4" || entry.family === 4;
+          if (!isIpv4) return;
+          if (entry.internal) return;
+          if (!entry.address) return;
+          localIps.push(String(entry.address));
+        });
+      });
+
+      const uniqueIps = Array.from(new Set(localIps));
+      apiOk(res, {
+        localIps: uniqueIps,
+        primaryIp: uniqueIps[0] || null,
+      });
+    } catch (error) {
+      logger.error("LAN内IP取得エラー", { error: error.message });
+      apiError(res, 500, "LAN内IPの取得に失敗しました。");
     }
   });
 }

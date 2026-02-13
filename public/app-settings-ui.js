@@ -579,6 +579,69 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
+      function initializeLocalLanIpToolUI() {
+        const localLanIpOutput = document.getElementById("localLanIpOutput");
+        const refreshLocalLanIpBtn = document.getElementById("refreshLocalLanIpBtn");
+        const copyLocalLanIpBtn = document.getElementById("copyLocalLanIpBtn");
+        const localLanIpStatus = document.getElementById("localLanIpStatus");
+        if (
+          !localLanIpOutput ||
+          !refreshLocalLanIpBtn ||
+          !copyLocalLanIpBtn ||
+          !localLanIpStatus
+        ) {
+          return;
+        }
+
+        const setStatus = (message, tone = "muted") => {
+          setSettingStatus(localLanIpStatus, message, tone);
+        };
+
+        const loadLocalLanIp = async () => {
+          setStatus("取得中...", "info");
+          try {
+            const response = await settingsUiDeps.fetchImpl("/api/network/local-ip");
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
+            if (!result.ok) {
+              throw new Error(result.error || "LAN内IPの取得に失敗しました。");
+            }
+            const ips = Array.isArray(result.data?.localIps) ? result.data.localIps : [];
+            if (ips.length === 0) {
+              localLanIpOutput.value = "";
+              setStatus("利用可能なLAN内IPが見つかりませんでした", "error");
+              return;
+            }
+            const endpoints = ips.map((ip) => `http://${ip}:3000`);
+            localLanIpOutput.value = endpoints.join(", ");
+            setStatus(`${ips.length} 件のLAN内IPを取得しました`, "success");
+          } catch (error) {
+            console.error("LAN内IP取得エラー:", error);
+            localLanIpOutput.value = "";
+            setStatus("LAN内IPの取得に失敗しました", "error");
+          }
+        };
+
+        refreshLocalLanIpBtn.addEventListener("click", () => {
+          loadLocalLanIp();
+        });
+
+        copyLocalLanIpBtn.addEventListener("click", async () => {
+          if (!localLanIpOutput.value) {
+            settingsUiDeps.notifyErrorImpl("コピーするLAN内IPがありません。");
+            return;
+          }
+          try {
+            await settingsUiDeps.writeClipboardTextImpl(localLanIpOutput.value);
+            settingsUiDeps.notifyInfoImpl("LAN内IPをコピーしました。");
+          } catch (error) {
+            console.error("LAN内IPコピー失敗:", error);
+            settingsUiDeps.notifyErrorImpl("LAN内IPのコピーに失敗しました。");
+          }
+        });
+
+        loadLocalLanIp();
+      }
+
       function createSettingsServerBridge(elements) {
         let currentWallpaperUrl = null;
 
@@ -1036,6 +1099,7 @@ function initializeSettingsUiController({
         initializeServerRestartButton();
         initializeConsoleLogViewer();
         initializeYoutubePlaylistConverterUI();
+        initializeLocalLanIpToolUI();
 
         const bridge = createSettingsServerBridge(elements);
         initializeCookieSettingsUI(elements, bridge);

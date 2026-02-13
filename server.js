@@ -274,6 +274,7 @@ registerLocalMediaRoutes(app, {
 registerNetworkRoutes(app, {
   ...routeBaseDeps,
   fetchWithTimeout,
+  os,
 });
 
 registerScheduleRoutes(app, {

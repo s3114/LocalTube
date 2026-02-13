@@ -1,4 +1,4 @@
-const CACHE_NAME = "localtube-shell-v1";
+const CACHE_NAME = "localtube-shell-v3";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -53,28 +53,48 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
   if (url.pathname.startsWith("/downloads/")) return;
+  if (url.pathname === "/events" || url.pathname === "/ping") return;
+  if (request.headers.get("range")) return;
+
+  const canCacheResponse = (response) =>
+    !!response && response.status === 200 && response.type === "basic";
+
+  const safeCachePut = async (cacheKey, response) => {
+    if (!canCacheResponse(response)) return;
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(cacheKey, response.clone());
+    } catch (_error) {
+      // キャッシュ保存失敗は致命ではないため握りつぶす
+    }
+  };
 
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy));
+          void safeCachePut("/index.html", response);
           return response;
         })
-        .catch(() => caches.match("/index.html"))
+        .catch(async () => {
+          const fallback = await caches.match("/index.html");
+          return fallback || new Response("Offline", { status: 503 });
+        })
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    (async () => {
+      try {
+        const response = await fetch(request);
+        void safeCachePut(request, response);
         return response;
-      });
-    })
+      } catch (_error) {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        return new Response("Offline", { status: 503 });
+      }
+    })()
   );
 });
