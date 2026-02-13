@@ -63,6 +63,149 @@
   }
 
   function createHeaderRoutingController({ appState }) {
+    function getFullscreenElement() {
+      return (
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.msFullscreenElement ||
+        null
+      );
+    }
+
+    async function requestDocumentFullscreen() {
+      const root = document.documentElement;
+      if (!root) return false;
+
+      if (typeof root.requestFullscreen === "function") {
+        await root.requestFullscreen();
+        return true;
+      }
+      if (typeof root.webkitRequestFullscreen === "function") {
+        root.webkitRequestFullscreen();
+        return true;
+      }
+      if (typeof root.msRequestFullscreen === "function") {
+        root.msRequestFullscreen();
+        return true;
+      }
+      return false;
+    }
+
+    async function exitDocumentFullscreen() {
+      if (typeof document.exitFullscreen === "function") {
+        await document.exitFullscreen();
+        return true;
+      }
+      if (typeof document.webkitExitFullscreen === "function") {
+        document.webkitExitFullscreen();
+        return true;
+      }
+      if (typeof document.msExitFullscreen === "function") {
+        document.msExitFullscreen();
+        return true;
+      }
+      return false;
+    }
+
+    function initializeMobileFullscreenButton() {
+      const fullscreenButton = document.getElementById("btn-mobile-fullscreen");
+      if (!fullscreenButton) return;
+
+      const updateFullscreenButtonState = () => {
+        const isFullscreen = !!getFullscreenElement();
+        fullscreenButton.classList.toggle("active", isFullscreen);
+        fullscreenButton.setAttribute("aria-pressed", isFullscreen ? "true" : "false");
+        fullscreenButton.title = isFullscreen ? "全画面解除" : "全画面表示";
+        fullscreenButton.innerHTML = isFullscreen
+          ? '<i class="fa-solid fa-compress"></i>'
+          : '<i class="fa-solid fa-expand"></i>';
+      };
+
+      fullscreenButton.addEventListener("click", async () => {
+        try {
+          if (getFullscreenElement()) {
+            await exitDocumentFullscreen();
+          } else {
+            await requestDocumentFullscreen();
+          }
+        } catch (error) {
+          console.warn("Fullscreen toggle failed:", error);
+        } finally {
+          updateFullscreenButtonState();
+        }
+      });
+
+      document.addEventListener("fullscreenchange", updateFullscreenButtonState);
+      document.addEventListener("webkitfullscreenchange", updateFullscreenButtonState);
+      document.addEventListener("msfullscreenchange", updateFullscreenButtonState);
+      updateFullscreenButtonState();
+    }
+
+    function initializeMobileBottomUiAutoHide() {
+      const root = document.body;
+      if (!root) return;
+      const mobileQuery = global.matchMedia?.("(max-width: 768px)");
+      if (!mobileQuery) return;
+
+      const setHidden = (hidden) => {
+        root.classList.toggle("mobile-bottom-ui-hidden", !!hidden);
+      };
+
+      let lastY = global.scrollY || 0;
+      let ticking = false;
+
+      const onScroll = () => {
+        if (!mobileQuery.matches) {
+          setHidden(false);
+          lastY = global.scrollY || 0;
+          ticking = false;
+          return;
+        }
+
+        const currentY = global.scrollY || 0;
+        const delta = currentY - lastY;
+        lastY = currentY;
+
+        if (Math.abs(delta) < 6) {
+          ticking = false;
+          return;
+        }
+
+        if (currentY < 24) {
+          setHidden(false);
+          ticking = false;
+          return;
+        }
+
+        if (delta > 0) {
+          setHidden(true);
+        } else {
+          setHidden(false);
+        }
+        ticking = false;
+      };
+
+      const queueScrollHandler = () => {
+        if (ticking) return;
+        ticking = true;
+        global.requestAnimationFrame(onScroll);
+      };
+
+      const onMediaChanged = () => {
+        if (!mobileQuery.matches) {
+          setHidden(false);
+        }
+      };
+
+      global.addEventListener("scroll", queueScrollHandler, { passive: true });
+      if (typeof mobileQuery.addEventListener === "function") {
+        mobileQuery.addEventListener("change", onMediaChanged);
+      } else if (typeof mobileQuery.addListener === "function") {
+        mobileQuery.addListener(onMediaChanged);
+      }
+      setHidden(false);
+    }
+
     function initialize() {
       const buttons = document.querySelectorAll(".icon-btn");
       const pages = document.querySelectorAll(".page");
@@ -108,6 +251,8 @@
 
       global.addEventListener("popstate", routeFromHash);
       routeFromHash();
+      initializeMobileFullscreenButton();
+      initializeMobileBottomUiAutoHide();
     }
 
     return {
