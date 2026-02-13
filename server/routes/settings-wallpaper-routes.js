@@ -17,6 +17,20 @@ function registerSettingsWallpaperRoutes(app, deps) {
   } = deps;
   const logger = deps.logger || createLogger("route-settings");
 
+  async function moveFileWithCrossDeviceFallback(fromPath, toPath) {
+    try {
+      await fs.promises.rename(fromPath, toPath);
+      return;
+    } catch (error) {
+      if (!error || error.code !== "EXDEV") {
+        throw error;
+      }
+    }
+
+    await fs.promises.copyFile(fromPath, toPath);
+    await fs.promises.unlink(fromPath);
+  }
+
   app.get("/api/settings", async (_req, res) => {
     try {
       const settings = await loadConfig();
@@ -67,7 +81,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
       }
 
       const finalPath = path.join(publicDir, `wallpaper${ext}`);
-      await fs.promises.rename(req.file.path, finalPath);
+      await moveFileWithCrossDeviceFallback(req.file.path, finalPath);
 
       const config = await loadConfig();
       if (typeof req.body?.wallpaperBlur !== "undefined") {
