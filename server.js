@@ -246,10 +246,12 @@ registerDownloadRoutes(app, {
 
 registerLiveChatRoutes(app, {
   ...routeBaseDeps,
+  getLocalVideoDirs: localPathService.getLocalVideoDirs,
 });
 
 registerInfoRoutes(app, {
   ...routeBaseDeps,
+  getLocalVideoDirs: localPathService.getLocalVideoDirs,
   getProvisionalInfoPath: localVideoService.getProvisionalInfoPath,
   findLocalVideoPathById: localVideoService.findLocalVideoPathById,
   createProvisionalInfoFromVideo: localVideoService.createProvisionalInfoFromVideo,

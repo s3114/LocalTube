@@ -7,12 +7,21 @@ function registerInfoRoutes(app, deps) {
     baseDir,
     apiOk,
     apiError,
+    getLocalVideoDirs,
     getProvisionalInfoPath,
     findLocalVideoPathById,
     createProvisionalInfoFromVideo,
     ensureProvisionalInfo,
   } = deps;
   const logger = deps.logger || createLogger("route-info");
+  const INFO_DIR_INDEX_PATH = path.join(baseDir, "cache", "info-dir-index.json");
+  const INFO_FILE_INDEX_PATH = path.join(baseDir, "cache", "info-file-index.json");
+  const INFO_INDEX_CACHE_TTL_MS = 5000;
+  let infoIndexCache = {
+    signature: "",
+    expiresAt: 0,
+    entries: [],
+  };
 
   function pickHomeLiteFields(info = {}) {
     return {
@@ -31,14 +40,259 @@ function registerInfoRoutes(app, deps) {
     };
   }
 
-  async function resolveInfoJsonPath(videoId) {
-    const commentDir = path.join(baseDir, "downloads", "コメント");
-    const files = await fs.promises.readdir(commentDir);
-    const match = files.find(
-      (f) => f.startsWith(videoId) && f.endsWith(".info.json"),
+  function deriveLibraryRootsFromSourceDirs(sourceDirs) {
+    const roots = new Set();
+    for (const sourceDir of sourceDirs) {
+      const resolved = path.resolve(sourceDir);
+      const parsed = path.parse(resolved);
+      const relative = resolved.slice(parsed.root.length);
+      const segments = relative.split(path.sep).filter(Boolean);
+      const videoDirIndex = segments.lastIndexOf("動画");
+      if (videoDirIndex >= 0) {
+        roots.add(path.join(parsed.root, ...segments.slice(0, videoDirIndex)));
+      } else {
+        roots.add(resolved);
+      }
+    }
+    return Array.from(roots);
+  }
+
+  async function buildCommentSearchRoots() {
+    const dirs = new Set([path.join(baseDir, "downloads", "コメント")]);
+    if (typeof getLocalVideoDirs !== "function") return Array.from(dirs);
+    const sourceDirs = await getLocalVideoDirs();
+    const roots = deriveLibraryRootsFromSourceDirs(sourceDirs);
+    for (const root of roots) {
+      dirs.add(path.join(root, "コメント"));
+    }
+    return Array.from(dirs);
+  }
+
+  async function buildDirsSignature(dirs) {
+    const stats = await Promise.all(
+      dirs.map(async (dir) => {
+        try {
+          if (!fs.existsSync(dir)) return `${dir}:missing`;
+          const stat = await fs.promises.stat(dir);
+          return `${dir}:${Math.round(stat.mtimeMs)}`;
+        } catch (_error) {
+          return `${dir}:error`;
+        }
+      }),
     );
-    if (!match) return null;
-    return path.join(commentDir, match);
+    return stats.join("|");
+  }
+
+  async function readIndexJson(indexPath) {
+    try {
+      if (!fs.existsSync(indexPath)) return null;
+      const raw = await fs.promises.readFile(indexPath, "utf-8");
+      return JSON.parse(raw);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function writeIndexJson(indexPath, value) {
+    await fs.promises.mkdir(path.dirname(indexPath), { recursive: true });
+    await fs.promises.writeFile(indexPath, JSON.stringify(value, null, 2), "utf-8");
+  }
+
+  async function collectInfoDirectoriesRecursive(searchRoot) {
+    const dirs = new Set();
+    if (!fs.existsSync(searchRoot)) return [];
+    const pendingDirs = [searchRoot];
+    while (pendingDirs.length > 0) {
+      const currentDir = pendingDirs.pop();
+      if (!currentDir) continue;
+      let entries = [];
+      try {
+        entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+      } catch (_error) {
+        continue;
+      }
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          pendingDirs.push(fullPath);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        if (!entry.name.endsWith(".info.json")) continue;
+        dirs.add(path.resolve(currentDir));
+      }
+    }
+    return Array.from(dirs);
+  }
+
+  async function resolveCommentInfoDirs(searchRoots, signature) {
+    const normalizedRoots = searchRoots.map((dir) => path.resolve(dir)).sort();
+    const cached = await readIndexJson(INFO_DIR_INDEX_PATH);
+    if (
+      cached &&
+      cached.signature === signature &&
+      Array.isArray(cached.searchRoots) &&
+      cached.searchRoots.join("|") === normalizedRoots.join("|") &&
+      Array.isArray(cached.infoDirs)
+    ) {
+      return {
+        dirs: cached.infoDirs,
+        fromCache: true,
+      };
+    }
+
+    const found = new Set();
+    for (const root of searchRoots) {
+      const dirs = await collectInfoDirectoriesRecursive(root);
+      for (const dir of dirs) found.add(path.resolve(dir));
+    }
+
+    const infoDirs = Array.from(found).sort();
+    await writeIndexJson(INFO_DIR_INDEX_PATH, {
+      signature,
+      searchRoots: normalizedRoots,
+      infoDirs,
+      generatedAt: new Date().toISOString(),
+    });
+
+    return {
+      dirs: infoDirs,
+      fromCache: false,
+    };
+  }
+
+  async function buildInfoEntriesFromDirs(infoDirs) {
+    const entries = [];
+    for (const infoDir of infoDirs) {
+      if (!fs.existsSync(infoDir)) continue;
+      let files = [];
+      try {
+        files = await fs.promises.readdir(infoDir, { withFileTypes: true });
+      } catch (_error) {
+        continue;
+      }
+      for (const file of files) {
+        if (!file.isFile()) continue;
+        if (!file.name.endsWith(".info.json")) continue;
+        entries.push({
+          fileName: file.name,
+          lowerName: file.name.toLowerCase(),
+          fullPath: path.join(infoDir, file.name),
+        });
+      }
+    }
+    return entries;
+  }
+
+  async function getInfoEntries() {
+    const searchRoots = await buildCommentSearchRoots();
+    const signature = await buildDirsSignature(searchRoots);
+    const now = Date.now();
+    if (
+      infoIndexCache.entries.length > 0 &&
+      infoIndexCache.signature === signature &&
+      infoIndexCache.expiresAt > now
+    ) {
+      return {
+        entries: infoIndexCache.entries,
+        signature,
+        fromMemoryCache: true,
+        fromDiskCache: false,
+        dirIndexCacheHit: false,
+      };
+    }
+
+    const diskIndex = await readIndexJson(INFO_FILE_INDEX_PATH);
+    if (
+      diskIndex &&
+      diskIndex.signature === signature &&
+      Array.isArray(diskIndex.entries)
+    ) {
+      const entries = diskIndex.entries
+        .filter((v) => v && typeof v.fileName === "string" && typeof v.fullPath === "string")
+        .map((v) => ({
+          fileName: v.fileName,
+          lowerName: v.fileName.toLowerCase(),
+          fullPath: v.fullPath,
+        }));
+      infoIndexCache = {
+        signature,
+        expiresAt: now + INFO_INDEX_CACHE_TTL_MS,
+        entries,
+      };
+      return {
+        entries,
+        signature,
+        fromMemoryCache: false,
+        fromDiskCache: true,
+        dirIndexCacheHit: false,
+      };
+    }
+
+    const { dirs: infoDirs, fromCache: dirIndexCacheHit } = await resolveCommentInfoDirs(
+      searchRoots,
+      signature,
+    );
+    const entries = await buildInfoEntriesFromDirs(infoDirs);
+    await writeIndexJson(INFO_FILE_INDEX_PATH, {
+      signature,
+      entries: entries.map((v) => ({
+        fileName: v.fileName,
+        fullPath: v.fullPath,
+      })),
+      generatedAt: new Date().toISOString(),
+    });
+
+    infoIndexCache = {
+      signature,
+      expiresAt: now + INFO_INDEX_CACHE_TTL_MS,
+      entries,
+    };
+    return {
+      entries,
+      signature,
+      fromMemoryCache: false,
+      fromDiskCache: false,
+      dirIndexCacheHit,
+    };
+  }
+
+  function findMatchingInfoPathFromEntries(videoId, entries) {
+    const prefix = String(videoId || "").toLowerCase();
+    const matched = entries.find((entry) => entry.lowerName.startsWith(prefix));
+    return matched ? matched.fullPath : null;
+  }
+
+  async function findMatchingInfoJson(videoId, searchDir) {
+    if (!fs.existsSync(searchDir)) return null;
+    const pendingDirs = [searchDir];
+    while (pendingDirs.length > 0) {
+      const currentDir = pendingDirs.pop();
+      if (!currentDir) continue;
+      let entries = [];
+      try {
+        entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+      } catch (_error) {
+        continue;
+      }
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          pendingDirs.push(fullPath);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        if (!entry.name.endsWith(".info.json")) continue;
+        if (!entry.name.startsWith(videoId)) continue;
+        return fullPath;
+      }
+    }
+    return null;
+  }
+
+  async function resolveInfoJsonPath(videoId) {
+    const { entries } = await getInfoEntries();
+    return findMatchingInfoPathFromEntries(videoId, entries);
   }
 
   async function resolveLiteInfoByVideoId(videoId) {
@@ -82,17 +336,13 @@ function registerInfoRoutes(app, deps) {
     try {
       const startedAt = Date.now();
       const videoId = decodeURIComponent(req.params.videoId);
-      const commentDir = path.join(baseDir, "downloads", "コメント");
       const provisionalPath = getProvisionalInfoPath(videoId);
 
       logger.info("info lookup start", { videoId });
 
-      const files = await fs.promises.readdir(commentDir);
-      const match = files.find(
-        (f) => f.startsWith(videoId) && f.endsWith(".info.json"),
-      );
+      const infoPath = await resolveInfoJsonPath(videoId);
 
-      if (!match) {
+      if (!infoPath) {
         if (fs.existsSync(provisionalPath)) {
           try {
             const cachedRaw = await fs.promises.readFile(provisionalPath, "utf-8");
@@ -136,7 +386,6 @@ function registerInfoRoutes(app, deps) {
         return res.sendFile(provisionalPath);
       }
 
-      const infoPath = path.join(commentDir, match);
       logger.info("serving existing info", {
         infoPath,
         elapsedMs: Date.now() - startedAt,
@@ -196,6 +445,7 @@ function registerInfoRoutes(app, deps) {
       logger.info("serving home-info batch", {
         requested: ids.length,
         resolved: Object.keys(data).length,
+        infoIndexSize: (await getInfoEntries()).entries.length,
         elapsedMs: Date.now() - startedAt,
       });
       apiOk(res, data);

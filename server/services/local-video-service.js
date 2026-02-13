@@ -109,10 +109,21 @@ function createLocalVideoService(deps) {
     return path.join(fallbackThumbnailDir, `${baseName}_${hash}.png`);
   }
 
+  function inferLibraryRootFromVideoPath(videoPath) {
+    const resolvedVideoDir = path.resolve(path.dirname(videoPath));
+    const parsed = path.parse(resolvedVideoDir);
+    const relative = resolvedVideoDir.slice(parsed.root.length);
+    const segments = relative.split(path.sep).filter(Boolean);
+    const videoDirIndex = segments.lastIndexOf("動画");
+    if (videoDirIndex < 0) return null;
+    return path.join(parsed.root, ...segments.slice(0, videoDirIndex));
+  }
+
   function findExistingThumbnailPath(videoPath, includeFallback = true) {
     const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
     const sourceDir = path.dirname(videoPath);
     const base = path.parse(videoPath).name;
+    const libraryRoot = inferLibraryRootFromVideoPath(videoPath);
 
     const candidates = [];
     for (const tExt of thumbExts) {
@@ -122,6 +133,18 @@ function createLocalVideoService(deps) {
     if (path.resolve(sourceDir) === path.resolve(movieDir)) {
       for (const tExt of thumbExts) {
         candidates.push(path.join(thumbnailDir, `${base}${tExt}`));
+      }
+    }
+
+    if (libraryRoot) {
+      const siblingThumbDirs = [
+        path.join(libraryRoot, "サムネ"),
+        path.join(libraryRoot, "サムネイル"),
+      ];
+      for (const thumbDir of siblingThumbDirs) {
+        for (const tExt of thumbExts) {
+          candidates.push(path.join(thumbDir, `${base}${tExt}`));
+        }
       }
     }
 
@@ -162,22 +185,41 @@ function createLocalVideoService(deps) {
 
     for (const sourceDir of sourceDirs) {
       if (!fs.existsSync(sourceDir)) continue;
-      const files = await fs.promises.readdir(sourceDir);
+      const pendingDirs = [sourceDir];
 
-      for (const file of files) {
-        const ext = path.extname(file).toLowerCase();
-        if (!videoExt.includes(ext)) continue;
+      while (pendingDirs.length > 0) {
+        const currentDir = pendingDirs.pop();
+        if (!currentDir) continue;
 
-        const base = path.parse(file).name;
-        if (
-          base !== normalizedId &&
-          !base.startsWith(normalizedId) &&
-          !normalizedId.startsWith(base)
-        ) {
+        let entries = [];
+        try {
+          entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+        } catch (_error) {
           continue;
         }
 
-        return path.join(sourceDir, file);
+        for (const entry of entries) {
+          const fullPath = path.join(currentDir, entry.name);
+          if (entry.isDirectory()) {
+            pendingDirs.push(fullPath);
+            continue;
+          }
+          if (!entry.isFile()) continue;
+
+          const ext = path.extname(entry.name).toLowerCase();
+          if (!videoExt.includes(ext)) continue;
+
+          const base = path.parse(entry.name).name;
+          if (
+            base !== normalizedId &&
+            !base.startsWith(normalizedId) &&
+            !normalizedId.startsWith(base)
+          ) {
+            continue;
+          }
+
+          return fullPath;
+        }
       }
     }
 
