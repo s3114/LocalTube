@@ -43,6 +43,25 @@
     });
   }
 
+  function notifyPageChanged(globalObj, pageId) {
+    if (typeof globalObj.dispatchEvent !== "function") return;
+
+    if (typeof globalObj.CustomEvent === "function") {
+      globalObj.dispatchEvent(
+        new globalObj.CustomEvent("app:page-changed", {
+          detail: { pageId },
+        }),
+      );
+      return;
+    }
+
+    if (typeof globalObj.Event === "function") {
+      const event = new globalObj.Event("app:page-changed");
+      event.detail = { pageId };
+      globalObj.dispatchEvent(event);
+    }
+  }
+
   function createHeaderRoutingController({ appState }) {
     function initialize() {
       const buttons = document.querySelectorAll(".icon-btn");
@@ -58,11 +77,7 @@
         applyPageVisibility(pages, pageId);
         global.updateHeaderSearchVisibility(pageId);
         global.updateSmoothSeekLoopState?.();
-        global.dispatchEvent(
-          new CustomEvent("app:page-changed", {
-            detail: { pageId },
-          }),
-        );
+        notifyPageChanged(global, pageId);
       }
 
       function setActiveButton(pageId) {
