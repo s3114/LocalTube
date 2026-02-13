@@ -377,10 +377,11 @@
         }
       }
 
-      async function loadLocalVideos() {
+      async function loadLocalVideos(forceRefresh = false) {
         const startedAt = performance.now();
         try {
-          const res = await fetch("/api/local-videos");
+          const url = forceRefresh ? "/api/local-videos?refresh=1" : "/api/local-videos";
+          const res = await fetch(url);
           const result = await parseApiResponse(res);
           if (!result.ok) {
             throw new Error(result.error || "動画一覧の取得に失敗しました。");
