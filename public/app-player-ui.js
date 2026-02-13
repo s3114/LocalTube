@@ -149,43 +149,179 @@ function bindPlayButton(videoPlayer, btnPlay) {
         });
       }
 
+      function hasCommentLineTimestamp(text) {
+        if (typeof text !== "string" || text.trim() === "") return false;
+        const lineStartTimestampPattern =
+          /(^|\n)\s*(?:\d{1,2}:[0-5]\d:[0-5]\d|[0-5]?\d:[0-5]\d)(?=\s|$)/;
+        return lineStartTimestampPattern.test(text);
+      }
+
+      function createCommentLookupTables(comments) {
+        const commentById = new Map();
+        const childCountById = new Map();
+        comments.forEach((comment) => {
+          if (!comment || !comment.id) return;
+          commentById.set(comment.id, comment);
+          if (comment.parent) {
+            const currentCount = childCountById.get(comment.parent) || 0;
+            childCountById.set(comment.parent, currentCount + 1);
+          }
+        });
+        return { commentById, childCountById };
+      }
+
+      function applyCommentFilters(comments, activeFilters) {
+        if (!(activeFilters instanceof Set) || activeFilters.size === 0) {
+          return [...comments];
+        }
+
+        const { commentById, childCountById } = createCommentLookupTables(comments);
+        const includeIds = new Set();
+
+        const isMatchedByAllFilters = (comment) => {
+          for (const filterKey of activeFilters) {
+            if (filterKey === "timestamp") {
+              if (!hasCommentLineTimestamp(comment.text || "")) return false;
+              continue;
+            }
+            if (filterKey === "with-replies") {
+              if ((childCountById.get(comment.id) || 0) === 0) return false;
+              continue;
+            }
+            if (filterKey === "favorited") {
+              if (comment.is_favorited !== true) return false;
+              continue;
+            }
+            if (filterKey === "pinned") {
+              if (comment.is_pinned !== true) return false;
+              continue;
+            }
+          }
+          return true;
+        };
+
+        comments.forEach((comment) => {
+          if (!comment || !comment.id || !isMatchedByAllFilters(comment)) return;
+
+          let current = comment;
+          while (current && current.id) {
+            if (includeIds.has(current.id)) break;
+            includeIds.add(current.id);
+            if (!current.parent) break;
+            current = commentById.get(current.parent) || null;
+          }
+        });
+
+        return comments.filter((comment) => comment && includeIds.has(comment.id));
+      }
+
+      function sortCommentsByType(comments, sortType) {
+        const sorted = [...comments];
+        if (sortType === "popular") {
+          sorted.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
+          return sorted;
+        }
+        if (sortType === "oldest") {
+          sorted.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+          return sorted;
+        }
+        sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        return sorted;
+      }
+
       function bindCommentSortMenu(renderSortedComments) {
         const sortToggle = document.getElementById("sort-toggle");
         const sortMenu = document.getElementById("sort-menu");
+        const filterToggle = document.getElementById("filter-toggle");
+        const filterMenu = document.getElementById("filter-menu");
         const sortItems = document.querySelectorAll(".sort-item");
+        const filterItems = document.querySelectorAll(".filter-item");
         if (!sortToggle || !sortMenu) return;
+
+        const state = {
+          sortType:
+            document.querySelector(".sort-item.active")?.dataset.sort || "newest",
+          activeFilters: new Set(
+            Array.from(filterItems)
+              .filter((item) => item.classList.contains("active"))
+              .map((item) => item.dataset.filter),
+          ),
+        };
+
+        const updateFilterToggleLabel = () => {
+          if (!filterToggle) return;
+          const activeCount = state.activeFilters.size;
+          filterToggle.innerHTML =
+            activeCount > 0
+              ? `<i class="fa-solid fa-filter"></i> 絞り込み (${activeCount})`
+              : '<i class="fa-solid fa-filter"></i> 絞り込み';
+        };
+
+        const applyCurrentCommentView = () => {
+          const allComments = Array.isArray(window.currentVideoComments)
+            ? window.currentVideoComments
+            : [];
+          const filtered = applyCommentFilters(allComments, state.activeFilters);
+          const sorted = sortCommentsByType(filtered, state.sortType);
+          renderSortedComments(sorted);
+        };
+
+        window.applyCurrentCommentSortAndFilters = applyCurrentCommentView;
+        updateFilterToggleLabel();
 
         sortToggle.addEventListener("click", (e) => {
           e.stopPropagation();
+          if (filterMenu) filterMenu.classList.add("hidden");
           sortMenu.classList.toggle("hidden");
         });
+
+        if (filterToggle && filterMenu) {
+          filterToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sortMenu.classList.add("hidden");
+            filterMenu.classList.toggle("hidden");
+          });
+        }
 
         document.addEventListener("click", (e) => {
           if (!sortToggle.contains(e.target) && !sortMenu.contains(e.target)) {
             sortMenu.classList.add("hidden");
           }
+          if (
+            filterToggle &&
+            filterMenu &&
+            !filterToggle.contains(e.target) &&
+            !filterMenu.contains(e.target)
+          ) {
+            filterMenu.classList.add("hidden");
+          }
         });
 
         sortItems.forEach((item) => {
           item.addEventListener("click", () => {
-            const sortType = item.dataset.sort;
+            state.sortType = item.dataset.sort || "newest";
             sortItems.forEach((i) => i.classList.remove("active"));
             item.classList.add("active");
             sortMenu.classList.add("hidden");
+            applyCurrentCommentView();
+          });
+        });
 
-            if (
-              !window.currentVideoComments ||
-              window.currentVideoComments.length === 0
-            )
-              return;
+        filterItems.forEach((item) => {
+          item.addEventListener("click", () => {
+            const filterKey = item.dataset.filter;
+            if (!filterKey) return;
 
-            const sorted = [...window.currentVideoComments];
-            if (sortType === "popular") {
-              sorted.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
-            } else if (sortType === "newest") {
-              sorted.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            if (state.activeFilters.has(filterKey)) {
+              state.activeFilters.delete(filterKey);
+              item.classList.remove("active");
+            } else {
+              state.activeFilters.add(filterKey);
+              item.classList.add("active");
             }
-            renderSortedComments(sorted);
+
+            updateFilterToggleLabel();
+            applyCurrentCommentView();
           });
         });
       }

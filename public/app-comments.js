@@ -19,6 +19,7 @@
       _time_text: top._time_text || "",
       author_thumbnail: top.author_thumbnail || null,
       timestamp: top.timestamp || 0,
+      is_favorited: top.is_favorited || false,
       is_pinned: top.is_pinned || false,
     };
   }
