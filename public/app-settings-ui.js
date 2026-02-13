@@ -8,11 +8,43 @@ const defaultSettingsUiDependencies = {
   notifyErrorImpl: (message) => global.alert?.(message),
   confirmImpl: (message) => global.confirm?.(message) ?? true,
   writeClipboardTextImpl: async (text) => {
-    if (global.navigator?.clipboard?.writeText) {
-      await global.navigator.clipboard.writeText(text);
-      return;
+    const clipboardText = String(text ?? "");
+
+    if (global.navigator?.clipboard?.writeText && global.isSecureContext) {
+      try {
+        await global.navigator.clipboard.writeText(clipboardText);
+        return;
+      } catch {
+        // fallback to execCommand
+      }
     }
-    throw new Error("Clipboard API unavailable");
+
+    const input = global.document?.createElement("input");
+    if (!input || !global.document?.body) {
+      throw new Error("Clipboard API unavailable");
+    }
+    input.value = clipboardText;
+    input.setAttribute("type", "text");
+    input.setAttribute("readonly", "");
+    input.style.position = "fixed";
+    input.style.top = "8px";
+    input.style.left = "8px";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.opacity = "0";
+    input.style.pointerEvents = "none";
+    input.style.zIndex = "-1";
+
+    global.document.body.appendChild(input);
+    input.focus({ preventScroll: true });
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+
+    const copied = Boolean(global.document.execCommand?.("copy"));
+    global.document.body.removeChild(input);
+    if (!copied) {
+      throw new Error("Clipboard fallback copy failed");
+    }
   },
 };
 
@@ -635,7 +667,15 @@ function clampNumberInRange(value, min, max, fallback) {
             settingsUiDeps.notifyInfoImpl("LAN内IPをコピーしました。");
           } catch (error) {
             console.error("LAN内IPコピー失敗:", error);
-            settingsUiDeps.notifyErrorImpl("LAN内IPのコピーに失敗しました。");
+            try {
+              localLanIpOutput.focus({ preventScroll: true });
+              localLanIpOutput.select();
+            } catch {
+              // noop
+            }
+            settingsUiDeps.notifyErrorImpl(
+              "LAN内IPのコピーに失敗しました。表示欄を長押しして手動コピーしてください。",
+            );
           }
         });
 
