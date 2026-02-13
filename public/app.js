@@ -81,6 +81,21 @@ const appState = window.AppState || {
         localVideoModule;
 
       // --- Main Logic ---
+      async function registerServiceWorker() {
+        if (
+          typeof window === "undefined" ||
+          typeof navigator === "undefined" ||
+          !("serviceWorker" in navigator)
+        ) {
+          return;
+        }
+        try {
+          await navigator.serviceWorker.register("/sw.js");
+        } catch (error) {
+          console.warn("Service Worker registration failed:", error);
+        }
+      }
+
       function initializeSettingsAndSse() {
         const elements = {
           fmt: document.getElementById("fmt"),
@@ -173,6 +188,7 @@ const appState = window.AppState || {
       });
 
       document.addEventListener("DOMContentLoaded", () => {
+        registerServiceWorker();
         initializeSettingsAndSse();
         headerRoutingController.initialize();
         playerPageController.initialize();
