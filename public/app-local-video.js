@@ -253,7 +253,11 @@
         resetVideoDataCommentDisplay(ui);
 
         global.currentVideoComments = commentRenderer.extractRenderableComments(info);
-        commentRenderer.renderComments(global.currentVideoComments);
+        if (typeof global.applyCurrentCommentSortAndFilters === "function") {
+          global.applyCurrentCommentSortAndFilters();
+        } else {
+          commentRenderer.renderComments(global.currentVideoComments);
+        }
       }
 
       async function loadLiveChat(videoBaseName) {

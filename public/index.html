@@ -892,7 +892,7 @@
         border-radius: 8px;
         padding: 12px 16px 0px 0px;
         /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); */
-        overflow: hidden;
+        overflow: visible;
         position: relative;
         /* backdrop-filter: blur(2px); */
       }
@@ -1015,7 +1015,8 @@
       }
 
       /* ===== 並び替えメニュー ===== */
-      .sort-btn {
+      .sort-btn,
+      .filter-btn {
         background: transparent;
         border: none;
         color: var(--subtext);
@@ -1028,12 +1029,14 @@
         padding: 8px;
         border-radius: 4px;
       }
-      .sort-btn:hover {
+      .sort-btn:hover,
+      .filter-btn:hover {
         background: rgba(255, 255, 255, 0.1);
         color: var(--text);
       }
 
-      .sort-menu {
+      .sort-menu,
+      .filter-menu {
         position: absolute;
         top: 100%;
         left: 0;
@@ -1045,21 +1048,30 @@
         z-index: 100;
         margin-top: 4px;
       }
+      .filter-menu {
+        width: 200px;
+      }
       .sort-menu.hidden {
         display: none;
       }
+      .filter-menu.hidden {
+        display: none;
+      }
 
-      .sort-item {
+      .sort-item,
+      .filter-item {
         padding: 10px 16px;
         font-size: 14px;
         color: var(--text);
         cursor: pointer;
         transition: background 0.1s;
       }
-      .sort-item:hover {
+      .sort-item:hover,
+      .filter-item:hover {
         background: rgba(255, 255, 255, 0.1);
       }
-      .sort-item.active {
+      .sort-item.active,
+      .filter-item.active {
         background: rgba(255, 255, 255, 0.2);
         font-weight: bold;
       }
@@ -1299,6 +1311,7 @@
         display: flex;
         align-items: center;
         gap: 20px;
+        flex-wrap: wrap;
       }
 
       .comment-count-label {
@@ -1306,7 +1319,18 @@
         font-weight: 700;
       }
 
+      .comment-controls {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
       .sort-container {
+        position: relative;
+      }
+
+      .filter-container {
         position: relative;
       }
 
@@ -2974,15 +2998,38 @@
                     <div class="comment-count-label">
                       <span id="comment-count-display"></span> 件のコメント
                     </div>
-                    <div class="sort-container">
-                      <button id="sort-toggle" class="sort-btn">
-                        <i class="fa-solid fa-arrow-down-short-wide"></i>
-                        並び替え
-                      </button>
-                      <div id="sort-menu" class="sort-menu hidden">
-                        <div class="sort-item" data-sort="popular">人気順</div>
-                        <div class="sort-item active" data-sort="newest">
-                          新しい順
+                    <div class="comment-controls">
+                      <div class="sort-container">
+                        <button id="sort-toggle" class="sort-btn">
+                          <i class="fa-solid fa-arrow-down-short-wide"></i>
+                          並び替え
+                        </button>
+                        <div id="sort-menu" class="sort-menu hidden">
+                          <div class="sort-item" data-sort="popular">人気順</div>
+                          <div class="sort-item active" data-sort="newest">
+                            新しい順
+                          </div>
+                          <div class="sort-item" data-sort="oldest">古い順</div>
+                        </div>
+                      </div>
+                      <div class="filter-container">
+                        <button id="filter-toggle" class="filter-btn">
+                          <i class="fa-solid fa-filter"></i>
+                          絞り込み
+                        </button>
+                        <div id="filter-menu" class="filter-menu hidden">
+                          <div class="filter-item" data-filter="timestamp">
+                            タイムスタンプ付き
+                          </div>
+                          <div class="filter-item" data-filter="with-replies">
+                            リプライ付き
+                          </div>
+                          <div class="filter-item" data-filter="favorited">
+                            投稿者のハート付き
+                          </div>
+                          <div class="filter-item" data-filter="pinned">
+                            ピン留め
+                          </div>
                         </div>
                       </div>
                     </div>
