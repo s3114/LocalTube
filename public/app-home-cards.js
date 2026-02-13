@@ -5,8 +5,9 @@
       : document.createElement("div");
     thumbEl.className = "home-video-card-thumb";
     if (video.thumb) {
-      thumbEl.src = video.thumb;
+      thumbEl.dataset.thumbSrc = video.thumb;
       thumbEl.loading = "lazy";
+      thumbEl.decoding = "async";
     }
     return thumbEl;
   }

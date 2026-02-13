@@ -16,6 +16,7 @@ function createDownloadJobService({
   loadConfig,
 }) {
   const logger = createLogger("download-job");
+  const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
 
   function buildArgs(job, paths, settings) {
     const { url, options } = job;
@@ -65,7 +66,8 @@ function createDownloadJobService({
       args.push("--get-comments");
     }
     if (options.commentOptions === "sub" || options.commentOptions === "both") {
-      args.push("--write-sub");
+      args.push("--write-subs");
+      args.push("--sub-langs", "live_chat,all");
     }
 
     return args;
@@ -317,7 +319,7 @@ function createDownloadJobService({
   function stageDownloadedExtraFiles(job, settings, finalMovieDir) {
     const files = fs.readdirSync(finalMovieDir);
     const infoFile = files.find((f) => f.endsWith(".info.json"));
-    const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
+    const chatFile = files.find((f) => LIVE_CHAT_JSON_PATTERN.test(f));
 
     const jobPendingDir = path.join(pendingChatDir, `job_${Date.now()}`);
     fs.mkdirSync(jobPendingDir, { recursive: true });
@@ -343,6 +345,10 @@ function createDownloadJobService({
       const src = path.join(finalMovieDir, chatFile);
       const dest = path.join(jobPendingDir, chatFile);
       moveOptionalFile(src, dest, "chat");
+    } else {
+      logger.warn("live chat ファイルが見つかりません", {
+        finalMovieDir,
+      });
     }
 
     return { infoFile, jobPendingDir };

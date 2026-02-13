@@ -305,6 +305,24 @@
     return keyword.length > 0 ? keyword.split(/\s+/).filter(Boolean) : [];
   }
 
+  function needsFullHomeInfoForAccurateFiltering(filterState, terms, sortState) {
+    if (Array.isArray(terms) && terms.length > 0) return true;
+    if (String(filterState?.channelKeyword || "").trim()) return true;
+    if (String(filterState?.durationMode || "all") !== "all") return true;
+    if (String(sortState?.sortKey || "") === "popular") return true;
+    return false;
+  }
+
+  function countMissingHomeInfo(videos, homeInfoData) {
+    let missing = 0;
+    for (const video of videos) {
+      const videoId = getVideoIdFromFilename(video?.filename);
+      if (!videoId) continue;
+      if (!homeInfoData.has(videoId)) missing += 1;
+    }
+    return missing;
+  }
+
   function getHomeVideoInfoFromMap(video, homeInfoData) {
     return homeInfoData.get(getVideoIdFromFilename(video.filename)) || null;
   }
@@ -528,7 +546,7 @@
     enrichCardInfo,
     cardRefsByVideoId,
     renderTokenRef,
-    initialBatchSize = 24,
+    initialBatchSize = 12,
     chunkSize = 18,
   }) {
     if (!homeVideoGrid) return;
@@ -567,56 +585,59 @@
     }
   }
 
-  async function getCachedHomeInfo(homeInfoData, homeInfoCache, video) {
-    const videoId = getVideoIdFromFilename(video.filename);
-    if (!videoId) return null;
-    if (homeInfoData.has(videoId)) return homeInfoData.get(videoId);
-    if (!homeInfoCache.has(videoId)) {
-      const request = fetch(`/api/info-lite/${encodeURIComponent(videoId)}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((payload) => payload?.data || null)
-        .then((info) => {
-          if (info) homeInfoData.set(videoId, info);
-          return info;
-        })
-        .catch(() => null);
-      homeInfoCache.set(videoId, request);
-    }
-    return homeInfoCache.get(videoId);
-  }
-
-  async function fetchHomeInfoBatch(homeInfoData, homeInfoCache, videos) {
+  async function fetchHomeInfoBatch(homeInfoData, requestedHomeInfoIds, videos) {
     const ids = videos
       .map((video) => getVideoIdFromFilename(video.filename))
       .filter((id) => id && !homeInfoData.has(id));
     if (ids.length === 0) return;
 
-    const uncachedIds = ids.filter((id) => !homeInfoCache.has(id));
+    const uncachedIds = ids.filter((id) => !requestedHomeInfoIds.has(id));
     if (uncachedIds.length > 0) {
-      const request = fetch(`/api/home-info?ids=${encodeURIComponent(uncachedIds.join(","))}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((payload) => payload?.data || {})
-        .catch(() => ({}));
+      const HOME_INFO_REQUEST_CHUNK_SIZE = 20;
+      const HOME_INFO_MAX_CONCURRENCY = 4;
+      const chunks = [];
+      for (let i = 0; i < uncachedIds.length; i += HOME_INFO_REQUEST_CHUNK_SIZE) {
+        chunks.push(uncachedIds.slice(i, i + HOME_INFO_REQUEST_CHUNK_SIZE));
+      }
 
-      uncachedIds.forEach((id) => {
-        homeInfoCache.set(
-          id,
-          request.then((map) => map[id] || null),
+      uncachedIds.forEach((id) => requestedHomeInfoIds.add(id));
+
+      const workerCount = Math.min(HOME_INFO_MAX_CONCURRENCY, chunks.length);
+      const workers = [];
+      for (let w = 0; w < workerCount; w += 1) {
+        workers.push(
+          (async () => {
+            while (chunks.length > 0) {
+              const chunk = chunks.shift();
+              if (!chunk || chunk.length === 0) continue;
+
+              try {
+                const response = await fetch(
+                  `/api/home-info?ids=${encodeURIComponent(chunk.join(","))}`,
+                );
+                const payload = response.ok ? await response.json() : null;
+                const map = payload?.data || {};
+                for (const id of chunk) {
+                  const info = map[id] || null;
+                  if (info) {
+                    homeInfoData.set(id, info);
+                    continue;
+                  }
+                  requestedHomeInfoIds.delete(id);
+                }
+              } catch (_error) {
+                chunk.forEach((id) => requestedHomeInfoIds.delete(id));
+              }
+            }
+          })(),
         );
-      });
+      }
+      await Promise.all(workers);
     }
-
-    const resolved = await Promise.all(
-      ids.map((id) => homeInfoCache.get(id)?.catch(() => null) || Promise.resolve(null)),
-    );
-    ids.forEach((id, index) => {
-      const info = resolved[index];
-      if (info) homeInfoData.set(id, info);
-    });
   }
 
   function applyHomeCardInfoFromInfo(video, refs, info) {
-    if (!info || !refs?.titleEl?.isConnected) return;
+    if (!info || !refs?.titleEl) return;
     refs.titleEl.textContent = info.title?.trim() || video.title;
     refs.channelEl.textContent = info.channel?.trim() || "ローカル動画";
     refs.statsEl.textContent = `${formatHomeViewCountText(info.view_count)} ・ ${formatHomeUploadDateText(info.upload_date)}`;
@@ -632,9 +653,11 @@
     };
   }
 
-  function createHomeCardInfoEnricher(homeInfoData, homeInfoCache) {
+  function createHomeCardInfoEnricher(homeInfoData) {
     return async function enrichHomeCardInfo(video, refs) {
-      const info = await getCachedHomeInfo(homeInfoData, homeInfoCache, video);
+      const videoId = getVideoIdFromFilename(video.filename);
+      if (!videoId) return;
+      const info = homeInfoData.get(videoId) || null;
       applyHomeCardInfoFromInfo(video, refs, info);
     };
   }
@@ -651,13 +674,16 @@
     renderedKeysRef,
     renderTokenRef,
     virtualStateRef,
+    thumbLazyLoader,
+    shouldRender = () => true,
     onMetric,
   }) {
-    if (!homeVideoGrid) return;
+    if (!homeVideoGrid || !shouldRender()) return;
     const renderStart = performance.now();
     if (allVideos.length === 0) {
       homeVideoGrid.innerHTML = "";
       renderHomeVideoGridEmpty(homeVideoGrid, "動画が見つかりません");
+      thumbLazyLoader?.observe();
       return;
     }
     const filteredVideos = getFilteredHomeVideos(
@@ -669,6 +695,7 @@
     if (filteredVideos.length === 0) {
       homeVideoGrid.innerHTML = "";
       renderHomeVideoGridEmpty(homeVideoGrid, "検索条件に一致する動画がありません");
+      thumbLazyLoader?.observe();
       return;
     }
 
@@ -677,6 +704,7 @@
       if (virtualStateRef.current.enabled) {
         virtualStateRef.current.schedule?.();
       }
+      thumbLazyLoader?.observe();
       return;
     }
     renderedKeysRef.current = nextKeys;
@@ -713,11 +741,12 @@
           enrichCardInfo: enrichHomeCardInfo,
           cardRefsByVideoId,
           renderTokenRef,
-          initialBatchSize: 16,
+          initialBatchSize: 12,
           chunkSize: 16,
         });
 
         homeVideoGrid.appendChild(bottomSpacer);
+        thumbLazyLoader?.observe();
       };
 
       state.schedule = (() => {
@@ -741,6 +770,7 @@
         cardRefsByVideoId,
         renderTokenRef,
       });
+      thumbLazyLoader?.observe();
     }
     onMetric?.("home_render_ms", performance.now() - renderStart, {
       total: allVideos.length,
@@ -886,6 +916,64 @@
     return null;
   }
 
+  function isHomePageActive() {
+    return document.getElementById("page-home")?.classList.contains("active-page");
+  }
+
+  function createHomeThumbLazyLoader(homeVideoGrid) {
+    let observer = null;
+
+    const activate = (img) => {
+      if (!(img instanceof HTMLImageElement)) return;
+      const src = String(img.dataset.thumbSrc || "").trim();
+      if (!src || img.src) return;
+      img.src = src;
+      delete img.dataset.thumbSrc;
+    };
+
+    const ensureObserver = () => {
+      if (observer || typeof IntersectionObserver !== "function") return;
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            activate(entry.target);
+            observer.unobserve(entry.target);
+          });
+        },
+        {
+          root: null,
+          rootMargin: "240px 0px",
+          threshold: 0.01,
+        },
+      );
+    };
+
+    const observe = () => {
+      if (!homeVideoGrid) return;
+      const targets = homeVideoGrid.querySelectorAll(
+        "img.home-video-card-thumb[data-thumb-src]",
+      );
+      if (!targets.length) return;
+
+      ensureObserver();
+      if (!observer) {
+        targets.forEach((img) => activate(img));
+        return;
+      }
+      targets.forEach((img) => observer.observe(img));
+    };
+
+    const disconnect = () => {
+      observer?.disconnect();
+    };
+
+    return {
+      observe,
+      disconnect,
+    };
+  }
+
   function createHomeVideoBrowserController({
     homeVideoGrid,
     homeSearchInput,
@@ -909,7 +997,7 @@
     onMetric = (_name, _value, _meta) => {},
   }) {
     let allVideos = [];
-    const homeInfoCache = new Map();
+    const requestedHomeInfoIds = new Set();
     const homeInfoData = new Map();
     const cardRefsByVideoId = new Map();
     const renderedKeysRef = { current: [] };
@@ -928,7 +1016,9 @@
       sortOrder: "desc",
     };
     const createHomeVideoCard = createHomeVideoCardFactory(onSelectVideo);
-    const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData, homeInfoCache);
+    const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData);
+    const thumbLazyLoader = createHomeThumbLazyLoader(homeVideoGrid);
+    let fullInfoFetchPromise = null;
     const homeSearchInputs = {
       homeSearchInput,
       filterChannel,
@@ -954,14 +1044,44 @@
       );
     }
 
+    function updateHomeSearchPlaceholder() {
+      if (!homeSearchInput) return;
+      const count = Array.isArray(allVideos) ? allVideos.length : 0;
+      homeSearchInput.placeholder = `検索（全${count.toLocaleString()}件）`;
+    }
+
     function syncAndRender() {
       syncHomeSearchStateToUrl();
       render();
     }
 
     async function render() {
+      if (!isHomePageActive()) {
+        thumbLazyLoader.disconnect();
+        return;
+      }
       const filterState = getHomeFilterStateFromInputs(homeSearchInputs);
       const terms = getHomeSearchTermsFromInput(homeSearchInput);
+      const needsFullInfo = needsFullHomeInfoForAccurateFiltering(
+        filterState,
+        terms,
+        currentSortState,
+      );
+      if (needsFullInfo) {
+        const missingCount = countMissingHomeInfo(allVideos, homeInfoData);
+        if (missingCount > 0) {
+          if (!fullInfoFetchPromise) {
+            fullInfoFetchPromise = fetchHomeInfoBatch(
+              homeInfoData,
+              requestedHomeInfoIds,
+              allVideos,
+            ).finally(() => {
+              fullInfoFetchPromise = null;
+            });
+          }
+          await fullInfoFetchPromise;
+        }
+      }
       const filtered = filterHomeVideosWithInputs(
         allVideos,
         homeInfoData,
@@ -985,6 +1105,8 @@
         renderedKeysRef,
         renderTokenRef,
         virtualStateRef,
+        thumbLazyLoader,
+        shouldRender: isHomePageActive,
         onMetric,
       });
     }
@@ -1033,6 +1155,14 @@
       };
       window.addEventListener("scroll", scheduleVirtualRerender, { passive: true });
       window.addEventListener("resize", scheduleVirtualRerender);
+      window.addEventListener("app:page-changed", (event) => {
+        const pageId = event?.detail?.pageId;
+        if (pageId === "page-home") {
+          render();
+          return;
+        }
+        thumbLazyLoader.disconnect();
+      });
     }
 
     function initializeHomeVideoBrowser() {
@@ -1046,12 +1176,13 @@
       homeSearchInput?.addEventListener("input", () => {
         syncAndRender();
       });
+      updateHomeSearchPlaceholder();
       bindEvents();
       updateDurationCustomInputState();
     }
 
     async function prefetch() {
-      const maxPrefetch = 120;
+      const maxPrefetch = 40;
       const prioritized = [
         ...lastFilteredVideos,
         ...allVideos.filter((video) => !lastFilteredVideos.includes(video)),
@@ -1063,7 +1194,7 @@
       const batchSize = 40;
       for (let i = 0; i < targets.length; i += batchSize) {
         const batch = targets.slice(i, i + batchSize);
-        await fetchHomeInfoBatch(homeInfoData, homeInfoCache, batch);
+        await fetchHomeInfoBatch(homeInfoData, requestedHomeInfoIds, batch);
       }
       onMetric?.("home_prefetch_ms", performance.now() - startedAt, {
         targetCount: targets.length,
@@ -1082,6 +1213,7 @@
       initialize: initializeHomeVideoBrowser,
       setVideos(videos) {
         allVideos = Array.isArray(videos) ? videos : [];
+        updateHomeSearchPlaceholder();
       },
       render,
       prefetch,

@@ -315,6 +315,13 @@ function clampNumberInRange(value, min, max, fallback) {
         let sinceId = 0;
         let pollTimer = null;
         const MAX_LINES = 800;
+        const LOG_POLL_INTERVAL_MS = 1000;
+        pauseToggle.checked = false;
+
+        function isSettingsPageActive() {
+          const settingsPage = document.getElementById("page-settings");
+          return Boolean(settingsPage?.classList.contains("active-page"));
+        }
 
         function appendLogLine(entry) {
           const line = document.createElement("div");
@@ -358,6 +365,12 @@ function clampNumberInRange(value, min, max, fallback) {
         }
 
         async function pollLogs() {
+          if (!isSettingsPageActive()) {
+            logStatus.textContent = "設定ページで表示中にログを取得します";
+            logStatus.style.color = "var(--subtext)";
+            return;
+          }
+
           if (pauseToggle.checked) {
             logStatus.textContent = "一時停止中";
             logStatus.style.color = "var(--warn)";
@@ -402,10 +415,33 @@ function clampNumberInRange(value, min, max, fallback) {
           }
         });
 
-        pollLogs();
-        pollTimer = setInterval(pollLogs, 1000);
+        function startPolling() {
+          if (pollTimer) return;
+          pollTimer = setInterval(pollLogs, LOG_POLL_INTERVAL_MS);
+        }
+
+        function stopPolling() {
+          if (!pollTimer) return;
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+
+        function updatePollingByVisibility() {
+          if (isSettingsPageActive()) {
+            startPolling();
+            pollLogs();
+            return;
+          }
+          stopPolling();
+        }
+
+        updatePollingByVisibility();
+        global.addEventListener("hashchange", updatePollingByVisibility);
+        global.addEventListener("app:page-changed", updatePollingByVisibility);
 
         global.addEventListener("beforeunload", () => {
+          global.removeEventListener("hashchange", updatePollingByVisibility);
+          global.removeEventListener("app:page-changed", updatePollingByVisibility);
           if (pollTimer) {
             clearInterval(pollTimer);
             pollTimer = null;

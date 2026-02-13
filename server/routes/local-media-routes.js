@@ -11,7 +11,9 @@ function registerLocalMediaRoutes(app, deps) {
     loadConfig,
     isPathWithin,
     findExistingThumbnailPath,
+    findCachedFallbackThumbnailPath,
     ensureFallbackThumbnail,
+    ensureCachedThumbnailFromPath,
     apiOk,
     apiError,
   } = deps;
@@ -21,6 +23,7 @@ function registerLocalMediaRoutes(app, deps) {
   const THUMB_EXT = [".jpg", ".jpeg", ".png", ".webp"];
   const VIDEO_DIR_INDEX_PATH = path.join(baseDir, "cache", "video-dir-index.json");
   const THUMB_DIR_INDEX_PATH = path.join(baseDir, "cache", "thumb-dir-index.json");
+  const LOCAL_VIDEOS_INDEX_PATH = path.join(baseDir, "cache", "local-videos-index.json");
   const SKIP_SCAN_DIR_NAMES = new Set([
     "コメント",
     "ライブチャット",
@@ -156,10 +159,38 @@ function registerLocalMediaRoutes(app, deps) {
     await fs.promises.writeFile(indexPath, JSON.stringify(index, null, 2), "utf-8");
   }
 
+  async function readLocalVideosIndex() {
+    try {
+      if (!fs.existsSync(LOCAL_VIDEOS_INDEX_PATH)) return null;
+      const raw = await fs.promises.readFile(LOCAL_VIDEOS_INDEX_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      if (!Array.isArray(parsed.videos)) return null;
+      return parsed;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function writeLocalVideosIndex(index) {
+    await fs.promises.mkdir(path.dirname(LOCAL_VIDEOS_INDEX_PATH), { recursive: true });
+    await fs.promises.writeFile(
+      LOCAL_VIDEOS_INDEX_PATH,
+      JSON.stringify(index, null, 2),
+      "utf-8",
+    );
+  }
+
   async function resolveVideoScanDirs(sourceDirs, signature, options = {}) {
     const forceRefresh = options.forceRefresh === true;
     const normalizedSourceDirs = sourceDirs.map((dir) => path.resolve(dir)).sort();
     const cachedIndex = await readDirIndex(VIDEO_DIR_INDEX_PATH, "videoDirs");
+    if (!forceRefresh && cachedIndex && Array.isArray(cachedIndex.videoDirs)) {
+      return {
+        dirs: cachedIndex.videoDirs,
+        fromCache: true,
+      };
+    }
     if (
       !forceRefresh &&
       cachedIndex &&
@@ -199,6 +230,12 @@ function registerLocalMediaRoutes(app, deps) {
     const forceRefresh = options.forceRefresh === true;
     const normalizedSourceDirs = sourceDirs.map((dir) => path.resolve(dir)).sort();
     const cachedIndex = await readDirIndex(THUMB_DIR_INDEX_PATH, "thumbDirs");
+    if (!forceRefresh && cachedIndex && Array.isArray(cachedIndex.thumbDirs)) {
+      return {
+        dirs: cachedIndex.thumbDirs,
+        fromCache: true,
+      };
+    }
     if (
       !forceRefresh &&
       cachedIndex &&
@@ -327,6 +364,29 @@ function registerLocalMediaRoutes(app, deps) {
     return Array.from(roots);
   }
 
+  function appendVideoPathToThumbUrl(videoItem) {
+    if (!videoItem || typeof videoItem !== "object") return videoItem;
+    const thumbUrl = String(videoItem.thumb || "");
+    const videoUrl = String(videoItem.video || "");
+    if (!thumbUrl.includes("/api/local-media?type=thumb")) return videoItem;
+    if (thumbUrl.includes("videoPath=")) return videoItem;
+    const marker = "path=";
+    const index = videoUrl.indexOf(marker);
+    if (index < 0) return videoItem;
+    const encodedVideoPath = videoUrl.slice(index + marker.length).split("&")[0];
+    if (!encodedVideoPath) return videoItem;
+    const joiner = thumbUrl.includes("?") ? "&" : "?";
+    return {
+      ...videoItem,
+      thumb: `${thumbUrl}${joiner}videoPath=${encodedVideoPath}`,
+    };
+  }
+
+  function normalizeThumbUrlsForCaching(videos) {
+    if (!Array.isArray(videos)) return [];
+    return videos.map((video) => appendVideoPathToThumbUrl(video));
+  }
+
   app.get("/api/local-media", async (req, res) => {
     try {
       const type = req.query.type;
@@ -369,6 +429,20 @@ function registerLocalMediaRoutes(app, deps) {
         return apiError(res, 404, "ファイルが見つかりません。");
       }
 
+      if (type === "thumb") {
+        const videoPath = String(req.query.videoPath || "");
+        if (videoPath) {
+          const isVideoPathAllowed = allowedVideoDirs.some((dir) =>
+            isPathWithin(videoPath, dir),
+          );
+          if (isVideoPathAllowed) {
+            ensureCachedThumbnailFromPath(videoPath, targetPath, "low").catch((error) => {
+              logger.warn("サムネイルの仮キャッシュ保存に失敗", { error: error.message });
+            });
+          }
+        }
+      }
+
       res.sendFile(path.resolve(targetPath));
     } catch (e) {
       logger.error("ローカルメディアの配信に失敗", { error: e.message });
@@ -406,7 +480,9 @@ function registerLocalMediaRoutes(app, deps) {
         return res.redirect("/none_icon.jpg");
       }
 
-      const existingThumbPath = findExistingThumbnailPath(videoPath, true);
+      const existingThumbPath =
+        findCachedFallbackThumbnailPath(videoPath) ||
+        findExistingThumbnailPath(videoPath, true);
       const thumbPath =
         existingThumbPath || (await ensureFallbackThumbnail(videoPath, priority));
       if (!thumbPath) {
@@ -428,20 +504,41 @@ function registerLocalMediaRoutes(app, deps) {
       const sourceDirs = await getLocalVideoDirs();
       const settings = await loadConfig();
       const fallbackEnabled = settings.enableFallbackThumbnails !== false;
-      const signature = await buildLocalVideoDirsSignature(sourceDirs);
       const now = Date.now();
       if (
         !forceRefresh &&
         localVideosCache.data &&
         localVideosCache.expiresAt > now &&
-        localVideosCache.signature === signature
+        localVideosCache.signature === "memory-cache"
       ) {
         logger.info("local videos cache hit", {
           count: localVideosCache.data.length,
           elapsedMs: Date.now() - startedAt,
         });
-        return apiOk(res, localVideosCache.data);
+        return apiOk(res, normalizeThumbUrlsForCaching(localVideosCache.data));
       }
+
+      if (!forceRefresh) {
+        const diskIndex = await readLocalVideosIndex();
+        if (
+          diskIndex &&
+          Array.isArray(diskIndex.videos) &&
+          diskIndex.fallbackEnabled === fallbackEnabled
+        ) {
+          localVideosCache = {
+            expiresAt: Date.now() + LOCAL_VIDEOS_CACHE_TTL_MS,
+            signature: "memory-cache",
+            data: diskIndex.videos,
+          };
+          logger.info("local videos disk cache hit", {
+            count: diskIndex.videos.length,
+            elapsedMs: Date.now() - startedAt,
+          });
+          return apiOk(res, normalizeThumbUrlsForCaching(diskIndex.videos));
+        }
+      }
+
+      const signature = await buildLocalVideoDirsSignature(sourceDirs);
 
       const videos = [];
       const seenVideoPaths = new Set();
@@ -478,7 +575,9 @@ function registerLocalMediaRoutes(app, deps) {
 
             const file = entry.name;
             const base = path.parse(file).name;
+            const cachedThumbPath = findCachedFallbackThumbnailPath(fullPath);
             const thumbPath =
+              cachedThumbPath ||
               findThumbnailPathByLookup(fullPath, thumbLookup) ||
               findExistingThumbnailPath(fullPath, false);
             const stat = await fs.promises.stat(fullPath);
@@ -487,7 +586,7 @@ function registerLocalMediaRoutes(app, deps) {
               title: base,
               video: `/api/local-media?type=video&path=${encodeURIComponent(fullPath)}`,
               thumb: thumbPath
-                ? `/api/local-media?type=thumb&path=${encodeURIComponent(thumbPath)}`
+                ? `/api/local-media?type=thumb&path=${encodeURIComponent(thumbPath)}&videoPath=${encodeURIComponent(fullPath)}`
                 : fallbackEnabled
                   ? `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}&priority=low`
                   : null,
@@ -502,9 +601,16 @@ function registerLocalMediaRoutes(app, deps) {
       }
 
       videos.sort((a, b) => b.mtime - a.mtime);
+      await writeLocalVideosIndex({
+        sourceDirs: sourceDirs.map((dir) => path.resolve(dir)).sort(),
+        fallbackEnabled,
+        signature,
+        videos,
+        generatedAt: new Date().toISOString(),
+      });
       localVideosCache = {
         expiresAt: Date.now() + LOCAL_VIDEOS_CACHE_TTL_MS,
-        signature,
+        signature: "memory-cache",
         data: videos,
       };
       logger.info("local videos scanned", {
@@ -517,7 +623,7 @@ function registerLocalMediaRoutes(app, deps) {
         forceRefresh,
         elapsedMs: Date.now() - startedAt,
       });
-      apiOk(res, videos);
+      apiOk(res, normalizeThumbUrlsForCaching(videos));
     } catch (e) {
       logger.error("ローカル動画のスキャンに失敗", { error: e.message });
       apiError(res, 500, "動画一覧の取得に失敗しました。");
