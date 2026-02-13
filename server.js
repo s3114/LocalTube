@@ -300,9 +300,9 @@ const startupBatPath = ${JSON.stringify(startupBatPath)};
 const useStartupBat = ${JSON.stringify(useStartupBat)};
 
 setTimeout(() => {
+  const batCommand = '"' + startupBatPath + '" >nul 2>&1';
   const child = useStartupBat
-    ? spawn(startupBatPath, [], {
-        shell: true,
+    ? spawn("cmd.exe", ["/d", "/s", "/c", batCommand], {
         cwd,
         detached: true,
         stdio: "ignore",
