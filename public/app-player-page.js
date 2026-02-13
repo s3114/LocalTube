@@ -177,7 +177,9 @@
         },
         onRenderHomeVideos: (videos) => {
           homeVideoBrowser.setVideos(videos);
-          homeVideoBrowser.render();
+          if (document.getElementById("page-home")?.classList.contains("active-page")) {
+            homeVideoBrowser.render();
+          }
         },
         onPrefetchHomeInfos: () => homeVideoBrowser.prefetch(),
       });

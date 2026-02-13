@@ -14,6 +14,7 @@ function createJobQueueService({
   enableWatch = true,
 }) {
   const logger = createLogger("job-queue");
+  const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
   if (!rootDir) throw new Error("rootDir is required");
   if (!pendingChatDir) throw new Error("pendingChatDir is required");
 
@@ -56,7 +57,7 @@ function createJobQueueService({
         let newPath;
         if (file.endsWith(".info.json")) {
           newPath = path.join(commentsDir, file);
-        } else if (file.endsWith(".live_chat.json")) {
+        } else if (LIVE_CHAT_JSON_PATTERN.test(file)) {
           newPath = path.join(liveChatDir, file);
         } else if (file.endsWith(".vtt") || file.endsWith(".srt")) {
           newPath = path.join(subtitleDir, file);

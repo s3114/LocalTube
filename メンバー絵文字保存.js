@@ -18,7 +18,8 @@ if (!jobDir) {
 
 // job_xxx の中から *.live_chat.json を探す
 const files = fs.readdirSync(jobDir);
-const chatFile = files.find((f) => f.endsWith(".live_chat.json"));
+const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
+const chatFile = files.find((f) => LIVE_CHAT_JSON_PATTERN.test(f));
 
 if (!chatFile) {
   console.error("live_chat.json が見つかりません:", jobDir);

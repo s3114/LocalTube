@@ -18,7 +18,9 @@ function createLocalVideoService(deps) {
 
   let ffmpegCommandCache;
   let ffprobeCommandCache;
+  const THUMB_EXTS = [".jpg", ".png", ".webp", ".jpeg"];
   const fallbackThumbnailJobs = new Map();
+  const cachedThumbnailJobs = new Map();
   const fallbackThumbnailQueue = [];
   let activeFallbackThumbnailJobs = 0;
   const FALLBACK_THUMBNAIL_CONCURRENCY = 2;
@@ -101,12 +103,29 @@ function createLocalVideoService(deps) {
     return ffprobeCommandCache;
   }
 
-  function getFallbackThumbPath(videoPath) {
+  function getFallbackThumbBasePath(videoPath) {
     const hash = crypto.createHash("sha1").update(videoPath).digest("hex").slice(0, 12);
     const baseName = path
       .parse(videoPath)
       .name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
-    return path.join(fallbackThumbnailDir, `${baseName}_${hash}.png`);
+    return path.join(fallbackThumbnailDir, `${baseName}_${hash}`);
+  }
+
+  function getFallbackThumbPath(videoPath) {
+    return `${getFallbackThumbBasePath(videoPath)}.png`;
+  }
+
+  function getFallbackThumbCandidates(videoPath) {
+    const base = getFallbackThumbBasePath(videoPath);
+    return THUMB_EXTS.map((ext) => `${base}${ext}`);
+  }
+
+  function findCachedFallbackThumbnailPath(videoPath) {
+    const candidates = getFallbackThumbCandidates(videoPath);
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
   }
 
   function inferLibraryRootFromVideoPath(videoPath) {
@@ -120,7 +139,7 @@ function createLocalVideoService(deps) {
   }
 
   function findExistingThumbnailPath(videoPath, includeFallback = true) {
-    const thumbExts = [".jpg", ".png", ".webp", ".jpeg"];
+    const thumbExts = THUMB_EXTS;
     const sourceDir = path.dirname(videoPath);
     const base = path.parse(videoPath).name;
     const libraryRoot = inferLibraryRootFromVideoPath(videoPath);
@@ -149,7 +168,7 @@ function createLocalVideoService(deps) {
     }
 
     if (includeFallback) {
-      candidates.push(getFallbackThumbPath(videoPath));
+      candidates.push(...getFallbackThumbCandidates(videoPath));
     }
 
     for (const candidate of candidates) {
@@ -537,13 +556,42 @@ function createLocalVideoService(deps) {
     return fallbackThumbnailJobs.get(outputPath);
   }
 
+  async function ensureCachedThumbnailFromPath(videoPath, thumbSourcePath, priority = "low") {
+    const sourcePath = String(thumbSourcePath || "");
+    if (!sourcePath || !fs.existsSync(sourcePath)) return null;
+
+    const sourceExt = path.extname(sourcePath).toLowerCase();
+    if (!THUMB_EXTS.includes(sourceExt)) return null;
+
+    const outputPath = `${getFallbackThumbBasePath(videoPath)}${sourceExt}`;
+    if (fs.existsSync(outputPath)) return outputPath;
+
+    if (!cachedThumbnailJobs.has(outputPath)) {
+      const job = enqueueFallbackThumbnailJob(async () => {
+        await fs.promises.mkdir(fallbackThumbnailDir, { recursive: true });
+        const tmpPath = `${outputPath}.tmp`;
+        await fs.promises.copyFile(sourcePath, tmpPath);
+        await fs.promises.rename(tmpPath, outputPath);
+        return outputPath;
+      }, priority);
+      cachedThumbnailJobs.set(outputPath, job);
+      job.finally(() => {
+        cachedThumbnailJobs.delete(outputPath);
+      });
+    }
+
+    return cachedThumbnailJobs.get(outputPath);
+  }
+
   return {
     findExistingThumbnailPath,
+    findCachedFallbackThumbnailPath,
     getProvisionalInfoPath,
     findLocalVideoPathById,
     createProvisionalInfoFromVideo,
     ensureProvisionalInfo,
     ensureFallbackThumbnail,
+    ensureCachedThumbnailFromPath,
   };
 }
 

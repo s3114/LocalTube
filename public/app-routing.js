@@ -58,6 +58,11 @@
         applyPageVisibility(pages, pageId);
         global.updateHeaderSearchVisibility(pageId);
         global.updateSmoothSeekLoopState?.();
+        global.dispatchEvent(
+          new CustomEvent("app:page-changed", {
+            detail: { pageId },
+          }),
+        );
       }
 
       function setActiveButton(pageId) {
