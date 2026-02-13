@@ -183,8 +183,8 @@ echo  Setup complete. Starting server...
 echo ==================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPath '%~dp0' -Filter '*.bat' | ForEach-Object { $f = $_.FullName; $raw = Get-Content -LiteralPath $f -Raw; $normalized = $raw -replace \"`r?`n\", \"`r`n\"; [System.IO.File]::WriteAllText($f, $normalized, [System.Text.UTF8Encoding]::new($false)); }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPath '%~dp0' -Filter '*.bat' | ForEach-Object { $f = $_.FullName; $raw = Get-Content -LiteralPath $f -Raw; $normalized = $raw -replace \"`r?`n\", \"`r`n\"; [System.IO.File]::WriteAllText($f, $normalized, [System.Text.Encoding]::GetEncoding(932)); }"
 
 :START_SERVER
-call "%~dp0起動最小構成.bat"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -WindowStyle Hidden -FilePath 'node' -ArgumentList '\"%~dp0server.js\"' -WorkingDirectory '%~dp0'"
 exit /b
