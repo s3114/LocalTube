@@ -1259,6 +1259,7 @@
         min-width: 0;
         max-width: none;
         width: 100%;
+        overflow: hidden;
       }
 
       .settings-actions-right {
@@ -1317,8 +1318,11 @@
         background: rgb(255 255 255 / 5%);
         min-height: 260px;
         max-height: 640px;
+        max-width: max-content;
+        width: 100%;
         overflow: auto;
         padding: 10px;
+        box-sizing: border-box;
         font-family: Consolas, "Courier New", monospace;
         font-size: 12px;
         line-height: 1.45;

@@ -321,13 +321,22 @@ function createDownloadJobService({
     const infoFile = files.find((f) => f.endsWith(".info.json"));
     const chatFile = files.find((f) => LIVE_CHAT_JSON_PATTERN.test(f));
 
-    const jobPendingDir = path.join(pendingChatDir, `job_${Date.now()}`);
-    fs.mkdirSync(jobPendingDir, { recursive: true });
-    logger.info("仮置きジョブフォルダ作成", { path: jobPendingDir });
+    if (!infoFile && !chatFile) {
+      return { infoFile: null, jobPendingDir: null };
+    }
+
+    const stagingDir = path.join(
+      pendingChatDir,
+      `.staging_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    );
+    fs.mkdirSync(stagingDir, { recursive: true });
+    logger.info("仮置きステージングフォルダ作成", { path: stagingDir });
+
+    let movedCount = 0;
 
     if (infoFile) {
       const src = path.join(finalMovieDir, infoFile);
-      const dest = path.join(jobPendingDir, infoFile);
+      const dest = path.join(stagingDir, infoFile);
       if (fs.existsSync(src)) {
         try {
           const raw = fs.readFileSync(src, "utf-8");
@@ -337,19 +346,28 @@ function createDownloadJobService({
         } catch (error) {
           logger.warn("info.json書き換え失敗", { error: error.message });
         }
-        moveOptionalFile(src, dest, "info");
+        if (moveOptionalFile(src, dest, "info")) movedCount++;
       }
     }
 
     if (chatFile) {
       const src = path.join(finalMovieDir, chatFile);
-      const dest = path.join(jobPendingDir, chatFile);
-      moveOptionalFile(src, dest, "chat");
+      const dest = path.join(stagingDir, chatFile);
+      if (moveOptionalFile(src, dest, "chat")) movedCount++;
     } else {
       logger.warn("live chat ファイルが見つかりません", {
         finalMovieDir,
       });
     }
+
+    if (movedCount === 0) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      return { infoFile: null, jobPendingDir: null };
+    }
+
+    const jobPendingDir = path.join(pendingChatDir, `job_${Date.now()}`);
+    fs.renameSync(stagingDir, jobPendingDir);
+    logger.info("仮置きジョブフォルダ確定", { path: jobPendingDir });
 
     return { infoFile, jobPendingDir };
   }
