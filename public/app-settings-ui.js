@@ -318,8 +318,32 @@ function clampNumberInRange(value, min, max, fallback) {
 
         function appendLogLine(entry) {
           const line = document.createElement("div");
-          line.className = `console-log-line level-${entry.level || "info"}`;
-          line.textContent = `${entry.timestamp} [${entry.level}] [${entry.scope}] ${entry.message}`;
+          const level = String(entry.level || "info").toLowerCase();
+          line.className = `console-log-line level-${level}`;
+
+          const ts = document.createElement("span");
+          ts.className = "console-log-ts";
+          ts.textContent = String(entry.timestamp || "");
+
+          const lv = document.createElement("span");
+          lv.className = `console-log-level level-${level}`;
+          lv.textContent = `[${level}]`;
+
+          const scope = document.createElement("span");
+          scope.className = "console-log-scope";
+          scope.textContent = `[${String(entry.scope || "app")}]`;
+
+          const message = document.createElement("span");
+          message.className = "console-log-message";
+          message.textContent = String(entry.message || "");
+
+          line.appendChild(ts);
+          line.appendChild(document.createTextNode(" "));
+          line.appendChild(lv);
+          line.appendChild(document.createTextNode(" "));
+          line.appendChild(scope);
+          line.appendChild(document.createTextNode(" "));
+          line.appendChild(message);
           logOutput.appendChild(line);
         }
 
