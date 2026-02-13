@@ -841,7 +841,7 @@
         /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); */
         overflow: hidden;
         position: relative;
-        backdrop-filter: blur(2px);
+        /* backdrop-filter: blur(2px); */
       }
 
       .player-video-wrap {
@@ -1185,6 +1185,14 @@
         border-top: none; /* YouTubeは区切り線なし */
       }
 
+      .comment-section .sidebar-header {
+        margin-bottom: 8px;
+      }
+
+      .comment-content.collapsed {
+        display: none;
+      }
+
       .comment-header {
         font-weight: bold;
         font-size: 20px;
@@ -1223,6 +1231,11 @@
         display: flex;
         align-items: center;
         gap: 20px;
+      }
+
+      .comment-count-label {
+        font-size: 20px;
+        font-weight: 700;
       }
 
       .sort-container {
@@ -1710,7 +1723,7 @@
         bottom: 8px;
         padding: 2px 6px;
         border-radius: 4px;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgb(0 0 0 / 75%);
         color: #fff;
         font-size: 12px;
         font-weight: 600;
@@ -2415,14 +2428,12 @@
 
               <button id="desc-toggle">もっと見る</button>
 
-              <div class="comment-section">
-                <div class="comment-header">
+              <div id="comment-section" class="comment-section">
+                <div class="sidebar-header">
                   <div class="comment-header-row">
-                    <div>
+                    <div class="comment-count-label">
                       <span id="comment-count-display"></span> 件のコメント
                     </div>
-
-                    <!-- 並び替えボタン -->
                     <div class="sort-container">
                       <button id="sort-toggle" class="sort-btn">
                         <i class="fa-solid fa-arrow-down-short-wide"></i>
@@ -2436,13 +2447,17 @@
                       </div>
                     </div>
                   </div>
+                  <button class="sidebar-toggle" data-target="comment-section">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </button>
                 </div>
+                <div class="sidebar-content comment-content">
+                  <div class="comment-empty">
+                    コメントはありません
+                  </div>
 
-                <div class="comment-empty">
-                  コメントはありません
+                  <div id="comment-list" class="comment-list"></div>
                 </div>
-
-                <div id="comment-list" class="comment-list"></div>
               </div>
             </div>
           </div>
@@ -2786,7 +2801,8 @@
                 </div>
                 <div
                   class="settings-stack settings-stack-10 settings-stack-wide">
-                  <div class="settings-inline-row settings-gap-8 settings-inline-right">
+                  <div
+                    class="settings-inline-row settings-gap-8 settings-inline-right">
                     <input
                       type="file"
                       id="wallpaper-file-input"
