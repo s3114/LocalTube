@@ -1,4 +1,5 @@
 (function attachHomeVideoBrowser(global) {
+  const HOME_SORT_STORAGE_KEY = "localtube.homeSortState";
   const ALLOWED_SORT_MODES = new Set([
     "popular_asc",
     "popular_desc",
@@ -14,6 +15,37 @@
       : "published";
     const order = sortOrder === "asc" ? "asc" : "desc";
     return `${key}_${order}`;
+  }
+
+  function normalizeHomeSortState(nextState) {
+    const source = nextState && typeof nextState === "object" ? nextState : {};
+    return {
+      sortKey: ["popular", "kana", "published"].includes(source.sortKey)
+        ? source.sortKey
+        : "published",
+      sortOrder: source.sortOrder === "asc" ? "asc" : "desc",
+    };
+  }
+
+  function loadHomeSortStateFromStorage() {
+    try {
+      const raw = global.localStorage?.getItem(HOME_SORT_STORAGE_KEY);
+      if (!raw) return null;
+      return normalizeHomeSortState(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+
+  function saveHomeSortStateToStorage(sortState) {
+    try {
+      global.localStorage?.setItem(
+        HOME_SORT_STORAGE_KEY,
+        JSON.stringify(normalizeHomeSortState(sortState)),
+      );
+    } catch {
+      // noop
+    }
   }
 
   function getHomeFilterStateFromInputs({
@@ -400,16 +432,18 @@
     return sorted;
   }
 
-  function bindHomeFilterPanelToggle(homeFilterBtn, homeFilterPanel) {
+  function bindHomeFilterPanelToggle(homeFilterBtn, homeFilterPanel, homeSortPanel) {
     homeFilterBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
+      homeSortPanel?.classList.add("hidden");
       homeFilterPanel?.classList.toggle("hidden");
     });
   }
 
-  function bindHomeSortPanelToggle(homeSortBtn, homeSortPanel) {
+  function bindHomeSortPanelToggle(homeSortBtn, homeSortPanel, homeFilterPanel) {
     homeSortBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
+      homeFilterPanel?.classList.add("hidden");
       homeSortPanel?.classList.toggle("hidden");
     });
   }
@@ -817,8 +851,8 @@
     getSortState,
     setSortState,
   }) {
-    bindHomeFilterPanelToggle(homeFilterBtn, homeFilterPanel);
-    bindHomeSortPanelToggle(homeSortBtn, homeSortPanel);
+    bindHomeFilterPanelToggle(homeFilterBtn, homeFilterPanel, homeSortPanel);
+    bindHomeSortPanelToggle(homeSortBtn, homeSortPanel, homeFilterPanel);
     bindCloseHomeFilterPanelOnOutsideClick(homeFilterBtn, homeFilterPanel);
     bindCloseHomeSortPanelOnOutsideClick(homeSortBtn, homeSortPanel);
     bindHomeFilterInputEvents(
@@ -1026,10 +1060,10 @@
       },
     };
     let lastFilteredVideos = [];
-    let currentSortState = {
+    let currentSortState = normalizeHomeSortState(loadHomeSortStateFromStorage() || {
       sortKey: "published",
       sortOrder: "desc",
-    };
+    });
     const createHomeVideoCard = createHomeVideoCardFactory(onSelectVideo);
     const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData);
     const thumbLazyLoader = createHomeThumbLazyLoader(homeVideoGrid);
@@ -1149,12 +1183,8 @@
         updateDurationCustomInputState,
         getSortState: () => ({ ...currentSortState }),
         setSortState: (nextState) => {
-          currentSortState = {
-            sortKey: ["popular", "kana", "published"].includes(nextState.sortKey)
-              ? nextState.sortKey
-              : "published",
-            sortOrder: nextState.sortOrder === "asc" ? "asc" : "desc",
-          };
+          currentSortState = normalizeHomeSortState(nextState);
+          saveHomeSortStateToStorage(currentSortState);
         },
       });
 
