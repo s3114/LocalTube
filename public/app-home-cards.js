@@ -1,4 +1,11 @@
 (function attachHomeCards(global) {
+  function createHomeCardDurationBadgeElement() {
+    const badgeEl = document.createElement("div");
+    badgeEl.className = "home-video-card-duration";
+    badgeEl.textContent = "";
+    return badgeEl;
+  }
+
   function createHomeCardThumbElement(video) {
     const thumbEl = video.thumb
       ? document.createElement("img")
@@ -10,6 +17,19 @@
       thumbEl.decoding = "async";
     }
     return thumbEl;
+  }
+
+  function createHomeCardThumbWrapElement(video) {
+    const wrapEl = document.createElement("div");
+    wrapEl.className = "home-video-card-thumb-wrap";
+
+    const thumbEl = createHomeCardThumbElement(video);
+    const durationEl = createHomeCardDurationBadgeElement();
+
+    wrapEl.appendChild(thumbEl);
+    wrapEl.appendChild(durationEl);
+
+    return { wrapEl, durationEl };
   }
 
   function createHomeCardMetaElements(video) {
@@ -52,15 +72,15 @@
   function createHomeVideoCardElement(video, onClick) {
     const item = document.createElement("div");
     item.className = "home-video-card";
-    item.appendChild(createHomeCardThumbElement(video));
+    const { wrapEl, durationEl } = createHomeCardThumbWrapElement(video);
+    item.appendChild(wrapEl);
 
     const { metaEl, refs } = createHomeCardMetaElements(video);
     item.appendChild(metaEl);
     item.addEventListener("click", () => onClick(video));
 
-    return { item, refs };
+    return { item, refs: { ...refs, durationEl } };
   }
 
   global.createHomeVideoCardElement = createHomeVideoCardElement;
 })(window);
-

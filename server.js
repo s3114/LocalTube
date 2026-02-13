@@ -362,7 +362,7 @@ app.post("/api/system/restart-node", (req, res) => {
   try {
     scheduleServerRestart({ preferStartupBat: false });
     apiOk(res, {
-      message: "server.js を再起動しています。15秒後に再読み込みしてください。",
+      message: "server.js を再起動しています。3秒後に再読み込みしてください。",
     });
 
     setTimeout(() => {

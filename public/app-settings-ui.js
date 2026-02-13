@@ -1,5 +1,6 @@
 // Settings UI module extracted from app.js
 (function attachSettingsUi(global) {
+const DISCONNECT_RELOAD_DELAY_KEY = "localtube.disconnectReloadDelayMs";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
@@ -258,6 +259,11 @@ function clampNumberInRange(value, min, max, fallback) {
           if (!settingsUiDeps.confirmImpl("更新して localhost:3000 を再起動しますか？")) return;
           restartStatus.textContent = "再起動リクエストを送信中...";
           restartStatus.style.color = "var(--blue)";
+          try {
+            sessionStorage.setItem(DISCONNECT_RELOAD_DELAY_KEY, "15000");
+          } catch {
+            // noop
+          }
           restartButton.disabled = true;
           restartNodeButton.disabled = true;
           try {
@@ -286,6 +292,11 @@ function clampNumberInRange(value, min, max, fallback) {
           if (!confirmed) return;
           restartStatus.textContent = "server.js再起動リクエストを送信中...";
           restartStatus.style.color = "var(--blue)";
+          try {
+            sessionStorage.setItem(DISCONNECT_RELOAD_DELAY_KEY, "3000");
+          } catch {
+            // noop
+          }
           restartButton.disabled = true;
           restartNodeButton.disabled = true;
           try {
@@ -296,7 +307,7 @@ function clampNumberInRange(value, min, max, fallback) {
             if (!result.ok) {
               throw new Error(result.error || "server.js の再起動に失敗しました。");
             }
-            restartStatus.textContent = "server.js再起動中です。15秒後にページを再読み込みしてください。";
+            restartStatus.textContent = "server.js再起動中です。3秒後にページを再読み込みしてください。";
             restartStatus.style.color = "var(--green)";
           } catch (error) {
             console.error("server.js再起動エラー:", error);
