@@ -2,6 +2,8 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>LocalTube</title>
     <style>
       /* ==================================================
@@ -36,6 +38,7 @@
         color: var(--text);
         position: relative;
         isolation: isolate;
+        overflow-x: hidden;
       }
 
       body::before {
@@ -2146,11 +2149,357 @@
       #channel-avatar-link:hover {
         opacity: 0.85;
       }
+
+      @media (max-width: 960px) {
+        header {
+          height: auto;
+          min-height: 56px;
+          padding: 8px 10px;
+        }
+
+        .header-inner {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .logo-text {
+          display: none;
+        }
+
+        .header-search-wrap {
+          order: 2;
+          flex: 1 1 100%;
+          max-width: none;
+        }
+
+        .header-filter-btn,
+        .header-sort-btn {
+          min-height: 34px;
+          padding: 0 10px;
+        }
+
+        .header-buttons {
+          order: 1;
+          margin-left: auto;
+          transform: none;
+          gap: 8px;
+        }
+
+        .header-connection-status {
+          order: 3;
+          max-width: 100%;
+          width: 100%;
+          border-radius: 10px;
+          white-space: normal;
+        }
+
+        main {
+          margin-top: 98px;
+        }
+
+        .card {
+          padding: 14px;
+        }
+
+        .card-layout {
+          flex-direction: column;
+        }
+
+        .player-layout {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .player-main {
+          padding: 8px 0 0;
+        }
+
+        .player-sidebar {
+          min-width: 0;
+          width: 100%;
+          padding: 0;
+          overflow: visible;
+        }
+
+        #chat-section {
+          max-height: none;
+        }
+
+        .settings-stack-wide,
+        .settings-stack-tool {
+          min-width: 0;
+          max-width: 100%;
+          width: 100%;
+          margin-left: 0;
+        }
+
+        .settings-actions-right,
+        .settings-inline-right {
+          text-align: left;
+          justify-content: flex-start;
+        }
+
+        .home-filter-panel,
+        .home-sort-panel {
+          width: min(96vw, 420px);
+          right: 0;
+          left: auto;
+        }
+      }
+
+      @media (max-width: 768px) {
+        header {
+          height: 0;
+          min-height: 0;
+          padding: 0;
+          background: transparent;
+          border: 0;
+        }
+
+        .header-inner {
+          display: block;
+          height: 0;
+          gap: 0;
+        }
+
+        .logo,
+        .header-connection-status {
+          display: none !important;
+        }
+
+        .header-search-wrap {
+          position: fixed;
+          top: 8px;
+          left: 10px;
+          right: 10px;
+          z-index: 1200;
+          max-width: none;
+          width: auto;
+        }
+
+        .header-buttons {
+          position: fixed;
+          left: 50%;
+          bottom: 10px;
+          transform: translateX(-50%);
+          z-index: 1200;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: 14px;
+          background: rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .icon-btn {
+          width: 42px;
+          height: 42px;
+          font-size: 17px;
+          border-radius: 10px;
+        }
+
+        main {
+          margin-top: 8px;
+          margin-bottom: 86px;
+        }
+
+        .home-video-grid {
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 12px;
+          padding: 10px;
+        }
+
+        #page-home {
+          padding-top: 56px;
+        }
+
+        .local-video-item {
+          grid-template-columns: 120px 1fr;
+          gap: 8px;
+          padding: 6px;
+        }
+
+        .local-video-thumb {
+          width: 120px;
+          height: 68px;
+        }
+
+        .url-row,
+        .field-row,
+        .url-box {
+          flex-wrap: wrap;
+        }
+
+        .field-label {
+          width: 100%;
+        }
+
+        .field-row select,
+        .field-row input,
+        .url-box textarea,
+        .url-box input {
+          width: 100%;
+        }
+
+        .url-box button,
+        #download-btn {
+          width: 100%;
+          height: 44px;
+          border-radius: 10px;
+        }
+
+        .toggle {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 10px;
+          padding: 10px;
+        }
+
+        .settings-inline-row {
+          flex-wrap: wrap;
+        }
+
+        .options {
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        .card {
+          padding: 12px;
+        }
+
+        .field-row {
+          gap: 8px;
+        }
+
+        .home-filter-inline {
+          flex-wrap: wrap;
+        }
+
+        .home-filter-ymd {
+          width: 100%;
+        }
+
+        .yt-controls {
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 8px 10px;
+        }
+
+        .yt-btn {
+          width: 36px;
+          height: 36px;
+          font-size: 14px;
+        }
+
+        .yt-time {
+          min-width: 64px;
+          font-size: 11px;
+        }
+
+        #volume-bar {
+          width: 56px;
+        }
+
+        #page-player {
+          padding-top: 0;
+          margin-top: 0;
+        }
+
+        #page-player .player-main {
+          padding-top: 0;
+        }
+
+        /* スマホのみ: シークバーを最上段へ */
+        #seek-bar {
+          order: -1;
+          flex: 1 1 100%;
+          width: 100%;
+          margin: 0 0 4px;
+          transform: translateY(0);
+        }
+
+        .comment-item,
+        .comment-reply {
+          padding: 8px 4px;
+          gap: 8px;
+        }
+
+        .comment-actions {
+          gap: 2px;
+          flex-wrap: wrap;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .icon-btn {
+          width: 40px;
+          height: 40px;
+          font-size: 16px;
+          border-radius: 9px;
+        }
+
+        main {
+          margin-top: 8px;
+          margin-bottom: 84px;
+        }
+
+        .home-video-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .comment-header-row {
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .comment-count-label {
+          font-size: 17px;
+        }
+
+        .sort-btn {
+          font-size: 13px;
+          padding: 6px;
+        }
+
+        .yt-info {
+          padding: 10px 8px 12px;
+        }
+
+        .video-header-row {
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        .channel-row {
+          gap: 8px;
+        }
+
+        .options {
+          gap: 8px;
+          margin-top: 10px;
+        }
+
+        .toggle {
+          padding: 8px;
+          gap: 8px;
+        }
+
+        .settings-inline-row .btn-ui {
+          min-height: 36px;
+        }
+      }
     </style>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   </head>
+  <!-- iOS用 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <!-- Android用 -->
+  <meta name="mobile-web-app-capable" content="yes">
 
   <body>
     <header>
