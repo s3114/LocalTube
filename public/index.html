@@ -7,7 +7,8 @@
     <meta name="theme-color" content="#0f0f0f" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LocalTube" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -3203,6 +3204,35 @@
                     <button
                       id="copyPlaylistUrlBtn"
                       class="btn-ui btn-blue btn-tight btn-copy">
+                      コピー
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="toggle">
+                <div>
+                  ローカルアドレスを確認
+                  <small>スマホ等からアクセスするときにこのURLを使用してください。</small>
+                  <small id="localLanIpStatus"
+                    class="settings-hint-blue">待機中...</small>
+                </div>
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-tool">
+                  <div class="settings-inline-row settings-gap-8">
+                    <input
+                      type="text"
+                      id="localLanIpOutput"
+                      readonly
+                      placeholder="LAN内IPを表示"
+                      class="settings-input-flex" />
+                    <button
+                      id="refreshLocalLanIpBtn"
+                      class="btn-ui btn-blue btn-tight btn-copy">
+                      更新
+                    </button>
+                    <button
+                      id="copyLocalLanIpBtn"
+                      class="btn-ui btn-gray btn-tight btn-copy">
                       コピー
                     </button>
                   </div>
