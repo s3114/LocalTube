@@ -221,6 +221,7 @@
 
     function createSseController({ jobQueueElement, onJobUpdated }) {
       const AUTO_RELOAD_KEY = "localtube.sseReloadAttempts";
+      const DISCONNECT_RELOAD_DELAY_KEY = "localtube.disconnectReloadDelayMs";
       const MAX_AUTO_RELOAD_ATTEMPTS = 10;
       let reloadTimer = null;
       let reloadCountdownTimer = null;
@@ -241,6 +242,7 @@
         }
         try {
           sessionStorage.removeItem(AUTO_RELOAD_KEY);
+          sessionStorage.removeItem(DISCONNECT_RELOAD_DELAY_KEY);
         } catch {
           // noop
         }
@@ -260,7 +262,15 @@
         if (attempts >= MAX_AUTO_RELOAD_ATTEMPTS) return;
 
         const nextAttempt = attempts + 1;
-        const delayMs = 15000;
+        let delayMs = 15000;
+        try {
+          const requestedDelayMs = Number(sessionStorage.getItem(DISCONNECT_RELOAD_DELAY_KEY));
+          if (Number.isFinite(requestedDelayMs)) {
+            delayMs = Math.max(1000, Math.min(60000, requestedDelayMs));
+          }
+        } catch {
+          // noop
+        }
         try {
           sessionStorage.setItem(AUTO_RELOAD_KEY, String(nextAttempt));
         } catch {

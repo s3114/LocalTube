@@ -217,6 +217,16 @@
     return "視聴回数不明";
   }
 
+  function formatHomeDurationText(durationSec) {
+    const total = Math.floor(Number(durationSec));
+    if (!Number.isFinite(total) || total < 0) return "";
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
   function buildHomeSearchSourceFromVideo(video, info) {
     const parts = [];
     parts.push(String(video.title || ""));
@@ -643,6 +653,11 @@
     refs.statsEl.textContent = `${formatHomeViewCountText(info.view_count)} ・ ${formatHomeUploadDateText(info.upload_date)}`;
     const avatar = info.channel_thumbnail?.trim();
     if (avatar) refs.iconEl.src = avatar;
+    if (refs.durationEl) {
+      const durationText = formatHomeDurationText(info.duration);
+      refs.durationEl.textContent = durationText;
+      refs.durationEl.classList.toggle("visible", Boolean(durationText));
+    }
   }
 
   function createHomeVideoCardFactory(onSelectVideo) {

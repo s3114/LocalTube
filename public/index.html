@@ -420,10 +420,12 @@
 
       .card-main {
         flex: 2;
+        min-width: 0;
       }
 
       .card-side {
         flex: 1;
+        min-width: 0;
         /* background: var(--black-panel); */
         border-radius: 10px;
         padding: 12px;
@@ -495,6 +497,11 @@
         margin-top: 20px;
         display: grid;
         gap: 14px;
+        min-width: 0;
+      }
+
+      .options > * {
+        min-width: 0;
       }
 
       /* レンジスライダー */
@@ -525,6 +532,11 @@
         align-items: center;
         border-radius: 8px;
         padding: 12px;
+        min-width: 0;
+      }
+
+      .toggle > * {
+        min-width: 0;
       }
 
       .toggle small {
@@ -1238,6 +1250,7 @@
       .settings-stack {
         display: flex;
         flex-direction: column;
+        min-width: 0;
       }
 
       .settings-stack-8 {
@@ -1257,9 +1270,10 @@
 
       .settings-stack-log {
         min-width: 0;
-        max-width: none;
+        max-width: 100%;
         width: 100%;
         overflow: hidden;
+        flex: 1 1 auto;
       }
 
       .settings-actions-right {
@@ -1318,17 +1332,21 @@
         background: rgb(255 255 255 / 5%);
         min-height: 260px;
         max-height: 640px;
-        max-width: max-content;
+        max-width: 100%;
         width: 100%;
-        overflow: auto;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: auto;
         padding: 10px;
         box-sizing: border-box;
         font-family: Consolas, "Courier New", monospace;
         font-size: 12px;
         line-height: 1.45;
+        contain: inline-size;
       }
 
       .console-log-line {
+        display: block;
         white-space: nowrap;
         word-break: normal;
         padding: 2px 0;
@@ -1679,6 +1697,30 @@
         border-radius: 12px;
         background: var(--black-panel);
         object-fit: cover;
+        display: block;
+      }
+
+      .home-video-card-thumb-wrap {
+        position: relative;
+      }
+
+      .home-video-card-duration {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.2;
+        display: none;
+        pointer-events: none;
+      }
+
+      .home-video-card-duration.visible {
+        display: inline-block;
       }
 
       .home-video-card-title {
