@@ -2,7 +2,6 @@
   function getPlayerPageElements() {
     return {
       desc: document.getElementById("video-description"),
-      toggleBtn: document.getElementById("desc-toggle"),
       videoPlayer: document.getElementById("local-player"),
       videoList: document.getElementById("local-video-list"),
       homeVideoGrid: document.querySelector(".home-video-grid"),
@@ -34,25 +33,65 @@
     };
   }
 
-  function createDescriptionController(desc, toggleBtn) {
+  function createDescriptionController(desc) {
+    function getDescContentElement() {
+      return desc?.querySelector(".yt-description-content") || null;
+    }
+
+    function getCollapseButton() {
+      return desc?.querySelector(".yt-desc-collapse-btn") || null;
+    }
+
     function updateDescButton() {
-      if (!desc || !toggleBtn) return;
-      if (desc.scrollHeight <= desc.clientHeight) {
-        toggleBtn.style.display = "none";
-      } else {
-        toggleBtn.style.display = "inline";
+      if (!desc) return;
+      const contentEl = getDescContentElement();
+      const collapseBtn = getCollapseButton();
+      if (!contentEl || !collapseBtn) return;
+
+      const isCollapsed = contentEl.classList.contains("collapsed");
+      const canExpand = isCollapsed
+        ? contentEl.scrollHeight > contentEl.clientHeight + 2
+        : contentEl.scrollHeight > 0;
+
+      if (!canExpand) {
+        desc.classList.remove("expandable");
+        collapseBtn.style.display = "none";
+        contentEl.classList.remove("collapsed");
+        return;
       }
+
+      desc.classList.add("expandable");
+      collapseBtn.style.display = isCollapsed ? "none" : "inline";
     }
 
     function initializeDescriptionController() {
-      if (!desc || !toggleBtn) return;
+      if (!desc) return;
       updateDescButton();
       global.addEventListener("resize", updateDescButton);
-      toggleBtn.addEventListener("click", () => {
-        desc.classList.toggle("collapsed");
-        toggleBtn.textContent = desc.classList.contains("collapsed")
-          ? "もっと見る"
-          : "折りたたむ";
+
+      desc.addEventListener("click", (event) => {
+        if (event.target.closest("a")) return;
+        if (event.target.closest(".yt-desc-collapse-btn")) return;
+
+        const contentEl = getDescContentElement();
+        const collapseBtn = getCollapseButton();
+        if (!contentEl || !collapseBtn) return;
+        if (!contentEl.classList.contains("collapsed")) return;
+
+        contentEl.classList.remove("collapsed");
+        collapseBtn.style.display = "inline";
+      });
+
+      desc.addEventListener("click", (event) => {
+        const collapseBtn = event.target.closest(".yt-desc-collapse-btn");
+        if (!collapseBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const contentEl = getDescContentElement();
+        if (!contentEl) return;
+        contentEl.classList.add("collapsed");
+        collapseBtn.style.display = "none";
+        updateDescButton();
       });
     }
 
@@ -110,10 +149,7 @@
   }) {
     function initialize() {
       const elements = getPlayerPageElements();
-      const descriptionController = createDescriptionController(
-        elements.desc,
-        elements.toggleBtn,
-      );
+      const descriptionController = createDescriptionController(elements.desc);
       const chatHeightController = createChatHeightController(
         elements.playerMain,
         elements.chatSection,
