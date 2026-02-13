@@ -371,6 +371,9 @@
         gap: 12px;
         transform: scale(1.1);
         flex-shrink: 0;
+        transition:
+          transform 0.22s ease,
+          opacity 0.22s ease;
       }
 
       .icon-btn {
@@ -399,6 +402,35 @@
 
       /* 現在のページ */
       .icon-btn.active {
+        border: 2.5px solid var(--text);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .fullscreen-toggle-btn {
+        display: none;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        transition: background 0.2s;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+
+      .fullscreen-toggle-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .fullscreen-toggle-btn:active {
+        background: rgba(255, 0, 0, 0.2);
+      }
+
+      .fullscreen-toggle-btn.active {
         border: 2.5px solid var(--text);
         background: rgba(255, 255, 255, 0.05);
       }
@@ -2157,6 +2189,11 @@
         opacity: 0.85;
       }
 
+      html:fullscreen #page-player .player-main,
+      html:-webkit-full-screen #page-player .player-main {
+        padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+      }
+
       @media (max-width: 960px) {
         header {
           height: auto;
@@ -2298,7 +2335,21 @@
           border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
+        body.mobile-bottom-ui-hidden .header-buttons {
+          transform: translate(-50%, calc(100% + 24px));
+          opacity: 0;
+          pointer-events: none;
+        }
+
         .icon-btn {
+          width: 42px;
+          height: 42px;
+          font-size: 17px;
+          border-radius: 10px;
+        }
+
+        .fullscreen-toggle-btn {
+          display: flex;
           width: 42px;
           height: 42px;
           font-size: 17px;
@@ -2441,6 +2492,13 @@
 
       @media (max-width: 560px) {
         .icon-btn {
+          width: 40px;
+          height: 40px;
+          font-size: 16px;
+          border-radius: 9px;
+        }
+
+        .fullscreen-toggle-btn {
           width: 40px;
           height: 40px;
           font-size: 16px;
@@ -2668,6 +2726,15 @@
             data-page="page-settings"
             title="設定">
             <i class="fa-solid fa-gear"></i>
+          </button>
+          <button
+            class="fullscreen-toggle-btn"
+            id="btn-mobile-fullscreen"
+            title="全画面表示"
+            aria-label="全画面表示"
+            aria-pressed="false"
+            type="button">
+            <i class="fa-solid fa-expand"></i>
           </button>
         </div>
       </div>
