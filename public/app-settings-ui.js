@@ -755,6 +755,14 @@ function clampNumberInRange(value, min, max, fallback) {
         return recovered ? refreshedDirs : null;
       }
 
+      async function triggerLocalVideoScanRefresh() {
+        const response = await settingsUiDeps.fetchImpl("/api/local-videos?refresh=1");
+        const result = await settingsUiDeps.parseApiResponseImpl(response);
+        if (!result.ok) {
+          throw new Error(result.error || "手動スキャンに失敗しました。");
+        }
+      }
+
       async function saveFallbackThumbnailSettingWithRecovery(bridge, enabled) {
         const result = await bridge.postSettings({
           enableFallbackThumbnails: enabled,
@@ -852,6 +860,17 @@ function clampNumberInRange(value, min, max, fallback) {
               buildLocalVideoDirsStatusText(appliedDirs),
               "success",
             );
+            setSettingStatus(
+              elements.localVideoDirsStatus,
+              "フォルダーを保存しました。手動スキャンを実行中...",
+              "info",
+            );
+            await triggerLocalVideoScanRefresh();
+            setSettingStatus(
+              elements.localVideoDirsStatus,
+              "フォルダーを保存し、手動スキャンを完了しました。",
+              "success",
+            );
             await onLocalVideosChanged?.();
           } catch (error) {
             console.error("ローカル動画フォルダー設定の保存に失敗:", error);
@@ -865,6 +884,26 @@ function clampNumberInRange(value, min, max, fallback) {
                 buildLocalVideoDirsStatusText(recoveredDirs),
                 "success",
               );
+              try {
+                setSettingStatus(
+                  elements.localVideoDirsStatus,
+                  "フォルダー保存済み。手動スキャンを実行中...",
+                  "info",
+                );
+                await triggerLocalVideoScanRefresh();
+                setSettingStatus(
+                  elements.localVideoDirsStatus,
+                  "フォルダーを保存し、手動スキャンを完了しました。",
+                  "success",
+                );
+              } catch (scanError) {
+                console.error("手動スキャンの実行に失敗:", scanError);
+                setSettingStatus(
+                  elements.localVideoDirsStatus,
+                  "フォルダーは保存済みですが、手動スキャンに失敗しました。再試行してください。",
+                  "error",
+                );
+              }
               await onLocalVideosChanged?.();
               return;
             }
