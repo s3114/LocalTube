@@ -249,15 +249,17 @@ function clampNumberInRange(value, min, max, fallback) {
 
       function initializeServerRestartButton() {
         const restartButton = document.getElementById("btn-restart-server");
+        const restartNodeButton = document.getElementById("btn-restart-server-node");
         const shutdownButton = document.getElementById("btn-shutdown-server");
         const restartStatus = document.getElementById("server-restart-status");
-        if (!restartButton || !shutdownButton || !restartStatus) return;
+        if (!restartButton || !restartNodeButton || !shutdownButton || !restartStatus) return;
 
         restartButton.addEventListener("click", async () => {
-          if (!settingsUiDeps.confirmImpl("localhost:3000 を再起動しますか？")) return;
+          if (!settingsUiDeps.confirmImpl("更新して localhost:3000 を再起動しますか？")) return;
           restartStatus.textContent = "再起動リクエストを送信中...";
           restartStatus.style.color = "var(--blue)";
           restartButton.disabled = true;
+          restartNodeButton.disabled = true;
           try {
             const response = await settingsUiDeps.fetchImpl("/api/system/restart", {
               method: "POST",
@@ -266,13 +268,42 @@ function clampNumberInRange(value, min, max, fallback) {
             if (!result.ok) {
               throw new Error(result.error || "再起動に失敗しました。");
             }
-            restartStatus.textContent = "再起動中です。数秒後にページを再読み込みしてください。";
+            restartStatus.textContent = "再起動中です。15秒後にページを再読み込みしてください。";
             restartStatus.style.color = "var(--green)";
           } catch (error) {
             console.error("サーバー再起動エラー:", error);
             restartStatus.textContent = `エラー: ${error.message || "再起動に失敗しました。"}`;
             restartStatus.style.color = "var(--accent)";
             restartButton.disabled = false;
+            restartNodeButton.disabled = false;
+          }
+        });
+
+        restartNodeButton.addEventListener("click", async () => {
+          const confirmed = settingsUiDeps.confirmImpl(
+            "server.js を直接再起動しますか？（起動.bat は使用しません）",
+          );
+          if (!confirmed) return;
+          restartStatus.textContent = "server.js再起動リクエストを送信中...";
+          restartStatus.style.color = "var(--blue)";
+          restartButton.disabled = true;
+          restartNodeButton.disabled = true;
+          try {
+            const response = await settingsUiDeps.fetchImpl("/api/system/restart-node", {
+              method: "POST",
+            });
+            const result = await settingsUiDeps.parseApiResponseImpl(response);
+            if (!result.ok) {
+              throw new Error(result.error || "server.js の再起動に失敗しました。");
+            }
+            restartStatus.textContent = "server.js再起動中です。15秒後にページを再読み込みしてください。";
+            restartStatus.style.color = "var(--green)";
+          } catch (error) {
+            console.error("server.js再起動エラー:", error);
+            restartStatus.textContent = `エラー: ${error.message || "server.js の再起動に失敗しました。"}`;
+            restartStatus.style.color = "var(--accent)";
+            restartButton.disabled = false;
+            restartNodeButton.disabled = false;
           }
         });
 
@@ -284,6 +315,7 @@ function clampNumberInRange(value, min, max, fallback) {
           restartStatus.textContent = "強制終了リクエストを送信中...";
           restartStatus.style.color = "var(--warn)";
           restartButton.disabled = true;
+          restartNodeButton.disabled = true;
           shutdownButton.disabled = true;
           try {
             const response = await settingsUiDeps.fetchImpl("/api/system/shutdown", {
@@ -300,6 +332,7 @@ function clampNumberInRange(value, min, max, fallback) {
             restartStatus.textContent = `エラー: ${error.message || "強制終了に失敗しました。"}`;
             restartStatus.style.color = "var(--accent)";
             restartButton.disabled = false;
+            restartNodeButton.disabled = false;
             shutdownButton.disabled = false;
           }
         });

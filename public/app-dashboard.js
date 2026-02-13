@@ -211,6 +211,7 @@
       const AUTO_RELOAD_KEY = "localtube.sseReloadAttempts";
       const MAX_AUTO_RELOAD_ATTEMPTS = 10;
       let reloadTimer = null;
+      let reloadCountdownTimer = null;
       const netBuffer = [];
       const latencyBuffer = [];
       const avgWindow = 5;
@@ -221,6 +222,10 @@
         if (reloadTimer) {
           clearTimeout(reloadTimer);
           reloadTimer = null;
+        }
+        if (reloadCountdownTimer) {
+          clearInterval(reloadCountdownTimer);
+          reloadCountdownTimer = null;
         }
         try {
           sessionStorage.removeItem(AUTO_RELOAD_KEY);
@@ -243,7 +248,7 @@
         if (attempts >= MAX_AUTO_RELOAD_ATTEMPTS) return;
 
         const nextAttempt = attempts + 1;
-        const delayMs = Math.min(15000, 3000 + (nextAttempt - 1) * 1000);
+        const delayMs = 15000;
         try {
           sessionStorage.setItem(AUTO_RELOAD_KEY, String(nextAttempt));
         } catch {
@@ -252,13 +257,30 @@
 
         const statusWrap = documentRef.getElementById("header-connection-status");
         const statusText = documentRef.getElementById("header-connection-status-text");
-        if (statusWrap && statusText) {
+        let remainingSec = Math.ceil(delayMs / 1000);
+        const updateCountdownText = () => {
+          if (!statusWrap || !statusText) return;
           statusText.textContent =
-            `サーバーとの接続が切れました。${Math.ceil(delayMs / 1000)}秒後に再接続を試みます。`;
+            `サーバーとの接続が切れました。${remainingSec}秒後に再接続を試みます。`;
           statusWrap.classList.add("visible");
+        };
+        if (statusWrap && statusText) {
+          updateCountdownText();
+          reloadCountdownTimer = setInterval(() => {
+            remainingSec = Math.max(0, remainingSec - 1);
+            updateCountdownText();
+            if (remainingSec <= 0 && reloadCountdownTimer) {
+              clearInterval(reloadCountdownTimer);
+              reloadCountdownTimer = null;
+            }
+          }, 1000);
         }
 
         reloadTimer = setTimeout(() => {
+          if (reloadCountdownTimer) {
+            clearInterval(reloadCountdownTimer);
+            reloadCountdownTimer = null;
+          }
           if (typeof global.location?.reload === "function") {
             global.location.reload();
           }

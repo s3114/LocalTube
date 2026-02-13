@@ -287,37 +287,54 @@ registerLogRoutes(app, {
   ...routeBaseDeps,
 });
 
-app.post("/api/system/restart", (_req, res) => {
-  try {
-    const scriptPath = path.resolve(__dirname, "server.js");
-const helperCode = `
+function scheduleServerRestart({ preferStartupBat }) {
+  const scriptPath = path.resolve(__dirname, "server.js");
+  const startupBatPath = path.resolve(__dirname, "起動.bat");
+  const useStartupBat = Boolean(preferStartupBat && fs.existsSync(startupBatPath));
+  const helperCode = `
 const { spawn } = require("child_process");
 const nodePath = ${JSON.stringify(process.execPath)};
 const scriptPath = ${JSON.stringify(scriptPath)};
 const cwd = ${JSON.stringify(__dirname)};
+const startupBatPath = ${JSON.stringify(startupBatPath)};
+const useStartupBat = ${JSON.stringify(useStartupBat)};
 
 setTimeout(() => {
-  const child = spawn(nodePath, [scriptPath], {
-    cwd,
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true,
-    env: process.env,
-  });
+  const child = useStartupBat
+    ? spawn(startupBatPath, [], {
+        shell: true,
+        cwd,
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+        env: process.env,
+      })
+    : spawn(nodePath, [scriptPath], {
+        cwd,
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+        env: process.env,
+      });
   child.unref();
 }, 1000);
 `;
-    const child = spawn(process.execPath, ["-e", helperCode], {
-      cwd: __dirname,
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-      env: { ...process.env },
-    });
+  const child = spawn(process.execPath, ["-e", helperCode], {
+    cwd: __dirname,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+    env: { ...process.env },
+  });
 
-    child.unref();
+  child.unref();
+}
+
+app.post("/api/system/restart", (_req, res) => {
+  try {
+    scheduleServerRestart({ preferStartupBat: true });
     apiOk(res, {
-      message: "サーバーを再起動しています。数秒後に再読み込みしてください。",
+      message: "サーバーを再起動しています。15秒後に再読み込みしてください。",
     });
 
     setTimeout(() => {
@@ -325,6 +342,23 @@ setTimeout(() => {
     }, 300);
   } catch (error) {
     apiError(res, 500, "サーバー再起動に失敗しました。", {
+      detail: error.message,
+    });
+  }
+});
+
+app.post("/api/system/restart-node", (_req, res) => {
+  try {
+    scheduleServerRestart({ preferStartupBat: false });
+    apiOk(res, {
+      message: "server.js を再起動しています。15秒後に再読み込みしてください。",
+    });
+
+    setTimeout(() => {
+      process.exit(0);
+    }, 300);
+  } catch (error) {
+    apiError(res, 500, "server.js の再起動に失敗しました。", {
       detail: error.message,
     });
   }
