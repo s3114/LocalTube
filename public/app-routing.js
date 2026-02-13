@@ -146,9 +146,28 @@
       if (!root) return;
       const mobileQuery = global.matchMedia?.("(max-width: 768px)");
       if (!mobileQuery) return;
+      const HIDE_DELAY_MS = 2200;
 
       const setHidden = (hidden) => {
         root.classList.toggle("mobile-bottom-ui-hidden", !!hidden);
+      };
+
+      let hideTimer = null;
+
+      const clearHideTimer = () => {
+        if (hideTimer) {
+          global.clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+      };
+
+      const scheduleHide = () => {
+        clearHideTimer();
+        if (!mobileQuery.matches) return;
+        if ((global.scrollY || 0) < 24) return;
+        hideTimer = global.setTimeout(() => {
+          setHidden(true);
+        }, HIDE_DELAY_MS);
       };
 
       let lastY = global.scrollY || 0;
@@ -158,6 +177,7 @@
         if (!mobileQuery.matches) {
           setHidden(false);
           lastY = global.scrollY || 0;
+          clearHideTimer();
           ticking = false;
           return;
         }
@@ -167,20 +187,24 @@
         lastY = currentY;
 
         if (Math.abs(delta) < 6) {
+          scheduleHide();
           ticking = false;
           return;
         }
 
         if (currentY < 24) {
           setHidden(false);
+          clearHideTimer();
           ticking = false;
           return;
         }
 
         if (delta > 0) {
           setHidden(true);
+          scheduleHide();
         } else {
           setHidden(false);
+          scheduleHide();
         }
         ticking = false;
       };
@@ -194,16 +218,29 @@
       const onMediaChanged = () => {
         if (!mobileQuery.matches) {
           setHidden(false);
+          clearHideTimer();
+          return;
         }
+        scheduleHide();
       };
 
       global.addEventListener("scroll", queueScrollHandler, { passive: true });
+      global.addEventListener(
+        "touchstart",
+        () => {
+          if (!mobileQuery.matches) return;
+          setHidden(false);
+          scheduleHide();
+        },
+        { passive: true },
+      );
       if (typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", onMediaChanged);
       } else if (typeof mobileQuery.addListener === "function") {
         mobileQuery.addListener(onMediaChanged);
       }
       setHidden(false);
+      scheduleHide();
     }
 
     function initialize() {

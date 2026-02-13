@@ -127,15 +127,80 @@
   }
 
   function createPlayerFullscreenToggleHandler(videoPlayer) {
-    return async function toggleFullscreen() {
-      if (document.fullscreenElement) {
+    let restorePageFullscreenOnExit = false;
+    const getFullscreenElement = () =>
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.msFullscreenElement ||
+      null;
+
+    const requestFullscreen = async (el) => {
+      if (!el) return false;
+      if (typeof el.requestFullscreen === "function") {
+        await el.requestFullscreen();
+        return true;
+      }
+      if (typeof el.webkitRequestFullscreen === "function") {
+        el.webkitRequestFullscreen();
+        return true;
+      }
+      if (typeof el.msRequestFullscreen === "function") {
+        el.msRequestFullscreen();
+        return true;
+      }
+      return false;
+    };
+
+    const exitFullscreen = async () => {
+      if (typeof document.exitFullscreen === "function") {
         await document.exitFullscreen();
+        return true;
+      }
+      if (typeof document.webkitExitFullscreen === "function") {
+        document.webkitExitFullscreen();
+        return true;
+      }
+      if (typeof document.msExitFullscreen === "function") {
+        document.msExitFullscreen();
+        return true;
+      }
+      return false;
+    };
+
+    return async function toggleFullscreen() {
+      const playerContainer = document.getElementById("player-container");
+      const playerTarget = videoPlayer || playerContainer;
+      const activeFullscreen = getFullscreenElement();
+      const pageRoot = document.documentElement;
+
+      if (activeFullscreen) {
+        // プレーヤー自身が全画面中なら解除
+        if (activeFullscreen === videoPlayer || activeFullscreen === playerContainer) {
+          await exitFullscreen();
+          if (restorePageFullscreenOnExit) {
+            restorePageFullscreenOnExit = false;
+            try {
+              await requestFullscreen(pageRoot);
+            } catch (_e) {
+              // no-op
+            }
+          }
+          return;
+        }
+        // ページ全画面など他要素が全画面中なら、解除して即プレーヤー全画面へ切替
+        restorePageFullscreenOnExit = activeFullscreen === pageRoot;
+        try {
+          await requestFullscreen(playerTarget);
+        } catch (_e) {
+          await requestFullscreen(playerContainer);
+        }
         return;
       }
+      restorePageFullscreenOnExit = false;
       try {
-        await videoPlayer.requestFullscreen();
+        await requestFullscreen(videoPlayer);
       } catch (_e) {
-        await document.getElementById("player-container")?.requestFullscreen();
+        await requestFullscreen(playerContainer);
       }
     };
   }

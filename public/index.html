@@ -2441,6 +2441,7 @@
         .yt-controls {
           flex-wrap: wrap;
           align-items: center;
+          justify-content: flex-start;
           gap: 8px;
           padding: 8px 8px 10px;
         }
@@ -2476,6 +2477,11 @@
           width: 100%;
           margin: 0 0 4px;
           transform: translateY(0);
+        }
+
+        /* 音量までは左寄せ、以降（時間/速度/全画面）は右寄せ */
+        .yt-controls .yt-volume {
+          margin-right: auto;
         }
 
         .comment-item,
