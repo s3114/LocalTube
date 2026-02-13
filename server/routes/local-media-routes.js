@@ -106,9 +106,21 @@ function registerLocalMediaRoutes(app, deps) {
     const discovered = new Set();
     if (!fs.existsSync(sourceDir)) return discovered;
 
-    // 1) 直下に動画があるなら、そのディレクトリ自体を優先して採用（重い再帰を避ける）
-    if (await hasDirectFileWithExt(sourceDir, VIDEO_EXT)) {
+    const hasDirectVideos = await hasDirectFileWithExt(sourceDir, VIDEO_EXT);
+
+    // 1) 直下に動画がある場合は、そのディレクトリを採用。
+    //    さらに "動画" フォルダ配下の整理（例: 動画\アニメ）も取りこぼさないよう、
+    //    直下サブフォルダのみ再帰探索する。
+    if (hasDirectVideos) {
       discovered.add(path.resolve(sourceDir));
+      const directEntries = await listDirEntriesSafe(sourceDir);
+      for (const entry of directEntries) {
+        if (!entry.isDirectory()) continue;
+        if (SKIP_SCAN_DIR_NAMES.has(entry.name)) continue;
+        const childDir = path.join(sourceDir, entry.name);
+        const dirs = await collectDirectoriesContainingExtRecursive(childDir, VIDEO_EXT);
+        for (const dir of dirs) discovered.add(path.resolve(dir));
+      }
       return discovered;
     }
 
