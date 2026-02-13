@@ -2332,6 +2332,37 @@
           z-index: 1200;
           max-width: none;
           width: auto;
+          height: 44px;
+          padding: 0 10px;
+          gap: 6px;
+          border-radius: 14px;
+        }
+
+        .header-search-wrap i {
+          display: none;
+        }
+
+        .header-search {
+          font-size: 15px;
+        }
+
+        .header-filter-btn,
+        .header-sort-btn {
+          min-height: 34px;
+          height: 34px;
+          min-width: 60px;
+          padding: 0 10px;
+          font-size: 12px;
+        }
+
+        .home-filter-panel,
+        .home-sort-panel {
+          position: fixed;
+          top: 56px;
+          left: 10px;
+          right: 10px;
+          width: auto;
+          max-width: none;
         }
 
         .header-buttons {
@@ -2510,6 +2541,46 @@
       }
 
       @media (max-width: 560px) {
+        .header-search-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          flex-wrap: nowrap;
+          align-items: center;
+          height: 44px;
+          min-height: 44px;
+          padding: 0 8px;
+          gap: 6px;
+        }
+
+        .header-search {
+          flex: 1;
+          min-width: 0;
+          height: auto;
+        }
+
+        .header-filter-container {
+          flex-shrink: 0;
+        }
+
+        .header-sort-container {
+          flex-shrink: 0;
+        }
+
+        .header-filter-btn,
+        .header-sort-btn {
+          width: auto;
+          min-width: 56px;
+          min-height: 34px;
+          height: 34px;
+          font-size: 12px;
+        }
+
+        .home-filter-panel,
+        .home-sort-panel {
+          top: 56px;
+        }
+
         .icon-btn {
           width: 40px;
           height: 40px;
