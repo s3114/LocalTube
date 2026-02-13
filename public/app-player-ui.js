@@ -455,10 +455,87 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         });
       }
 
+      function bindPlayerPictureInPictureButton(videoPlayer, btnPip) {
+        if (!btnPip) return;
+
+        const canUseStandardPip =
+          typeof videoPlayer.requestPictureInPicture === "function";
+        const canUseWebkitPip =
+          typeof videoPlayer.webkitSetPresentationMode === "function" &&
+          "webkitPresentationMode" in videoPlayer;
+        const isPipSupported = canUseStandardPip || canUseWebkitPip;
+
+        const updatePipButtonState = () => {
+          const standardActive = document.pictureInPictureElement === videoPlayer;
+          const webkitActive =
+            canUseWebkitPip && videoPlayer.webkitPresentationMode === "picture-in-picture";
+          const isActive = !!(standardActive || webkitActive);
+          btnPip.classList.toggle("active", isActive);
+          btnPip.title = isActive
+            ? "ピクチャーインピクチャ終了"
+            : "ピクチャーインピクチャ";
+        };
+
+        if (!isPipSupported) {
+          btnPip.style.opacity = "0.6";
+          btnPip.title = "このブラウザではPiP APIに未対応";
+          btnPip.addEventListener("click", () => {
+            console.warn("Picture-in-Picture is not supported in this browser.");
+          });
+          return;
+        }
+
+        const exitFullscreenIfNeeded = async () => {
+          if (!document.fullscreenElement) return;
+          if (typeof document.exitFullscreen === "function") {
+            await document.exitFullscreen();
+          }
+        };
+
+        btnPip.addEventListener("click", async () => {
+          try {
+            await exitFullscreenIfNeeded();
+
+            if (canUseStandardPip && document.pictureInPictureEnabled !== false) {
+              if (document.pictureInPictureElement === videoPlayer) {
+                await document.exitPictureInPicture();
+              } else {
+                if (videoPlayer.readyState < 1) {
+                  throw new Error("Video is not ready for PiP yet.");
+                }
+                if (videoPlayer.paused) {
+                  try {
+                    await videoPlayer.play();
+                  } catch (_playError) {
+                    // ユーザー操作直後でも再生に失敗する環境があるため、ここでは継続。
+                  }
+                }
+                await videoPlayer.requestPictureInPicture();
+              }
+            } else if (canUseWebkitPip) {
+              const nextMode =
+                videoPlayer.webkitPresentationMode === "picture-in-picture"
+                  ? "inline"
+                  : "picture-in-picture";
+              videoPlayer.webkitSetPresentationMode(nextMode);
+            }
+          } catch (error) {
+            console.warn("Picture-in-Picture toggle failed:", error);
+          } finally {
+            updatePipButtonState();
+          }
+        });
+
+        videoPlayer.addEventListener("enterpictureinpicture", updatePipButtonState);
+        videoPlayer.addEventListener("leavepictureinpicture", updatePipButtonState);
+        updatePipButtonState();
+      }
+
       function createPlayerUiController({
         videoPlayer,
         seekBar,
         btnPlay,
+        btnPip,
         btnFull,
         timeDisplay,
         onToggleFullscreen,
@@ -491,6 +568,7 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
             actions.togglePlay,
           );
           bindAutoHideControls();
+          bindPlayerPictureInPictureButton(videoPlayer, btnPip);
           bindPlayerFullscreenButton(btnFull, onToggleFullscreen);
 
           window.updateSmoothSeekLoopState = seekSync.updateSmoothSeekLoopState;

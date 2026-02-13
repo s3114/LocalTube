@@ -2266,7 +2266,19 @@
         }
 
         #chat-section {
+          max-height: min(48vh, 420px);
+          overflow: hidden;
+        }
+
+        #chat-section .sidebar-content,
+        #live-chat-container {
+          max-height: 100%;
+          overflow-y: auto;
+        }
+
+        #chat-messages {
           max-height: none;
+          overflow-y: auto;
         }
 
         .settings-stack-wide,
@@ -2816,6 +2828,10 @@
                     <div class="speed-option" data-speed="4.0">4.0×</div>
                   </div>
                 </div>
+
+                <button id="btn-pip" class="yt-btn" title="ピクチャーインピクチャ">
+                  <i class="fa-regular fa-clone"></i>
+                </button>
 
                 <button id="btn-full" class="yt-btn">
                   <i class="fa-solid fa-expand"></i>
