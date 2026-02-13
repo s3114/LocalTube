@@ -140,6 +140,25 @@
     };
   }
 
+  function collapseSectionById(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    const content = section.querySelector(".sidebar-content");
+    if (!content) return;
+    content.classList.add("collapsed");
+    section.classList.add("collapsed");
+    const icon = section.querySelector(".sidebar-toggle i");
+    if (icon) {
+      icon.className = "fa-solid fa-chevron-right";
+    }
+  }
+
+  function applyInitialMobileCollapsedState() {
+    if (!global.matchMedia || !global.matchMedia("(max-width: 768px)").matches) return;
+    collapseSectionById("comment-section");
+    collapseSectionById("chat-section");
+  }
+
   function createPlayerPageController({
     createHomeVideoBrowserController,
     createVideoDataController,
@@ -228,6 +247,7 @@
       descriptionController.initialize();
       chatHeightController.initialize();
       playerUi.initialize();
+      applyInitialMobileCollapsedState();
       initializeDataLoadingAndPlaybackState();
       global.refreshLocalVideos = () => localVideoController.loadLocalVideos(true);
     }
