@@ -300,7 +300,7 @@ const startupBatPath = ${JSON.stringify(startupBatPath)};
 const useStartupBat = ${JSON.stringify(useStartupBat)};
 
 setTimeout(() => {
-  const batCommand = 'call "' + startupBatPath + '"';
+  const batCommand = 'set "LOCALTUBE_RESTART=1" && call "' + startupBatPath + '"';
   const child = useStartupBat
     ? spawn("cmd.exe", ["/d", "/c", batCommand], {
         cwd,

@@ -4,6 +4,11 @@ setlocal EnableDelayedExpansion
 cd /d %~dp0
 set "SAVE_DIR=%~dp0"
 
+if /I "%LOCALTUBE_RESTART%"=="1" (
+  echo [INFO] Fast restart mode. Skipping update/setup checks.
+  goto START_SERVER
+)
+
 echo ==================================================
 echo  Starting development environment setup...
 echo ==================================================
