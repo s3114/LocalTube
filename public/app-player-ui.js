@@ -20,9 +20,59 @@ function bindPlayButton(videoPlayer, btnPlay) {
       function bindVideoClickInteractions(videoPlayer, onToggleFullscreen) {
         let clickTimer = null;
         const DOUBLE_CLICK_DELAY = 250;
+        const ytControls = document.querySelector(".yt-controls");
+        let controlsHideTimer = null;
+        let suppressNextClick = false;
+
+        const isMobileViewport = () =>
+          !!window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
+
+        const showControlsTemporarily = () => {
+          if (!ytControls) return;
+          ytControls.classList.add("show");
+          if (controlsHideTimer) clearTimeout(controlsHideTimer);
+          controlsHideTimer = setTimeout(() => {
+            ytControls.classList.remove("show");
+          }, 2000);
+        };
+
+        const handleMobileVideoTap = () => {
+          const controlsVisible = !!ytControls && ytControls.classList.contains("show");
+          showControlsTemporarily();
+          if (!controlsVisible) return;
+          if (videoPlayer.paused) {
+            videoPlayer.play();
+          } else {
+            videoPlayer.pause();
+          }
+        };
+
+        videoPlayer.addEventListener(
+          "touchend",
+          (e) => {
+            if (!isMobileViewport()) return;
+            if (e.target.closest(".yt-controls")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            suppressNextClick = true;
+            handleMobileVideoTap();
+          },
+          { passive: false },
+        );
 
         videoPlayer.addEventListener("click", (e) => {
           if (e.target.closest(".yt-controls")) return;
+
+          if (isMobileViewport()) {
+            if (suppressNextClick) {
+              suppressNextClick = false;
+              return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            handleMobileVideoTap();
+            return;
+          }
 
           if (clickTimer) {
             clearTimeout(clickTimer);
@@ -41,6 +91,7 @@ function bindPlayButton(videoPlayer, btnPlay) {
         });
 
         videoPlayer.addEventListener("dblclick", async () => {
+          if (isMobileViewport()) return;
           await onToggleFullscreen();
           if (clickTimer) {
             clearTimeout(clickTimer);
