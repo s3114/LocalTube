@@ -892,7 +892,7 @@
         border-radius: 8px;
         padding: 12px 16px 0px 0px;
         /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); */
-        overflow: visible;
+        overflow: hidden;
         position: relative;
         /* backdrop-filter: blur(2px); */
       }
@@ -1050,6 +1050,10 @@
       }
       .filter-menu {
         width: 200px;
+        top: auto;
+        bottom: 100%;
+        margin-top: 0;
+        margin-bottom: 4px;
       }
       .sort-menu.hidden {
         display: none;
@@ -1217,12 +1221,14 @@
       }
 
       /* ===== 概要欄のリンク ===== */
-      .yt-description a.desc-link {
+      .yt-description a.desc-link,
+      .yt-description a.timestamp-link {
         color: #8ab4ff; /* YouTubeっぽい青 */
         text-decoration: none;
       }
 
-      .yt-description a.desc-link:hover {
+      .yt-description a.desc-link:hover,
+      .yt-description a.timestamp-link:hover {
         text-decoration: underline;
       }
 
@@ -2111,12 +2117,14 @@
       }
 
       /* ===== コメント内のリンク ===== */
-      .comment-text a.desc-link {
+      .comment-text a.desc-link,
+      .comment-text a.timestamp-link {
         color: #8ab4ff; /* YouTubeっぽい青 */
         text-decoration: none;
       }
 
-      .comment-text a.desc-link:hover {
+      .comment-text a.desc-link:hover,
+      .comment-text a.timestamp-link:hover {
         text-decoration: underline;
       }
 
@@ -2571,6 +2579,11 @@
         .comment-actions {
           gap: 2px;
           flex-wrap: wrap;
+        }
+
+        .filter-menu {
+          left: auto;
+          right: 0;
         }
       }
 

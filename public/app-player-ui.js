@@ -413,6 +413,24 @@ function bindPlayButton(videoPlayer, btnPlay) {
         });
       }
 
+      function bindTimestampSeekLinks(videoPlayer) {
+        document.addEventListener("click", (event) => {
+          const link = event.target.closest("a.timestamp-link");
+          if (!link) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+          const seconds = Number.parseInt(link.dataset.seconds || "", 10);
+          if (!Number.isFinite(seconds) || seconds < 0) return;
+          const duration = Number(videoPlayer.duration);
+          if (Number.isFinite(duration) && duration > 0) {
+            videoPlayer.currentTime = Math.min(seconds, duration);
+            return;
+          }
+          videoPlayer.currentTime = seconds;
+        });
+      }
+
       function bindAutoHideControls() {
         const playerContainer = document.getElementById("player-container");
         const ytControls = document.querySelector(".yt-controls");
@@ -703,6 +721,7 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
             actions.changeVolume,
             actions.togglePlay,
           );
+          bindTimestampSeekLinks(videoPlayer);
           bindAutoHideControls();
           bindPlayerPictureInPictureButton(videoPlayer, btnPip);
           bindPlayerFullscreenButton(btnFull, onToggleFullscreen);
