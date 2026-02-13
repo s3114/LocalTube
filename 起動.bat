@@ -183,8 +183,8 @@ echo  Setup complete. Starting server...
 echo ==================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$files = @('%~dp0襍ｷ蜍・bat','%~dp0襍ｷ蜍墓怙蟆乗ｧ区・.bat'); foreach ($f in $files) { if (Test-Path -LiteralPath $f) { $raw = Get-Content -LiteralPath $f -Raw; $normalized = $raw -replace \"`r?`n\", \"`r`n\"; [System.IO.File]::WriteAllText($f, $normalized, [System.Text.UTF8Encoding]::new($false)); } }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPath '%~dp0' -Filter '*.bat' | ForEach-Object { $f = $_.FullName; $raw = Get-Content -LiteralPath $f -Raw; $normalized = $raw -replace \"`r?`n\", \"`r`n\"; [System.IO.File]::WriteAllText($f, $normalized, [System.Text.UTF8Encoding]::new($false)); }"
 
 :START_SERVER
-call "%~dp0襍ｷ蜍墓怙蟆乗ｧ区・.bat"
+call "%~dp0起動最小構成.bat"
 exit /b
