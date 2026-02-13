@@ -140,6 +140,49 @@
         .replace(/>/g, "&gt;");
     }
 
+    function parseTimestampToSeconds(token) {
+      if (!token || typeof token !== "string") return null;
+      const parts = token.split(":").map((part) => Number.parseInt(part, 10));
+      if (parts.some((value) => !Number.isFinite(value) || value < 0)) return null;
+
+      if (parts.length === 2) {
+        const [mm, ss] = parts;
+        if (ss > 59) return null;
+        return mm * 60 + ss;
+      }
+
+      if (parts.length === 3) {
+        const [hh, mm, ss] = parts;
+        if (mm > 59 || ss > 59) return null;
+        return hh * 3600 + mm * 60 + ss;
+      }
+
+      return null;
+    }
+
+    function linkifyTimestampsInPlainText(text) {
+      const source = String(text || "");
+      const timestampRegex = /(\b\d{1,2}:[0-5]\d:[0-5]\d\b|\b[0-5]?\d:[0-5]\d\b)/g;
+      const parts = [];
+      let lastIndex = 0;
+
+      for (const match of source.matchAll(timestampRegex)) {
+        const token = match[0];
+        const start = match.index ?? 0;
+        const seconds = parseTimestampToSeconds(token);
+        if (!Number.isFinite(seconds)) continue;
+
+        parts.push(escapeHtml(source.slice(lastIndex, start)));
+        parts.push(
+          `<a href="#" class="timestamp-link" data-seconds="${escapeAttr(seconds)}">${escapeHtml(token)}</a>`,
+        );
+        lastIndex = start + token.length;
+      }
+
+      parts.push(escapeHtml(source.slice(lastIndex)));
+      return parts.join("");
+    }
+
     function linkifyText(text) {
       if (!text) return "";
       const source = String(text);
@@ -150,14 +193,14 @@
       for (const match of source.matchAll(urlRegex)) {
         const url = match[0];
         const start = match.index ?? 0;
-        parts.push(escapeHtml(source.slice(lastIndex, start)));
+        parts.push(linkifyTimestampsInPlainText(source.slice(lastIndex, start)));
         parts.push(
           `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" class="desc-link">${escapeHtml(url)}</a>`,
         );
         lastIndex = start + url.length;
       }
 
-      parts.push(escapeHtml(source.slice(lastIndex)));
+      parts.push(linkifyTimestampsInPlainText(source.slice(lastIndex)));
       return parts.join("");
     }
 
@@ -251,4 +294,3 @@
   global.loadLocalSetting = loadLocalSetting;
   global.normalizeDirListForUi = normalizeDirListForUi;
 })(window);
-
