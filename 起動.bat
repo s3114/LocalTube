@@ -4,11 +4,6 @@ setlocal EnableDelayedExpansion
 cd /d %~dp0
 set "SAVE_DIR=%~dp0"
 
-if /I "%LOCALTUBE_RESTART%"=="1" (
-  echo [INFO] Fast restart mode. Skipping update/setup checks.
-  goto START_SERVER
-)
-
 echo ==================================================
 echo  Starting development environment setup...
 echo ==================================================
@@ -189,5 +184,5 @@ echo ==================================================
 echo.
 
 :START_SERVER
-node "%~dp0server.js"
-pause
+call "%~dp0起動最小構成.bat"
+exit /b
