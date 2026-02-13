@@ -185,12 +185,6 @@ function registerLocalMediaRoutes(app, deps) {
     const forceRefresh = options.forceRefresh === true;
     const normalizedSourceDirs = sourceDirs.map((dir) => path.resolve(dir)).sort();
     const cachedIndex = await readDirIndex(VIDEO_DIR_INDEX_PATH, "videoDirs");
-    if (!forceRefresh && cachedIndex && Array.isArray(cachedIndex.videoDirs)) {
-      return {
-        dirs: cachedIndex.videoDirs,
-        fromCache: true,
-      };
-    }
     if (
       !forceRefresh &&
       cachedIndex &&
@@ -230,12 +224,6 @@ function registerLocalMediaRoutes(app, deps) {
     const forceRefresh = options.forceRefresh === true;
     const normalizedSourceDirs = sourceDirs.map((dir) => path.resolve(dir)).sort();
     const cachedIndex = await readDirIndex(THUMB_DIR_INDEX_PATH, "thumbDirs");
-    if (!forceRefresh && cachedIndex && Array.isArray(cachedIndex.thumbDirs)) {
-      return {
-        dirs: cachedIndex.thumbDirs,
-        fromCache: true,
-      };
-    }
     if (
       !forceRefresh &&
       cachedIndex &&
@@ -502,6 +490,8 @@ function registerLocalMediaRoutes(app, deps) {
       const startedAt = Date.now();
       const forceRefresh = String(_req.query.refresh || "").toLowerCase() === "1";
       const sourceDirs = await getLocalVideoDirs();
+      const signature = await buildLocalVideoDirsSignature(sourceDirs);
+      const normalizedSourceDirs = sourceDirs.map((dir) => path.resolve(dir)).sort();
       const settings = await loadConfig();
       const fallbackEnabled = settings.enableFallbackThumbnails !== false;
       const now = Date.now();
@@ -523,6 +513,9 @@ function registerLocalMediaRoutes(app, deps) {
         if (
           diskIndex &&
           Array.isArray(diskIndex.videos) &&
+          diskIndex.signature === signature &&
+          Array.isArray(diskIndex.sourceDirs) &&
+          diskIndex.sourceDirs.join("|") === normalizedSourceDirs.join("|") &&
           diskIndex.fallbackEnabled === fallbackEnabled
         ) {
           localVideosCache = {
@@ -537,8 +530,6 @@ function registerLocalMediaRoutes(app, deps) {
           return apiOk(res, normalizeThumbUrlsForCaching(diskIndex.videos));
         }
       }
-
-      const signature = await buildLocalVideoDirsSignature(sourceDirs);
 
       const videos = [];
       const seenVideoPaths = new Set();

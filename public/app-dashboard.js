@@ -1,5 +1,5 @@
 (function attachDashboardController(global) {
-  function createDashboardController({
+    function createDashboardController({
     jobStates,
     renderJob,
     updateJobElement,
@@ -196,16 +196,28 @@
       statusText.textContent = "";
     }
 
-    function applyDashboardJobPatch({ id, patch, onJobUpdated, updateCounts }) {
-      const job = jobStates.get(id);
-      if (!job) return;
-      Object.assign(job, patch);
-      updateJobElement(job);
-      if (updateCounts) {
-        renderDashboardJobCounts(countJobsByStatus());
+      function applyDashboardJobPatch({ id, patch, onJobUpdated, updateCounts }) {
+        const job = jobStates.get(id);
+        if (!job) return;
+        const prevStatus = job.status;
+        Object.assign(job, patch);
+        updateJobElement(job);
+        if (updateCounts) {
+          renderDashboardJobCounts(countJobsByStatus());
+        }
+        if (
+          prevStatus !== "completed" &&
+          patch.status === "completed" &&
+          typeof documentRef.dispatchEvent === "function"
+        ) {
+          documentRef.dispatchEvent(
+            new CustomEvent("job_completed", {
+              detail: { id },
+            }),
+          );
+        }
+        onJobUpdated?.();
       }
-      onJobUpdated?.();
-    }
 
     function createSseController({ jobQueueElement, onJobUpdated }) {
       const AUTO_RELOAD_KEY = "localtube.sseReloadAttempts";

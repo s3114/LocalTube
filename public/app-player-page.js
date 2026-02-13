@@ -193,7 +193,7 @@
       chatHeightController.initialize();
       playerUi.initialize();
       initializeDataLoadingAndPlaybackState();
-      global.refreshLocalVideos = () => localVideoController.loadLocalVideos();
+      global.refreshLocalVideos = () => localVideoController.loadLocalVideos(true);
     }
 
     return {
