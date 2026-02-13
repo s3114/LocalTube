@@ -85,6 +85,7 @@ function bindPlayButton(videoPlayer, btnPlay) {
             if (!content) return;
 
             const isCollapsed = content.classList.toggle("collapsed");
+            section.classList.toggle("collapsed", isCollapsed);
             const icon = btn.querySelector("i");
             if (icon) {
               icon.className = isCollapsed
