@@ -1,114 +1,17 @@
 # LocalTube
 
-## Run
+YouTube動画をPCに保存し、ローカルで管理・再生するためのツールです。  
+通常は `起動.bat` を実行するだけで使えます。
 
-```bash
-npm start
-```
+- 動画のダウンロード
+- 保存した動画の一覧表示・再生
+- コメントやライブチャット、サムネイルの保存、再生
 
-Environment variables:
+## セットアップ
 
-- `PORT`: server listen port (default: `3000`)
-- `YTDL_CONFIG_PATH`: custom config file path
-- `YTDL_PUBLIC_DIR`: custom public directory path (useful for tests)
-- `LOG_LEVEL`: log verbosity (`info` / `warn` / `error`, default: `info`)
+動画での詳しいセットアップ方法は[こちら](https://www.youtube.com/watch?v=CHa9mrQl_lM)
 
-## Test
-
-```bash
-npm test
-```
-
-## Check
-
-```bash
-npm run check
-```
-
-`npm test` starts a temporary server on a random local port with a temporary
-config file, so it does not overwrite your real `config.json`.
-
-## CI
-
-GitHub Actions runs syntax checks and tests on every push / pull request:
-
-- `npm run check`
-- `npm test`
-
-## Server Structure
-
-Server routes are split under `server/routes/`:
-
-- `settings-wallpaper-routes.js`
-- `local-media-routes.js`
-- `network-routes.js`
-- `schedule-routes.js`
-- `info-routes.js`
-- `download-routes.js`
-- `live-chat-routes.js`
-
-Server services are split under `server/services/`:
-
-- `sse-bus.js`
-- `http-utils.js`
-- `process-utils.js`
-- `fetch-utils.js`
-- `job-queue-service.js`
-- `download-job-service.js`
-- `download-queue-service.js`
-- `input-url-resolver.js`
-- `local-video-service.js`
-- `wallpaper-service.js`
-- `local-path-service.js`
-- `config-service.js`
-- `startup-service.js`
-- `logger-service.js`
-
-Frontend scripts are split under `public/`:
-
-- `app.js` (bootstrap/orchestration)
-- `app-core.js` (shared helpers: API envelope parsing, job UI rendering, localStorage utils)
-- `app-home-cards.js` (home video card DOM builders)
-- `app-renderers.js` (chat/meta render helpers)
-- `app-comments.js` (comment tree renderer)
-- `app-home-browser.js` (home search/filter panel + browser state)
-- `app-dashboard.js` (SSE dashboard updates/system info)
-- `app-settings-ui.js` (settings UI logic)
-- `app-player-ui.js` (player UI logic)
-- `app-player-page.js` (player page composition/bootstrap)
-- `app-local-video.js` (local video list + side data loading)
-- `app-state.js` (shared app state)
-- `app-actions.js` (download form actions)
-- `app-routing.js` (header/hash routing)
-
-## Performance Check (Browser)
-
-Runtime performance metrics are logged in DevTools console as `[perf] ...`.
-You can also inspect current aggregated stats:
-
-```js
-window.getPerfMetricSummary()
-```
-
-Typical keys:
-
-- `local_videos_load_ms`
-- `home_render_ms`
-- `home_prefetch_ms`
-- `info_load_ms`
-- `chat_load_ms`
-
-Use these values (especially `p50` / `p95`) before and after changes to
-compare performance impact.
-
-## CPU Profile (Node.js)
-
-You can capture a CPU profile for server-side bottlenecks:
-
-```bash
-npm run profile:server
-```
-
-Then reproduce your heavy scenario (local video scan, home load, info requests),
-stop the server, and open generated `.cpuprofile` files under `profiles/`
-in Chrome DevTools Performance tab.
+1. インストーラーを[ダウンロード](https://github.com/s3114/LocalTube/releases/latest)
+2. 解凍し、任意の場所に移動したうえで `起動.bat` をダブルクリック
+3. 初回は自動セットアップが走るので待機
+4. ブラウザで `http://localhost:3000` を開く
