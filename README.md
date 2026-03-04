@@ -8,7 +8,9 @@ YouTube動画をPCに保存し、ローカルで管理・再生するための�
 
 ## セットアップ
 
-動画での詳しいセットアップ方法は[こちら](https://www.youtube.com/watch?v=CHa9mrQl_lM)
+動画での詳しいセットアップ方法はこちら
+https://www.youtube.com/watch?v=CHa9mrQl_lM
+
 
 1. インストーラーを[ダウンロード](https://github.com/s3114/LocalTube/releases/latest)
 2. 解凍し、任意の場所に移動したうえで `起動.bat` をダブルクリック
