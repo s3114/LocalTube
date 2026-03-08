@@ -76,6 +76,10 @@
       formData.append("format", doc.getElementById("fmt").value);
       formData.append("saveHistory", doc.getElementById("optHistory").checked);
       formData.append("downloadThumb", doc.getElementById("optThumb").checked);
+      formData.append(
+        "embedThumbnail",
+        doc.getElementById("optEmbedThumbnail")?.checked ?? true,
+      );
       formData.append("drmProtect", doc.getElementById("optDrm").checked);
       formData.append("savePath", doc.getElementById("savePath").value);
       formData.append(

@@ -30,7 +30,6 @@ function createDownloadJobService({
       `home:${targetMovieDir}`,
       "-P",
       `temp:${tempDir}`,
-      "--embed-thumbnail",
       "--add-metadata",
       "--ignore-errors",
       "--retries",
@@ -39,6 +38,10 @@ function createDownloadJobService({
       "--no-color",
       "--newline",
     ];
+
+    if (options.embedThumbnail !== false) {
+      args.push("--embed-thumbnail");
+    }
 
     if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
     if (options.downloadThumb) {

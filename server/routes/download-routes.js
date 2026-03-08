@@ -41,6 +41,7 @@ function registerDownloadRoutes(
       format,
       saveHistory,
       downloadThumb,
+      embedThumbnail,
       drmProtect,
       savePath,
       parallelDownloads,
@@ -70,6 +71,10 @@ function registerDownloadRoutes(
               format,
               saveHistory: saveHistory === "true",
               downloadThumb: downloadThumb === "true",
+              embedThumbnail:
+                typeof embedThumbnail === "undefined"
+                  ? true
+                  : embedThumbnail === "true",
               drmProtect: drmProtect === "true",
               savePath,
               concurrentFragments,
