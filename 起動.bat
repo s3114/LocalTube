@@ -3,6 +3,8 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d %~dp0
 set "SAVE_DIR=%~dp0"
+set "SERVER_PORT=%PORT%"
+if "%SERVER_PORT%"=="" set "SERVER_PORT=3000"
 
 echo ==================================================
 echo  Starting development environment setup...
@@ -25,17 +27,17 @@ powershell -NoProfile -Command "$path = '%TEMP_REMOTE_VERSION%'; $dir = Split-Pa
 if not exist "%LOCAL_VERSION_FILE%" (
   echo Local version.txt not found. Update required.
   set NEED_UPDATE=1
-) else (
+  ) else (
   for /f "usebackq tokens=* delims=" %%R in ("%TEMP_REMOTE_VERSION%") do set REMOTE_VER=%%R
   for /f "usebackq tokens=* delims=" %%L in ("%LOCAL_VERSION_FILE%") do set LOCAL_VER=%%L
-
+  
   echo Local version : [!LOCAL_VER!]
   echo Remote version: [!REMOTE_VER!]
-
+  
   if "!LOCAL_VER!"=="!REMOTE_VER!" (
     echo Version is up to date.
     set NEED_UPDATE=0
-  ) else (
+    ) else (
     echo Newer version found. Update required.
     set NEED_UPDATE=1
   )
@@ -46,22 +48,22 @@ del "%TEMP_REMOTE_VERSION%" >nul 2>&1
 if "%NEED_UPDATE%"=="1" (
   echo.
   echo [1/6] Checking for LocalTube updates...
-
+  
   echo ===== LocalTube Auto Update =====
-
+  
   set "ZIP_URL=https://github.com/s3114/LocalTube/archive/refs/heads/main.zip"
   set "TEMP_DIR=%~dp0temp_update"
   set "ZIP_FILE=%~dp0update.zip"
-
+  
   echo [1/4 /6] Downloading the latest version...
-
+  
   powershell -Command "$path = '!ZIP_FILE!'; $dir = Split-Path -Path $path -Parent; if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory | Out-Null }; Invoke-WebRequest -Uri '!ZIP_URL!' -OutFile $path"
   if errorlevel 1 (
     echo ERROR: Failed to download update package.
     pause
     exit /b 1
   )
-
+  
   if not exist "!TEMP_DIR!" mkdir "!TEMP_DIR!"
   echo [2/4 /6] Extracting files...
   powershell -Command "Expand-Archive -Force '!ZIP_FILE!' '!TEMP_DIR!'"
@@ -70,7 +72,7 @@ if "%NEED_UPDATE%"=="1" (
     pause
     exit /b 1
   )
-
+  
   echo [3/4 /6] Updating files...
   xcopy /E /Y "!TEMP_DIR!\LocalTube-main\*" "%~dp0"
   if errorlevel 1 (
@@ -78,11 +80,11 @@ if "%NEED_UPDATE%"=="1" (
     pause
     exit /b 1
   )
-
+  
   echo [4/4 /6] Cleaning up temporary files...
   rd /s /q "!TEMP_DIR!"
   del "!ZIP_FILE!"
-
+  
   copy /y "%~dp0version.txt" "%LOCAL_VERSION_FILE%"
 )
 
@@ -138,7 +140,7 @@ echo.
 echo [4/6] Checking and setting up yt-dlp...
 if exist "%SAVE_DIR%yt-dlp.exe" (
   echo Updating yt-dlp.exe...
-) else (
+  ) else (
   echo Downloading yt-dlp.exe...
   curl -L -o "%SAVE_DIR%yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" || (echo ERROR: Failed to download yt-dlp. & pause & exit /b)
 )
@@ -149,7 +151,7 @@ echo.
 echo [5/6] Checking and setting up AtomicParsley...
 if exist "%SAVE_DIR%AtomicParsley.exe" (
   echo AtomicParsley.exe already exists.
-) else (
+  ) else (
   echo Downloading AtomicParsley...
   curl -L -o "%SAVE_DIR%AtomicParsley.zip" "https://github.com/wez/atomicparsley/releases/download/20240608.083822.1ed9031/AtomicParsleyWindows.zip" || (echo ERROR: Failed to download AtomicParsley. & pause & exit /b)
   if exist "%SAVE_DIR%AtomicParsley.zip" (
@@ -166,7 +168,7 @@ if exist "%SAVE_DIR%deno.exe" (
   echo Upgrading Deno...
   "%SAVE_DIR%deno.exe" upgrade
   if exist "%SAVE_DIR%deno.old.exe" del "%SAVE_DIR%deno.old.exe"
-) else (
+  ) else (
   echo Downloading Deno...
   curl -L -o "%SAVE_DIR%deno.zip" "https://github.com/denoland/deno/releases/download/v1.44.4/deno-x86_64-pc-windows-msvc.zip" || (echo ERROR: Failed to download Deno. & pause & exit /b)
   if exist "%SAVE_DIR%deno.zip" (
@@ -187,4 +189,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPa
 
 :START_SERVER
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -WindowStyle Hidden -FilePath 'node' -ArgumentList '\"%~dp0server.js\"' -WorkingDirectory '%~dp0'"
+echo Server started at http://localhost:%SERVER_PORT%
+echo Window will close after 15 seconds...
+timeout /t 15 /nobreak >nul
 exit /b
