@@ -316,8 +316,14 @@
       });
     }
 
-    function navigateToPlayerPageFromVideoId(videoId, onAfterNavigate) {
-      history.pushState(null, "", `#player/${encodeURIComponent(videoId)}`);
+    function navigateToPlayerPageFromVideoId(videoId, onAfterNavigate, playlistMeta = null) {
+      const encodedVideoId = encodeURIComponent(videoId);
+      const listId = String(playlistMeta?.listId || "").trim();
+      const index = String(playlistMeta?.index || "").trim();
+      const hash = listId
+        ? `#player/${encodedVideoId}&list=${encodeURIComponent(listId)}${index ? `&index=${encodeURIComponent(index)}` : ""}`
+        : `#player/${encodedVideoId}`;
+      history.pushState(null, "", hash);
       window.scrollTo(0, 0);
       document
         .querySelectorAll(".page")
@@ -950,12 +956,12 @@
         setTimeout(() => onPrefetchHomeInfos(), 0);
       }
 
-      function playLocalVideo(video, activeItem = null, shouldAutoplay = true) {
+      function playLocalVideo(video, activeItem = null, shouldAutoplay = true, playlistMeta = null) {
         const videoId = getVideoIdFromFilename(video.filename);
         activateLocalVideoListItem(activeItem);
         setupLocalVideoPlayerSource(videoPlayer, titleEl, onResetSeekBar, video);
         tryAutoplayLocalVideo(videoPlayer, shouldAutoplay);
-        navigateToPlayerPageFromVideoId(videoId, onAfterNavigate);
+        navigateToPlayerPageFromVideoId(videoId, onAfterNavigate, playlistMeta);
         // 再生開始の体感を優先して、重いサイド情報処理は次フレームへ遅延
         if (typeof requestAnimationFrame === "function") {
           requestAnimationFrame(() => {
@@ -966,6 +972,25 @@
             onLoadSideData?.(videoId);
           }, 0);
         }
+      }
+
+      function playPendingVideoIfAny(shouldAutoplay = false) {
+        if (!appState.pendingVideoId) return false;
+        const matchedVideo = findLocalVideoById(allLocalVideos, appState.pendingVideoId);
+        if (!matchedVideo) return false;
+        const matchedItem = findLocalVideoListItem(videoList, matchedVideo.filename);
+        const playlistMeta =
+          appState.pendingPlaylistId
+            ? {
+              listId: appState.pendingPlaylistId,
+              index: appState.pendingPlaylistIndex || "",
+            }
+            : null;
+        playLocalVideo(matchedVideo, matchedItem || null, shouldAutoplay, playlistMeta);
+        appState.pendingVideoId = null;
+        appState.pendingPlaylistId = "";
+        appState.pendingPlaylistIndex = "";
+        return true;
       }
 
       async function loadLocalVideos(forceRefresh = false) {
@@ -985,17 +1010,7 @@
           renderPlaylistUi();
           scheduleHomeInfoPrefetch();
 
-          if (appState.pendingVideoId) {
-            const matchedVideo = findLocalVideoById(allLocalVideos, appState.pendingVideoId);
-            if (matchedVideo) {
-              const matchedItem = findLocalVideoListItem(
-                videoList,
-                matchedVideo.filename,
-              );
-              playLocalVideo(matchedVideo, matchedItem || null, false);
-              appState.pendingVideoId = null;
-            }
-          }
+          playPendingVideoIfAny(false);
           onMetric("local_videos_load_ms", performance.now() - startedAt, {
             count: allLocalVideos.length,
           });
@@ -1007,6 +1022,7 @@
 
       return {
         playLocalVideo,
+        playPendingVideoIfAny,
         loadLocalVideos,
       };
     }

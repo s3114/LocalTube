@@ -29,6 +29,7 @@
 
   function createPlaylistPageController({ parseApiResponse, appState }) {
     const grid = document.getElementById("playlist-page-grid");
+    const PLAYLIST_HASH_PREFIX = "#playlists/";
 
     function isPlaylistPageActive() {
       return document.getElementById("page-playlists")?.classList.contains("active-page");
@@ -37,6 +38,12 @@
     function renderEmpty(message) {
       if (!grid) return;
       grid.innerHTML = `<div class="home-video-empty">${message}</div>`;
+    }
+
+    function getPlaylistIdFromHash() {
+      const hash = String(global.location?.hash || "");
+      if (!hash.startsWith(PLAYLIST_HASH_PREFIX)) return "";
+      return decodeURIComponent(hash.slice(PLAYLIST_HASH_PREFIX.length)).trim();
     }
 
     function createCardElement(playlist, firstVideo, count, onOpen) {
@@ -65,23 +72,101 @@
       meta.className = "playlist-page-card-meta";
       meta.textContent = `${count.toLocaleString()} 本の動画`;
 
-      const link = document.createElement("div");
-      link.className = "playlist-page-card-link";
-      link.textContent = "再生リストの全体を見る";
-
       body.appendChild(title);
       body.appendChild(meta);
-      body.appendChild(link);
       card.appendChild(thumb);
       card.appendChild(body);
       return card;
     }
 
-    function openFirstVideo(firstVideo) {
+    function createPlaylistVideoRow(video, onOpen) {
+      const row = document.createElement("div");
+      row.className = "playlist-page-video-row";
+      row.addEventListener("click", onOpen);
+
+      const thumb = document.createElement("img");
+      thumb.className = "playlist-page-video-thumb";
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      thumb.src = video?.thumb || "/none_icon.jpg";
+      thumb.alt = video?.title || video?.filename || "video";
+      thumb.onerror = () => {
+        thumb.src = "/none_icon.jpg";
+      };
+
+      const body = document.createElement("div");
+      body.className = "playlist-page-video-body";
+
+      const title = document.createElement("div");
+      title.className = "playlist-page-video-title";
+      title.textContent = video?.title || video?.filename || "無題";
+
+      const meta = document.createElement("div");
+      meta.className = "playlist-page-video-meta";
+      meta.textContent = video?.filename || "";
+
+      body.appendChild(title);
+      body.appendChild(meta);
+      row.appendChild(thumb);
+      row.appendChild(body);
+      return row;
+    }
+
+    function openPlaylistDetail(playlistId) {
+      if (!playlistId) return;
+      history.pushState(null, "", `#playlists/${encodeURIComponent(playlistId)}`);
+      render();
+    }
+
+    function createBackButton(onBack) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "playlist-page-back-btn";
+      button.innerHTML = '<i class="fa-solid fa-chevron-left"></i> プレイリスト一覧へ戻る';
+      button.addEventListener("click", onBack);
+      return button;
+    }
+
+    function createPlaylistSummaryCard(playlist, firstVideo, videoCount) {
+      const card = document.createElement("div");
+      card.className = "playlist-summary-card";
+
+      const thumb = document.createElement("img");
+      thumb.className = "playlist-summary-thumb";
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      thumb.src = firstVideo?.thumb || "/none_icon.jpg";
+      thumb.alt = playlist?.name || "playlist";
+      thumb.onerror = () => {
+        thumb.src = "/none_icon.jpg";
+      };
+
+      const title = document.createElement("div");
+      title.className = "playlist-summary-title";
+      title.textContent = playlist?.name || "プレイリスト";
+
+      const meta = document.createElement("div");
+      meta.className = "playlist-summary-meta";
+      meta.textContent = `${Number(videoCount || 0).toLocaleString()} 本の動画`;
+
+      card.appendChild(thumb);
+      card.appendChild(title);
+      card.appendChild(meta);
+      return card;
+    }
+
+    function openFirstVideo(firstVideo, playlistId = "", playlistIndex = null) {
       if (!firstVideo?.filename) return;
       const videoId = firstVideo.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
       appState.pendingVideoId = videoId;
-      global.location.hash = `#player/${encodeURIComponent(videoId)}`;
+      const listIdText = String(playlistId || "").trim();
+      const indexNum = Number.isFinite(Number(playlistIndex))
+        ? Math.max(1, Number(playlistIndex) + 1)
+        : null;
+      const suffix = listIdText
+        ? `&list=${encodeURIComponent(listIdText)}${indexNum ? `&index=${indexNum}` : ""}`
+        : "";
+      global.location.hash = `#player/${encodeURIComponent(videoId)}${suffix}`;
       global.scrollTo(0, 0);
     }
 
@@ -102,8 +187,63 @@
         }
         const videos = Array.isArray(result.data) ? result.data : [];
         const videoMap = new Map(videos.map((video) => [video.filename, video]));
+        const selectedPlaylistId = getPlaylistIdFromHash();
 
         grid.innerHTML = "";
+        if (selectedPlaylistId) {
+          const selectedPlaylist = state.playlists.find((playlist) => playlist.id === selectedPlaylistId);
+          if (!selectedPlaylist) {
+            renderEmpty("指定されたプレイリストが見つかりません");
+            return;
+          }
+
+          const playableVideos = selectedPlaylist.items
+            .map((filename) => videoMap.get(filename))
+            .filter(Boolean);
+          if (playableVideos.length === 0) {
+            const backButton = createBackButton(() => {
+              history.pushState(null, "", "#playlists");
+              render();
+            });
+            grid.appendChild(backButton);
+            const empty = document.createElement("div");
+            empty.className = "home-video-empty";
+            empty.textContent = "プレイリストに再生可能な動画がありません";
+            grid.appendChild(empty);
+            return;
+          }
+
+          const backButton = createBackButton(() => {
+            history.pushState(null, "", "#playlists");
+            render();
+          });
+          const detailLayout = document.createElement("div");
+          detailLayout.className = "playlist-page-detail-layout";
+
+          const side = document.createElement("aside");
+          side.className = "playlist-page-detail-side";
+          side.appendChild(backButton);
+          side.appendChild(
+            createPlaylistSummaryCard(selectedPlaylist, playableVideos[0], playableVideos.length),
+          );
+
+          const list = document.createElement("section");
+          list.className = "playlist-page-video-list";
+          playableVideos.forEach((video, index) => {
+            list.appendChild(
+              createPlaylistVideoRow(
+                video,
+                () => openFirstVideo(video, selectedPlaylist.id, index),
+              ),
+            );
+          });
+
+          detailLayout.appendChild(side);
+          detailLayout.appendChild(list);
+          grid.appendChild(detailLayout);
+          return;
+        }
+
         let renderedCount = 0;
         state.playlists.forEach((playlist) => {
           const playableVideos = playlist.items
@@ -115,7 +255,7 @@
             playlist,
             firstVideo,
             playableVideos.length,
-            () => openFirstVideo(firstVideo),
+            () => openPlaylistDetail(playlist.id),
           );
           grid.appendChild(card);
           renderedCount += 1;
@@ -136,6 +276,14 @@
           render();
         }
       });
+      global.addEventListener("hashchange", () => {
+        if (isPlaylistPageActive()) {
+          render();
+        }
+      });
+      if (isPlaylistPageActive()) {
+        render();
+      }
     }
 
     return {

@@ -311,11 +311,26 @@
         localVideoController.loadLocalVideos();
       }
 
+      function tryResolvePendingPlayerVideo() {
+        localVideoController?.playPendingVideoIfAny?.(false);
+      }
+
       descriptionController.initialize();
       chatHeightController.initialize();
       playerUi.initialize();
       applyInitialMobileCollapsedState();
       initializeDataLoadingAndPlaybackState();
+      global.addEventListener("app:page-changed", (event) => {
+        if (event?.detail?.pageId === "page-player") {
+          tryResolvePendingPlayerVideo();
+        }
+      });
+      global.addEventListener("hashchange", () => {
+        const hash = String(global.location?.hash || "");
+        if (hash.startsWith("#player/")) {
+          tryResolvePendingPlayerVideo();
+        }
+      });
       global.refreshLocalVideos = () => localVideoController.loadLocalVideos(true);
     }
 
