@@ -11,6 +11,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
     loadConfig,
     saveConfig,
     normalizeDirList,
+    normalizePlaylistsState,
     getWallpaperPublicUrl,
     apiOk,
     apiError,
@@ -143,13 +144,15 @@ function registerSettingsWallpaperRoutes(app, deps) {
         enableFallbackThumbnails,
         wallpaperBlur,
         wallpaperBrightness,
+        playlistsState,
       } = req.body || {};
       if (
         typeof browser === "undefined" &&
         typeof localVideoDirs === "undefined" &&
         typeof enableFallbackThumbnails === "undefined" &&
         typeof wallpaperBlur === "undefined" &&
-        typeof wallpaperBrightness === "undefined"
+        typeof wallpaperBrightness === "undefined" &&
+        typeof playlistsState === "undefined"
       ) {
         return apiError(res, 400, "無効なリクエストです。");
       }
@@ -173,6 +176,10 @@ function registerSettingsWallpaperRoutes(app, deps) {
       }
       if (typeof wallpaperBrightness !== "undefined") {
         currentConfig.wallpaperBrightness = Number(wallpaperBrightness);
+      }
+
+      if (typeof playlistsState !== "undefined") {
+        currentConfig.playlistsState = normalizePlaylistsState(playlistsState);
       }
 
       const savedConfig = await saveConfig(currentConfig);

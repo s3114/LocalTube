@@ -21,7 +21,7 @@
       :root {
         --bg: #0f0f0f;
         --panel: rgba(18, 18, 18, 0.78);
-        --border: #303030;
+        /* --border: #303030; */
         --text: #f1f1f1;
         --subtext: #aaa;
         --accent: #ff0000;
@@ -1798,7 +1798,7 @@
         justify-self: end;
         width: 28px;
         height: 28px;
-        background: #1d1d1d00;
+        /* border: 1px solid #ffffff00; */
         border-radius: 8px;
         border: 1px solid var(--border);
         color: var(--text);
@@ -2207,7 +2207,7 @@
       }
 
       .playlist-page-card-title {
-        font-size: 26px;
+        font-size: 20px;
         font-weight: 700;
         line-height: 1.2;
         margin-bottom: 4px;
@@ -3248,7 +3248,6 @@
 
       <div id="page-playlists" class="page">
         <div class="playlist-page">
-          <h2 class="playlist-page-title">再生リスト</h2>
           <div id="playlist-page-grid" class="playlist-page-grid"></div>
         </div>
       </div>
@@ -3445,33 +3444,6 @@
                 id="live-chat-container">
                 <div id="chat-messages"></div>
                 <div class="chat-empty">チャットを選択してください</div>
-              </div>
-            </div>
-
-            <div class="sidebar-local_movie" id="playlist-section">
-              <div class="sidebar-header">
-                <div class="sidebar-title">プレイリスト</div>
-                <button class="sidebar-toggle" data-target="playlist-section">
-                  <i class="fa-solid fa-chevron-down"></i>
-                </button>
-              </div>
-              <div class="sidebar-content">
-                <div class="playlist-controls">
-                  <select id="playlist-select"></select>
-                  <button id="playlist-delete-btn"
-                    class="playlist-btn">削除</button>
-                </div>
-                <div class="playlist-controls">
-                  <input id="playlist-name-input"
-                    type="text"
-                    placeholder="新規プレイリスト名" />
-                  <button id="playlist-create-btn"
-                    class="playlist-btn">作成</button>
-                  <button id="playlist-add-current-btn"
-                    class="playlist-btn">現在の動画を追加</button>
-                </div>
-                <div id="playlist-items"
-                  class="playlist-items"></div>
               </div>
             </div>
 

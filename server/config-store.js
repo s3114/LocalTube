@@ -10,6 +10,10 @@ const CONFIG_DEFAULTS = {
   enableFallbackThumbnails: true,
   wallpaperBlur: 2,
   wallpaperBrightness: 50,
+  playlistsState: {
+    playlists: [],
+    selectedId: "",
+  },
 };
 
 function clampNumber(value, min, max, fallback) {
@@ -25,6 +29,32 @@ function normalizeDirList(dirList) {
     .map((dir) => String(dir || "").trim())
     .filter(Boolean)
     .filter((dir, idx, arr) => arr.indexOf(dir) === idx);
+}
+
+function normalizePlaylistsState(rawState) {
+  const source = rawState && typeof rawState === "object" ? rawState : {};
+  const playlists = Array.isArray(source.playlists)
+    ? source.playlists
+      .filter((playlist) => playlist && typeof playlist === "object")
+      .map((playlist) => ({
+        id: String(playlist.id || "").trim(),
+        name: String(playlist.name || "").trim(),
+        items: Array.isArray(playlist.items)
+          ? playlist.items.map((item) => String(item || "").trim()).filter(Boolean)
+          : [],
+      }))
+      .filter((playlist) => playlist.id && playlist.name)
+    : [];
+
+  const selectedId = String(source.selectedId || "").trim();
+  const resolvedSelectedId = playlists.some((playlist) => playlist.id === selectedId)
+    ? selectedId
+    : playlists[0]?.id || "";
+
+  return {
+    playlists,
+    selectedId: resolvedSelectedId,
+  };
 }
 
 function normalizeConfig(config) {
@@ -48,6 +78,7 @@ function normalizeConfig(config) {
       200,
       CONFIG_DEFAULTS.wallpaperBrightness,
     ),
+    playlistsState: normalizePlaylistsState(raw.playlistsState),
   };
 }
 
@@ -77,6 +108,7 @@ async function saveConfig(configPath, config) {
 module.exports = {
   CONFIG_DEFAULTS,
   normalizeDirList,
+  normalizePlaylistsState,
   normalizeConfig,
   loadConfig,
   saveConfig,
