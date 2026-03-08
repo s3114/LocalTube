@@ -1,7 +1,35 @@
 (function attachHeaderRoutingController(global) {
+  function parsePlayerRoutePayload(payload) {
+    const rawPayload = String(payload || "").trim();
+    if (!rawPayload) {
+      return { videoId: "", listId: "", index: "" };
+    }
+
+    const [rawVideoId, ...paramTokens] = rawPayload.split("&");
+    const videoId = decodeURIComponent(rawVideoId || "");
+    let listId = "";
+    let index = "";
+
+    paramTokens.forEach((token) => {
+      const [rawKey, ...rawValueParts] = String(token || "").split("=");
+      const key = decodeURIComponent(rawKey || "").trim();
+      const value = decodeURIComponent(rawValueParts.join("=") || "").trim();
+      if (key === "list") {
+        listId = value;
+      } else if (key === "index") {
+        index = value;
+      }
+    });
+
+    return { videoId, listId, index };
+  }
+
   function resolvePageIdFromHash(hash) {
     const normalizedHash = String(hash || "").replace("#", "");
-    const [page, videoId] = normalizedHash.split("/");
+    const [page, payload] = normalizedHash.split("/");
+    const playerPayload = page === "player"
+      ? parsePlayerRoutePayload(payload)
+      : { videoId: payload || "", listId: "", index: "" };
 
     let pageId;
     switch (page) {
@@ -25,7 +53,13 @@
         pageId = "page-downloader";
     }
 
-    return { page, videoId, pageId };
+    return {
+      page,
+      pageId,
+      videoId: playerPayload.videoId,
+      listId: playerPayload.listId,
+      index: playerPayload.index,
+    };
   }
 
   function applyPageVisibility(pages, pageId) {
@@ -268,13 +302,21 @@
       }
 
       function routeFromHash() {
-        const { page, videoId, pageId } = resolvePageIdFromHash(location.hash);
+        const {
+          page,
+          videoId,
+          pageId,
+          listId,
+          index,
+        } = resolvePageIdFromHash(location.hash);
 
         showPage(pageId);
         setActiveButton(pageId);
 
         if (page === "player" && videoId) {
-          appState.pendingVideoId = decodeURIComponent(videoId);
+          appState.pendingVideoId = videoId;
+          appState.pendingPlaylistId = listId || "";
+          appState.pendingPlaylistIndex = index || "";
         }
       }
 
@@ -290,6 +332,7 @@
       });
 
       global.addEventListener("popstate", routeFromHash);
+      global.addEventListener("hashchange", routeFromHash);
       routeFromHash();
       initializeMobileFullscreenButton();
       initializeMobileBottomUiAutoHide();
