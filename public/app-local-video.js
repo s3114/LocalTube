@@ -310,7 +310,7 @@
     function tryAutoplayLocalVideo(videoPlayer, shouldAutoplay) {
       if (!shouldAutoplay) return;
       videoPlayer.play().catch((err) => {
-        if (err?.name !== "NotAllowedError") {
+        if (err?.name !== "NotAllowedError" && err?.name !== "AbortError") {
           onError("Play failed:", err);
         }
       });
@@ -324,6 +324,7 @@
         ? `#player/${encodedVideoId}&list=${encodeURIComponent(listId)}${index ? `&index=${encodeURIComponent(index)}` : ""}`
         : `#player/${encodedVideoId}`;
       history.pushState(null, "", hash);
+      appState.lastPlayerHash = hash;
       window.scrollTo(0, 0);
       document
         .querySelectorAll(".page")
@@ -979,17 +980,51 @@
         const matchedVideo = findLocalVideoById(allLocalVideos, appState.pendingVideoId);
         if (!matchedVideo) return false;
         const matchedItem = findLocalVideoListItem(videoList, matchedVideo.filename);
+        let hashListId = "";
+        let hashIndex = "";
+        try {
+          const hash = String(window.location?.hash || "");
+          const playerPrefix = "#player/";
+          if (hash.startsWith(playerPrefix)) {
+            const payload = hash.slice(playerPrefix.length);
+            const [, ...tokens] = payload.split("&");
+            tokens.forEach((token) => {
+              const [rawKey, ...rawValueParts] = String(token || "").split("=");
+              const key = decodeURIComponent(rawKey || "").trim();
+              const value = decodeURIComponent(rawValueParts.join("=") || "").trim();
+              if (key === "list") hashListId = value;
+              if (key === "index") hashIndex = value;
+            });
+          }
+        } catch (_error) {
+          // noop
+        }
         const playlistMeta =
-          appState.pendingPlaylistId
+          (appState.pendingPlaylistId || hashListId)
             ? {
-              listId: appState.pendingPlaylistId,
-              index: appState.pendingPlaylistIndex || "",
+              listId: appState.pendingPlaylistId || hashListId,
+              index: appState.pendingPlaylistIndex || hashIndex || "",
             }
             : null;
-        playLocalVideo(matchedVideo, matchedItem || null, shouldAutoplay, playlistMeta);
+        const resolvedAutoplay =
+          typeof appState.pendingAutoplay === "boolean"
+            ? appState.pendingAutoplay
+            : shouldAutoplay;
+        playLocalVideo(matchedVideo, matchedItem || null, resolvedAutoplay, playlistMeta);
         appState.pendingVideoId = null;
         appState.pendingPlaylistId = "";
         appState.pendingPlaylistIndex = "";
+        appState.pendingAutoplay = undefined;
+        return true;
+      }
+
+      function playVideoById(videoId, { shouldAutoplay = true, playlistMeta = null } = {}) {
+        const targetId = String(videoId || "").trim();
+        if (!targetId) return false;
+        const matchedVideo = findLocalVideoById(allLocalVideos, targetId);
+        if (!matchedVideo) return false;
+        const matchedItem = findLocalVideoListItem(videoList, matchedVideo.filename);
+        playLocalVideo(matchedVideo, matchedItem || null, shouldAutoplay, playlistMeta);
         return true;
       }
 
@@ -1023,6 +1058,7 @@
       return {
         playLocalVideo,
         playPendingVideoIfAny,
+        playVideoById,
         loadLocalVideos,
       };
     }
