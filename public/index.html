@@ -1763,7 +1763,7 @@
       /* ローカル動画一覧 */
       .local-video-item {
         display: grid;
-        grid-template-columns: 160px 1fr;
+        grid-template-columns: 160px 1fr auto;
         gap: 10px;
         padding: 8px;
         border-radius: 10px;
@@ -1791,6 +1791,267 @@
       .local-video-text {
         flex: 1;
         font-size: 13px;
+      }
+
+      .local-video-option-btn {
+        align-self: center;
+        justify-self: end;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .local-video-option-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .local-video-options-menu {
+        position: fixed;
+        min-width: 230px;
+        background: #1f1f1f;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 14px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+        padding: 8px;
+        z-index: 3000;
+      }
+
+      .local-video-options-menu.hidden {
+        display: none;
+      }
+
+      .local-video-options-item {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        padding: 10px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .local-video-options-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .playlist-save-panel {
+        position: fixed;
+        width: min(420px, calc(100vw - 24px));
+        background: #1f1f1f;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 16px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+        z-index: 3010;
+        padding: 10px;
+      }
+
+      .playlist-save-panel.hidden {
+        display: none;
+      }
+
+      .playlist-save-title {
+        font-size: 30px;
+        font-weight: 700;
+        margin: 4px 8px 10px;
+      }
+
+      .playlist-save-list {
+        max-height: 340px;
+        overflow-y: auto;
+      }
+
+      .playlist-save-row {
+        display: grid;
+        grid-template-columns: 48px 1fr 32px;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
+      }
+
+      .playlist-save-row:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .playlist-save-thumb {
+        width: 48px;
+        height: 27px;
+        border-radius: 6px;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .playlist-save-name {
+        font-size: 16px;
+        line-height: 1.2;
+      }
+
+      .playlist-save-sub {
+        font-size: 13px;
+        color: var(--subtext);
+      }
+
+      .playlist-save-action {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .playlist-save-create {
+        margin-top: 10px;
+        width: 100%;
+        height: 40px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      .playlist-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 3020;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+      }
+
+      .playlist-modal-backdrop.hidden {
+        display: none;
+      }
+
+      .playlist-modal {
+        width: min(460px, calc(100vw - 24px));
+        background: #1f1f1f;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 16px;
+        padding: 18px;
+      }
+
+      .playlist-modal-title {
+        font-size: 34px;
+        font-weight: 700;
+        margin: 0 0 14px;
+      }
+
+      .playlist-modal-input {
+        width: 100%;
+        height: 46px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #171717;
+        color: var(--text);
+        padding: 0 12px;
+        margin-bottom: 16px;
+      }
+
+      .playlist-modal-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .playlist-modal-btn {
+        flex: 1;
+        height: 42px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      .playlist-controls {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+
+      .playlist-controls input,
+      .playlist-controls select {
+        background: #1b1b1b;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        height: 32px;
+        padding: 0 8px;
+      }
+
+      #playlist-select {
+        min-width: 140px;
+        flex: 1 1 140px;
+      }
+
+      #playlist-name-input {
+        min-width: 140px;
+        flex: 1 1 140px;
+      }
+
+      .playlist-btn {
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #1d1d1d;
+        color: var(--text);
+        padding: 0 10px;
+        cursor: pointer;
+      }
+
+      .playlist-items {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .playlist-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .playlist-item-title {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .playlist-item-remove {
+        height: 24px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        padding: 0 8px;
+        cursor: pointer;
+        font-size: 11px;
       }
 
       /* ホーム：ローカル動画グリッド */
@@ -1894,6 +2155,63 @@
       .home-video-empty {
         color: var(--subtext);
         padding: 8px;
+      }
+
+      .playlist-page {
+        padding: 16px;
+      }
+
+      .playlist-page-title {
+        margin: 0 0 12px;
+        font-size: 34px;
+        font-weight: 800;
+      }
+
+      .playlist-page-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+      }
+
+      .playlist-page-card {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        overflow: hidden;
+        cursor: pointer;
+      }
+
+      .playlist-page-thumb {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.05);
+        display: block;
+      }
+
+      .playlist-page-card-body {
+        padding: 10px 12px 12px;
+      }
+
+      .playlist-page-card-title {
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .playlist-page-card-meta {
+        color: #ddd;
+        font-size: 15px;
+      }
+
+      .playlist-page-card-link {
+        color: #ddd;
+        font-size: 15px;
+        margin-top: 2px;
       }
 
       /* ==================================================
@@ -2467,8 +2785,12 @@
           padding-top: 56px;
         }
 
+        .playlist-page {
+          padding-top: 56px;
+        }
+
         .local-video-item {
-          grid-template-columns: 120px 1fr;
+          grid-template-columns: 120px 1fr auto;
           gap: 8px;
           padding: 6px;
         }
@@ -2659,6 +2981,15 @@
 
         .home-video-grid {
           grid-template-columns: 1fr;
+        }
+
+        .playlist-page-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .playlist-page-title {
+          font-size: 28px;
+          margin-bottom: 10px;
         }
 
         .comment-header-row {
@@ -2861,6 +3192,13 @@
             <i class="fa-solid fa-play"></i>
           </button>
           <button
+            class="icon-btn"
+            id="btn-playlists"
+            data-page="page-playlists"
+            title="再生リスト">
+            <i class="fa-solid fa-list"></i>
+          </button>
+          <button
             class="icon-btn active"
             id="btn-downloader"
             data-page="page-downloader"
@@ -2892,6 +3230,13 @@
       <div id="page-home" class="page active-page">
         <div class="home-video-grid">
 
+        </div>
+      </div>
+
+      <div id="page-playlists" class="page">
+        <div class="playlist-page">
+          <h2 class="playlist-page-title">再生リスト</h2>
+          <div id="playlist-page-grid" class="playlist-page-grid"></div>
         </div>
       </div>
 
@@ -3087,6 +3432,33 @@
                 id="live-chat-container">
                 <div id="chat-messages"></div>
                 <div class="chat-empty">チャットを選択してください</div>
+              </div>
+            </div>
+
+            <div class="sidebar-local_movie" id="playlist-section">
+              <div class="sidebar-header">
+                <div class="sidebar-title">プレイリスト</div>
+                <button class="sidebar-toggle" data-target="playlist-section">
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+              </div>
+              <div class="sidebar-content">
+                <div class="playlist-controls">
+                  <select id="playlist-select"></select>
+                  <button id="playlist-delete-btn"
+                    class="playlist-btn">削除</button>
+                </div>
+                <div class="playlist-controls">
+                  <input id="playlist-name-input"
+                    type="text"
+                    placeholder="新規プレイリスト名" />
+                  <button id="playlist-create-btn"
+                    class="playlist-btn">作成</button>
+                  <button id="playlist-add-current-btn"
+                    class="playlist-btn">現在の動画を追加</button>
+                </div>
+                <div id="playlist-items"
+                  class="playlist-items"></div>
               </div>
             </div>
 
@@ -3588,6 +3960,7 @@
     <script src="/app-player-ui.js"></script>
     <script src="/app-player-page.js"></script>
     <script src="/app-local-video.js"></script>
+    <script src="/app-playlists-page.js"></script>
     <script src="/app-state.js"></script>
     <script src="/app-actions.js"></script>
     <script src="/app-routing.js"></script>

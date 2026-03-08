@@ -1,4 +1,8 @@
 (function attachLocalVideoModule(global) {
+  const PLAYLIST_STORAGE_KEY = "localtube.playlists.v1";
+  const WATCH_LATER_PLAYLIST_ID = "watch_later_default";
+  const WATCH_LATER_PLAYLIST_NAME = "後で見る";
+
   function createLocalVideoModule({
     appState,
     parseApiResponse,
@@ -12,7 +16,93 @@
     onMetric = (_name, _value, _meta) => {},
     onError = (message, error) => console.error(message, error),
   }) {
-    function createLocalVideoListItemElement(video, onClick) {
+    async function copyTextToClipboard(text) {
+      const value = String(text || "");
+      if (global.navigator?.clipboard?.writeText && global.isSecureContext) {
+        await global.navigator.clipboard.writeText(value);
+        return;
+      }
+      const input = document.createElement("input");
+      input.value = value;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      input.style.pointerEvents = "none";
+      document.body.appendChild(input);
+      input.focus();
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+
+    function ensureWatchLaterPlaylist(playlists) {
+      const source = Array.isArray(playlists) ? playlists : [];
+      const hasWatchLater = source.some((playlist) => playlist.id === WATCH_LATER_PLAYLIST_ID);
+      if (hasWatchLater) {
+        return source.map((playlist) =>
+          playlist.id === WATCH_LATER_PLAYLIST_ID
+            ? { ...playlist, name: WATCH_LATER_PLAYLIST_NAME }
+            : playlist,
+        );
+      }
+      return [
+        {
+          id: WATCH_LATER_PLAYLIST_ID,
+          name: WATCH_LATER_PLAYLIST_NAME,
+          items: [],
+        },
+        ...source,
+      ];
+    }
+
+    function normalizePlaylistsState(rawState) {
+      const source = rawState && typeof rawState === "object" ? rawState : {};
+      const playlists = ensureWatchLaterPlaylist(Array.isArray(source.playlists)
+        ? source.playlists
+          .filter((p) => p && typeof p === "object")
+          .map((p) => ({
+            id: String(p.id || ""),
+            name: String(p.name || "").trim(),
+            items: Array.isArray(p.items)
+              ? p.items.map((v) => String(v || "").trim()).filter(Boolean)
+              : [],
+          }))
+          .filter((p) => p.id && p.name)
+        : []);
+      const selectedId = String(source.selectedId || "").trim();
+      return {
+        playlists,
+        selectedId:
+          selectedId && playlists.some((p) => p.id === selectedId)
+            ? selectedId
+            : playlists[0]?.id || "",
+      };
+    }
+
+    function loadPlaylistsState() {
+      try {
+        const raw = global.localStorage?.getItem(PLAYLIST_STORAGE_KEY);
+        if (!raw) return { playlists: [], selectedId: "" };
+        return normalizePlaylistsState(JSON.parse(raw));
+      } catch (_error) {
+        return { playlists: [], selectedId: "" };
+      }
+    }
+
+    function savePlaylistsState(state) {
+      try {
+        const normalized = normalizePlaylistsState(state);
+        global.localStorage?.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(normalized));
+      } catch (_error) {
+        // noop
+      }
+    }
+
+    function createPlaylistId() {
+      return `pl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function createLocalVideoListItemElement(video, onClick, onOpenOptions) {
       const item = document.createElement("div");
       item.className = "local-video-item";
       item.dataset.filename = video.filename;
@@ -32,6 +122,17 @@
       textEl.className = "local-video-text";
       textEl.textContent = video.title;
       item.appendChild(textEl);
+
+      const optionBtn = document.createElement("button");
+      optionBtn.className = "local-video-option-btn";
+      optionBtn.type = "button";
+      optionBtn.title = "オプション";
+      optionBtn.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+      optionBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onOpenOptions?.(video, optionBtn);
+      });
+      item.appendChild(optionBtn);
 
       item.addEventListener("click", () => onClick(video, item));
       return item;
@@ -207,7 +308,7 @@
       onAfterNavigate?.();
     }
 
-    function renderLocalVideoList(videoList, videos, onSelect) {
+    function renderLocalVideoList(videoList, videos, onSelect, onOpenOptions) {
       videoList.innerHTML = "";
       if (videos.length === 0) {
         videoList.innerHTML = '<div class="status-subtext">動画が見つかりません</div>';
@@ -215,8 +316,10 @@
       }
       videos.forEach((video) => {
         videoList.appendChild(
-          createLocalVideoListItemElement(video, (selectedVideo, selectedItem) =>
-            onSelect(selectedVideo, selectedItem),
+          createLocalVideoListItemElement(
+            video,
+            (selectedVideo, selectedItem) => onSelect(selectedVideo, selectedItem),
+            onOpenOptions,
           ),
         );
       });
@@ -352,6 +455,453 @@
       onPrefetchHomeInfos,
     }) {
       let allLocalVideos = [];
+      let playlistsState = loadPlaylistsState();
+      const transientQueue = [];
+      let optionMenuVideo = null;
+      const playlistSelectEl = document.getElementById("playlist-select");
+      const playlistNameInputEl = document.getElementById("playlist-name-input");
+      const playlistCreateBtnEl = document.getElementById("playlist-create-btn");
+      const playlistDeleteBtnEl = document.getElementById("playlist-delete-btn");
+      const playlistAddCurrentBtnEl = document.getElementById("playlist-add-current-btn");
+      const playlistItemsEl = document.getElementById("playlist-items");
+      const optionsMenuEl = document.createElement("div");
+      optionsMenuEl.className = "local-video-options-menu hidden";
+      optionsMenuEl.innerHTML = `
+        <button type="button" class="local-video-options-item" data-action="queue">
+          <i class="fa-solid fa-list"></i>キューに追加
+        </button>
+        <button type="button" class="local-video-options-item" data-action="watch-later">
+          <i class="fa-regular fa-clock"></i>「後で見る」に保存
+        </button>
+        <button type="button" class="local-video-options-item" data-action="save-playlist">
+          <i class="fa-regular fa-bookmark"></i>再生リストに保存
+        </button>
+        <button type="button" class="local-video-options-item" data-action="share">
+          <i class="fa-solid fa-share-nodes"></i>共有
+        </button>
+      `;
+      document.body.appendChild(optionsMenuEl);
+
+      const playlistSavePanelEl = document.createElement("div");
+      playlistSavePanelEl.className = "playlist-save-panel hidden";
+      playlistSavePanelEl.innerHTML = `
+        <div class="playlist-save-title">保存先...</div>
+        <div class="playlist-save-list" id="playlist-save-list"></div>
+        <button type="button" class="playlist-save-create" id="playlist-save-create-btn">
+          ＋ 新しい再生リスト
+        </button>
+      `;
+      document.body.appendChild(playlistSavePanelEl);
+      const playlistSaveListEl = playlistSavePanelEl.querySelector("#playlist-save-list");
+      const playlistSaveCreateBtnEl = playlistSavePanelEl.querySelector("#playlist-save-create-btn");
+
+      const playlistModalBackdropEl = document.createElement("div");
+      playlistModalBackdropEl.className = "playlist-modal-backdrop hidden";
+      playlistModalBackdropEl.innerHTML = `
+        <div class="playlist-modal">
+          <h3 class="playlist-modal-title">新しい再生リスト</h3>
+          <input id="playlist-modal-input"
+            class="playlist-modal-input"
+            type="text"
+            placeholder="タイトルを入力してください" />
+          <div class="playlist-modal-actions">
+            <button type="button" class="playlist-modal-btn" id="playlist-modal-cancel">キャンセル</button>
+            <button type="button" class="playlist-modal-btn" id="playlist-modal-create">作成</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(playlistModalBackdropEl);
+      const playlistModalInputEl = playlistModalBackdropEl.querySelector("#playlist-modal-input");
+      const playlistModalCancelEl = playlistModalBackdropEl.querySelector("#playlist-modal-cancel");
+      const playlistModalCreateEl = playlistModalBackdropEl.querySelector("#playlist-modal-create");
+
+      function getPlaylistById(playlistId) {
+        return playlistsState.playlists.find((p) => p.id === playlistId) || null;
+      }
+
+      function getSelectedPlaylist() {
+        return getPlaylistById(playlistsState.selectedId);
+      }
+
+      function updatePlaylistsState(nextState) {
+        playlistsState = normalizePlaylistsState(nextState);
+        savePlaylistsState(playlistsState);
+        renderPlaylistUi();
+      }
+
+      function upsertPlaylist(name) {
+        const trimmedName = String(name || "").trim();
+        if (!trimmedName) return null;
+        const existing = playlistsState.playlists.find((playlist) => playlist.name === trimmedName);
+        if (existing) return existing;
+        const newPlaylist = {
+          id: createPlaylistId(),
+          name: trimmedName,
+          items: [],
+        };
+        updatePlaylistsState({
+          playlists: [...playlistsState.playlists, newPlaylist],
+          selectedId: newPlaylist.id,
+        });
+        return newPlaylist;
+      }
+
+      function addVideoToPlaylistById(video, playlistId) {
+        if (!video?.filename || !playlistId) return;
+        const target = getPlaylistById(playlistId);
+        if (!target) return;
+        if (target.items.includes(video.filename)) return;
+        updatePlaylistsState({
+          ...playlistsState,
+          playlists: playlistsState.playlists.map((playlist) =>
+            playlist.id === playlistId
+              ? { ...playlist, items: [...playlist.items, video.filename] }
+              : playlist,
+          ),
+          selectedId: playlistsState.selectedId || playlistId,
+        });
+      }
+
+      function addVideoToSelectedPlaylist(video) {
+        const selected = getSelectedPlaylist();
+        if (!selected) return;
+        addVideoToPlaylistById(video, selected.id);
+      }
+
+      function addVideoToWatchLater(video) {
+        addVideoToPlaylistById(video, WATCH_LATER_PLAYLIST_ID);
+      }
+
+      function removeVideoFromSelectedPlaylist(filename) {
+        const selected = getSelectedPlaylist();
+        if (!selected) return;
+        updatePlaylistsState({
+          ...playlistsState,
+          playlists: playlistsState.playlists.map((playlist) =>
+            playlist.id === selected.id
+              ? {
+                ...playlist,
+                items: playlist.items.filter((itemName) => itemName !== filename),
+              }
+              : playlist,
+          ),
+        });
+      }
+
+      function renderPlaylistUi() {
+        if (!playlistSelectEl || !playlistItemsEl) return;
+        const currentSelectedId = playlistsState.selectedId;
+        playlistSelectEl.innerHTML = "";
+
+        if (playlistsState.playlists.length === 0) {
+          const emptyOption = document.createElement("option");
+          emptyOption.value = "";
+          emptyOption.textContent = "プレイリストなし";
+          playlistSelectEl.appendChild(emptyOption);
+          playlistSelectEl.disabled = true;
+          if (playlistDeleteBtnEl) playlistDeleteBtnEl.disabled = true;
+          if (playlistAddCurrentBtnEl) playlistAddCurrentBtnEl.disabled = true;
+          playlistItemsEl.innerHTML = '<div class="status-subtext">プレイリストがありません</div>';
+          return;
+        }
+
+        playlistsState.playlists.forEach((playlist) => {
+          const option = document.createElement("option");
+          option.value = playlist.id;
+          option.textContent = playlist.name;
+          playlistSelectEl.appendChild(option);
+        });
+        playlistSelectEl.disabled = false;
+        if (playlistDeleteBtnEl) playlistDeleteBtnEl.disabled = false;
+        if (playlistAddCurrentBtnEl) playlistAddCurrentBtnEl.disabled = false;
+        playlistSelectEl.value = currentSelectedId || playlistsState.playlists[0].id;
+
+        const selected = getSelectedPlaylist();
+        const items = Array.isArray(selected?.items) ? selected.items : [];
+        if (items.length === 0) {
+          playlistItemsEl.innerHTML = '<div class="status-subtext">動画がありません</div>';
+          return;
+        }
+
+        const videoMap = new Map(allLocalVideos.map((video) => [video.filename, video]));
+        playlistItemsEl.innerHTML = "";
+        items.forEach((filename) => {
+          const video = videoMap.get(filename);
+          if (!video) return;
+
+          const row = document.createElement("div");
+          row.className = "playlist-item";
+
+          const title = document.createElement("div");
+          title.className = "playlist-item-title";
+          title.textContent = video.title || video.filename;
+          title.title = video.filename;
+          title.addEventListener("click", () => {
+            const matchedItem = findLocalVideoListItem(videoList, video.filename);
+            playLocalVideo(video, matchedItem || null, true);
+          });
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "playlist-item-remove";
+          removeBtn.textContent = "削除";
+          removeBtn.addEventListener("click", () => {
+            removeVideoFromSelectedPlaylist(filename);
+          });
+
+          row.appendChild(title);
+          row.appendChild(removeBtn);
+          playlistItemsEl.appendChild(row);
+        });
+
+        if (!playlistItemsEl.hasChildNodes()) {
+          playlistItemsEl.innerHTML = '<div class="status-subtext">動画がありません</div>';
+        }
+      }
+
+      function hideOptionsMenu() {
+        optionMenuVideo = null;
+        optionsMenuEl.classList.add("hidden");
+      }
+
+      function hidePlaylistSavePanel() {
+        playlistSavePanelEl.classList.add("hidden");
+      }
+
+      function openPlaylistCreateModal() {
+        if (!playlistModalInputEl) return;
+        playlistModalInputEl.value = "";
+        playlistModalBackdropEl.classList.remove("hidden");
+        playlistModalInputEl.focus();
+      }
+
+      function closePlaylistCreateModal() {
+        playlistModalBackdropEl.classList.add("hidden");
+      }
+
+      function renderPlaylistSavePanel(video) {
+        if (!playlistSaveListEl) return;
+        const baseVideo = video || optionMenuVideo;
+        if (!baseVideo) return;
+
+        playlistSaveListEl.innerHTML = "";
+        const allPlaylists = playlistsState.playlists.filter(
+          (playlist) => playlist.id !== WATCH_LATER_PLAYLIST_ID,
+        );
+        if (allPlaylists.length === 0) {
+          playlistSaveListEl.innerHTML = '<div class="status-subtext">保存先がありません</div>';
+          return;
+        }
+
+        allPlaylists.forEach((playlist) => {
+          const row = document.createElement("div");
+          row.className = "playlist-save-row";
+
+          const thumb = document.createElement("img");
+          thumb.className = "playlist-save-thumb";
+          thumb.src = baseVideo.thumb || "/none_icon.jpg";
+          thumb.alt = playlist.name;
+          thumb.onerror = () => {
+            thumb.src = "/none_icon.jpg";
+          };
+
+          const textWrap = document.createElement("div");
+          const nameEl = document.createElement("div");
+          nameEl.className = "playlist-save-name";
+          nameEl.textContent = playlist.name;
+          const subEl = document.createElement("div");
+          subEl.className = "playlist-save-sub";
+          subEl.textContent = "非公開";
+          textWrap.appendChild(nameEl);
+          textWrap.appendChild(subEl);
+
+          const actionBtn = document.createElement("button");
+          actionBtn.type = "button";
+          actionBtn.className = "playlist-save-action";
+          actionBtn.innerHTML = '<i class="fa-regular fa-bookmark"></i>';
+          actionBtn.addEventListener("click", () => {
+            addVideoToPlaylistById(baseVideo, playlist.id);
+          });
+
+          row.appendChild(thumb);
+          row.appendChild(textWrap);
+          row.appendChild(actionBtn);
+          playlistSaveListEl.appendChild(row);
+        });
+      }
+
+      function openPlaylistSavePanel(anchorRect, video) {
+        renderPlaylistSavePanel(video);
+        const panelWidth = Math.min(420, window.innerWidth - 24);
+        const left = anchorRect
+          ? Math.max(12, Math.min(window.innerWidth - panelWidth - 12, anchorRect.left))
+          : 12;
+        const top = anchorRect
+          ? Math.min(window.innerHeight - 20, anchorRect.bottom + 8)
+          : 60;
+        playlistSavePanelEl.style.left = `${left}px`;
+        playlistSavePanelEl.style.top = `${top}px`;
+        playlistSavePanelEl.classList.remove("hidden");
+      }
+
+      async function copyVideoShareUrl(video) {
+        const videoId = getVideoIdFromFilename(video?.filename);
+        if (!videoId) return;
+        let url = `http://localhost:3000/#player/${encodeURIComponent(videoId)}`;
+        try {
+          const response = await fetch(`/info/${encodeURIComponent(videoId)}`);
+          if (response.ok) {
+            const info = await response.json();
+            if (info?.id) {
+              url = `https://www.youtube.com/watch?v=${info.id}`;
+            } else if (info?.webpage_url) {
+              url = String(info.webpage_url);
+            }
+          }
+        } catch (_error) {
+          // fallback to local URL
+        }
+        await copyTextToClipboard(url);
+      }
+
+      function enqueueVideo(video) {
+        if (!video?.filename) return;
+        transientQueue.push(video.filename);
+      }
+
+      function playNextVideoInQueue() {
+        while (transientQueue.length > 0) {
+          const nextFilename = transientQueue.shift();
+          const nextVideo = allLocalVideos.find((video) => video.filename === nextFilename);
+          if (!nextVideo) continue;
+          const matchedItem = findLocalVideoListItem(videoList, nextVideo.filename);
+          playLocalVideo(nextVideo, matchedItem || null, true);
+          return;
+        }
+      }
+
+      function openOptionsMenu(video, anchorButton) {
+        optionMenuVideo = video;
+        const rect = anchorButton.getBoundingClientRect();
+        const menuWidth = 250;
+        const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.left - 8));
+        const top = Math.min(window.innerHeight - 12, rect.bottom + 6);
+        optionsMenuEl.style.left = `${left}px`;
+        optionsMenuEl.style.top = `${top}px`;
+        optionsMenuEl.classList.remove("hidden");
+      }
+
+      function initializePlaylistEvents() {
+        if (!playlistSelectEl) return;
+
+        playlistSelectEl.addEventListener("change", () => {
+          updatePlaylistsState({
+            ...playlistsState,
+            selectedId: String(playlistSelectEl.value || ""),
+          });
+        });
+
+        playlistCreateBtnEl?.addEventListener("click", () => {
+          const name = String(playlistNameInputEl?.value || "").trim();
+          if (!name) return;
+          const created = upsertPlaylist(name);
+          if (created) {
+            updatePlaylistsState({
+              ...playlistsState,
+              selectedId: created.id,
+            });
+          }
+          if (playlistNameInputEl) playlistNameInputEl.value = "";
+        });
+
+        playlistDeleteBtnEl?.addEventListener("click", () => {
+          const selected = getSelectedPlaylist();
+          if (!selected) return;
+          updatePlaylistsState({
+            playlists: playlistsState.playlists.filter((p) => p.id !== selected.id),
+            selectedId: "",
+          });
+        });
+
+        playlistAddCurrentBtnEl?.addEventListener("click", () => {
+          const filename = appState.lastSelectedFilename;
+          if (!filename) return;
+          const currentVideo = allLocalVideos.find((video) => video.filename === filename);
+          if (!currentVideo) return;
+          addVideoToSelectedPlaylist(currentVideo);
+        });
+
+        optionsMenuEl.addEventListener("click", async (event) => {
+          const button = event.target.closest(".local-video-options-item");
+          if (!button) return;
+          const action = button.getAttribute("data-action");
+          const targetVideo = optionMenuVideo;
+          const menuRect = optionsMenuEl.getBoundingClientRect();
+          hideOptionsMenu();
+          if (!targetVideo) return;
+
+          if (action === "queue") {
+            enqueueVideo(targetVideo);
+            return;
+          }
+          if (action === "watch-later") {
+            addVideoToWatchLater(targetVideo);
+            return;
+          }
+          if (action === "save-playlist") {
+            openPlaylistSavePanel(menuRect, targetVideo);
+            return;
+          }
+          if (action === "share") {
+            try {
+              await copyVideoShareUrl(targetVideo);
+            } catch (error) {
+              onError("共有URLのコピーに失敗:", error);
+            }
+          }
+        });
+
+        playlistSaveCreateBtnEl?.addEventListener("click", () => {
+          openPlaylistCreateModal();
+        });
+
+        playlistModalCancelEl?.addEventListener("click", () => {
+          closePlaylistCreateModal();
+        });
+
+        playlistModalCreateEl?.addEventListener("click", () => {
+          const name = String(playlistModalInputEl?.value || "").trim();
+          if (!name) return;
+          const created = upsertPlaylist(name);
+          if (created && optionMenuVideo) {
+            addVideoToPlaylistById(optionMenuVideo, created.id);
+          }
+          closePlaylistCreateModal();
+          renderPlaylistSavePanel(optionMenuVideo);
+        });
+
+        document.addEventListener("click", (event) => {
+          const target = event.target;
+          const clickedOptionButton = target.closest(".local-video-option-btn");
+          if (!clickedOptionButton && !optionsMenuEl.contains(target)) {
+            hideOptionsMenu();
+          }
+          if (!playlistSavePanelEl.contains(target) && !optionsMenuEl.contains(target)) {
+            hidePlaylistSavePanel();
+          }
+          if (target === playlistModalBackdropEl) {
+            closePlaylistCreateModal();
+          }
+        });
+
+        videoPlayer.addEventListener("ended", () => {
+          playNextVideoInQueue();
+        });
+
+        renderPlaylistUi();
+      }
+
+      initializePlaylistEvents();
 
       function scheduleHomeInfoPrefetch() {
         if (!onPrefetchHomeInfos) return;
@@ -392,8 +942,9 @@
           const videos = result.data;
           allLocalVideos = Array.isArray(videos) ? videos : [];
 
-          renderLocalVideoList(videoList, allLocalVideos, playLocalVideo);
+          renderLocalVideoList(videoList, allLocalVideos, playLocalVideo, openOptionsMenu);
           onRenderHomeVideos?.(allLocalVideos);
+          renderPlaylistUi();
           scheduleHomeInfoPrefetch();
 
           if (appState.pendingVideoId) {

@@ -11,6 +11,9 @@
       case "player":
         pageId = "page-player";
         break;
+      case "playlists":
+        pageId = "page-playlists";
+        break;
       case "settings":
         pageId = "page-settings";
         break;
