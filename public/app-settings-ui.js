@@ -150,6 +150,7 @@ function clampNumberInRange(value, min, max, fallback) {
         elements.savePath.value = loadLocalSetting("savePath", "");
         elements.optHistory.checked = loadLocalSetting("optHistory", true);
         elements.optThumb.checked = loadLocalSetting("optThumb", true);
+        elements.optEmbedThumbnail.checked = loadLocalSetting("optEmbedThumbnail", true);
         elements.optDrm.checked = loadLocalSetting("optDrm", false);
         const loadedParallel = loadLocalSetting("optParallelDownloads", "3");
         elements.optParallelDownloads.value = loadedParallel;
@@ -173,6 +174,9 @@ function clampNumberInRange(value, min, max, fallback) {
         );
         elements.optThumb.addEventListener("change", (e) =>
           saveLocalSetting("optThumb", e.target.checked),
+        );
+        elements.optEmbedThumbnail.addEventListener("change", (e) =>
+          saveLocalSetting("optEmbedThumbnail", e.target.checked),
         );
         elements.optDrm.addEventListener("change", (e) =>
           saveLocalSetting("optDrm", e.target.checked),

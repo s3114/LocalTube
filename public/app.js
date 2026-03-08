@@ -102,6 +102,7 @@ const appState = window.AppState || {
           savePath: document.getElementById("savePath"),
           optHistory: document.getElementById("optHistory"),
           optThumb: document.getElementById("optThumb"),
+          optEmbedThumbnail: document.getElementById("optEmbedThumbnail"),
           optDrm: document.getElementById("optDrm"),
           optParallelDownloads: document.getElementById("optParallelDownloads"),
           parallelDownloadsValue: document.getElementById(
