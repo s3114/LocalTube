@@ -158,11 +158,29 @@
     function openFirstVideo(firstVideo, playlistId = "", playlistIndex = null) {
       if (!firstVideo?.filename) return;
       const videoId = firstVideo.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
-      appState.pendingVideoId = videoId;
       const listIdText = String(playlistId || "").trim();
       const indexNum = Number.isFinite(Number(playlistIndex))
         ? Math.max(1, Number(playlistIndex) + 1)
         : null;
+      const immediatePlayed = typeof global.playLocalVideoById === "function"
+        ? global.playLocalVideoById(videoId, {
+          shouldAutoplay: true,
+          playlistMeta: {
+            listId: listIdText,
+            index: indexNum ? String(indexNum) : "",
+          },
+        })
+        : false;
+      if (immediatePlayed) {
+        return;
+      }
+
+      appState.pendingVideoId = videoId;
+      appState.pendingAutoplay = true;
+      appState.pendingPlaylistId = listIdText;
+      appState.pendingPlaylistIndex = Number.isFinite(Number(playlistIndex))
+        ? String(Math.max(1, Number(playlistIndex) + 1))
+        : "";
       const suffix = listIdText
         ? `&list=${encodeURIComponent(listIdText)}${indexNum ? `&index=${indexNum}` : ""}`
         : "";

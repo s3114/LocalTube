@@ -320,6 +320,8 @@
       playerUi.initialize();
       applyInitialMobileCollapsedState();
       initializeDataLoadingAndPlaybackState();
+      global.playLocalVideoById = (videoId, options) =>
+        localVideoController?.playVideoById?.(videoId, options) || false;
       global.addEventListener("app:page-changed", (event) => {
         if (event?.detail?.pageId === "page-player") {
           tryResolvePendingPlayerVideo();

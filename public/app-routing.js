@@ -317,14 +317,26 @@
           appState.pendingVideoId = videoId;
           appState.pendingPlaylistId = listId || "";
           appState.pendingPlaylistIndex = index || "";
+          appState.lastPlayerHash = String(location.hash || "");
+        } else if (page === "player" && String(location.hash || "").startsWith("#player/")) {
+          appState.lastPlayerHash = String(location.hash || "");
         }
       }
 
       buttons.forEach((btn) => {
         btn.addEventListener("click", () => {
           const pageId = btn.dataset.page;
-          const hash = pageId.replace("page-", "");
-          history.pushState(null, "", "#" + hash);
+          const isPlayerButton = pageId === "page-player";
+          const currentHash = String(location.hash || "");
+          const shouldKeepPlayerHash = isPlayerButton && currentHash.startsWith("#player/");
+          if (!shouldKeepPlayerHash) {
+            if (isPlayerButton && appState.lastPlayerHash) {
+              history.pushState(null, "", appState.lastPlayerHash);
+            } else {
+              const hash = pageId.replace("page-", "");
+              history.pushState(null, "", "#" + hash);
+            }
+          }
 
           showPage(pageId);
           setActiveButton(pageId);
