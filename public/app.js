@@ -187,12 +187,19 @@ const appState = window.AppState || {
         createLocalVideoController,
         linkifyText,
       });
+      const playlistPageController = typeof window.createPlaylistPageController === "function"
+        ? window.createPlaylistPageController({
+          parseApiResponse,
+          appState,
+        })
+        : { initialize: () => {} };
 
       document.addEventListener("DOMContentLoaded", () => {
         registerServiceWorker();
         initializeSettingsAndSse();
         headerRoutingController.initialize();
         playerPageController.initialize();
+        playlistPageController.initialize();
       });
 
       document.addEventListener("job_completed", () => {
