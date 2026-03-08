@@ -493,6 +493,7 @@
       let allLocalVideos = [];
       let playlistsState = loadPlaylistsState();
       const transientQueue = [];
+      let currentPlaylistPlayback = { listId: "", index: "" };
       let optionMenuVideo = null;
       let playlistSaveTargetVideo = null;
       let playlistModalTargetVideo = null;
@@ -502,6 +503,9 @@
       const playlistDeleteBtnEl = document.getElementById("playlist-delete-btn");
       const playlistAddCurrentBtnEl = document.getElementById("playlist-add-current-btn");
       const playlistItemsEl = document.getElementById("playlist-items");
+      const playbackPlaylistSectionEl = document.getElementById("playback-playlist-section");
+      const playbackPlaylistItemsEl = document.getElementById("playback-playlist-items");
+      const playbackPlaylistTitleEl = document.getElementById("playback-playlist-title");
       const optionsMenuEl = document.createElement("div");
       optionsMenuEl.className = "local-video-options-menu hidden";
       optionsMenuEl.innerHTML = `
@@ -565,6 +569,7 @@
         playlistsState = normalizePlaylistsState(nextState);
         savePlaylistsState(playlistsState).catch(() => {});
         renderPlaylistUi();
+        renderPlaybackPlaylistSidebar();
       }
 
       function upsertPlaylist(name) {
@@ -806,6 +811,7 @@
       function enqueueVideo(video) {
         if (!video?.filename) return;
         transientQueue.push(video.filename);
+        renderPlaybackPlaylistSidebar();
       }
 
       function playNextVideoInQueue() {
@@ -815,8 +821,130 @@
           if (!nextVideo) continue;
           const matchedItem = findLocalVideoListItem(videoList, nextVideo.filename);
           playLocalVideo(nextVideo, matchedItem || null, true);
+          renderPlaybackPlaylistSidebar();
           return;
         }
+        renderPlaybackPlaylistSidebar();
+      }
+
+      function createPlaybackSidebarItem(video, labelPrefix, onClick) {
+        const row = document.createElement("div");
+        row.className = "local-video-item";
+
+        if (video?.thumb) {
+          const thumb = document.createElement("img");
+          thumb.className = "local-video-thumb";
+          thumb.src = video.thumb;
+          thumb.loading = "lazy";
+          thumb.decoding = "async";
+          thumb.onerror = () => {
+            thumb.src = "/none_icon.jpg";
+          };
+          row.appendChild(thumb);
+        } else {
+          const thumbPlaceholder = document.createElement("div");
+          thumbPlaceholder.className = "local-video-thumb";
+          row.appendChild(thumbPlaceholder);
+        }
+
+        const text = document.createElement("div");
+        text.className = "local-video-text";
+        text.textContent = `${labelPrefix}${video?.title || video?.filename || "無題"}`;
+        row.appendChild(text);
+
+        if (typeof onClick === "function") {
+          row.addEventListener("click", onClick);
+        }
+        return row;
+      }
+
+      function getQueuePlaybackEntries() {
+        return transientQueue
+          .map((filename, idx) => {
+            const video = allLocalVideos.find((item) => item.filename === filename);
+            if (!video) return null;
+            return {
+              key: `q:${filename}:${idx}`,
+              video,
+              labelPrefix: "[キュー] ",
+              playlistMeta: null,
+            };
+          })
+          .filter(Boolean);
+      }
+
+      function getPlaylistPlaybackEntries() {
+        const listId = String(currentPlaylistPlayback.listId || "").trim();
+        if (!listId) return [];
+        const playlist = getPlaylistById(listId);
+        if (!playlist || !Array.isArray(playlist.items) || playlist.items.length === 0) return [];
+
+        const startIndexRaw = Number(currentPlaylistPlayback.index || 1);
+        const startIndex = Number.isFinite(startIndexRaw) && startIndexRaw > 0
+          ? startIndexRaw - 1
+          : 0;
+        const clampedStart = Math.max(0, Math.min(startIndex, playlist.items.length - 1));
+
+        return playlist.items
+          .slice(clampedStart)
+          .map((filename, idx) => {
+            const video = allLocalVideos.find((item) => item.filename === filename);
+            if (!video) return null;
+            const order = clampedStart + idx + 1;
+            return {
+              key: `p:${filename}:${order}`,
+              video,
+              labelPrefix: `[${order}] `,
+              playlistMeta: {
+                listId,
+                index: String(order),
+              },
+            };
+          })
+          .filter(Boolean);
+      }
+
+      function renderPlaybackPlaylistSidebar() {
+        if (!playbackPlaylistSectionEl || !playbackPlaylistItemsEl) return;
+        const queueEntries = getQueuePlaybackEntries();
+        const playlistEntries = getPlaylistPlaybackEntries();
+        const entries = queueEntries.length > 0 ? queueEntries : playlistEntries;
+        const currentPlaylist = getPlaylistById(String(currentPlaylistPlayback.listId || "").trim());
+
+        if (entries.length === 0) {
+          playbackPlaylistSectionEl.style.display = "none";
+          playbackPlaylistItemsEl.innerHTML = "";
+          if (playbackPlaylistTitleEl) {
+            playbackPlaylistTitleEl.textContent = "プレイリスト";
+          }
+          return;
+        }
+
+        playbackPlaylistSectionEl.style.display = "";
+        if (playbackPlaylistTitleEl) {
+          if (queueEntries.length > 0) {
+            playbackPlaylistTitleEl.textContent = "プレイリスト - キュー";
+          } else {
+            const playlistName = String(currentPlaylist?.name || "").trim() || "未設定";
+            playbackPlaylistTitleEl.textContent = `プレイリスト - ${playlistName}`;
+          }
+        }
+        playbackPlaylistItemsEl.innerHTML = "";
+
+        const fragment = document.createDocumentFragment();
+        entries.forEach((entry) => {
+          fragment.appendChild(
+            createPlaybackSidebarItem(
+              entry.video,
+              entry.labelPrefix,
+              () => {
+                const matchedItem = findLocalVideoListItem(videoList, entry.video.filename);
+                playLocalVideo(entry.video, matchedItem || null, true, entry.playlistMeta);
+              },
+            ),
+          );
+        });
+        playbackPlaylistItemsEl.appendChild(fragment);
       }
 
       function openOptionsMenu(video, anchorButton) {
@@ -946,6 +1074,7 @@
         .then((serverState) => {
           playlistsState = normalizePlaylistsState(serverState);
           renderPlaylistUi();
+          renderPlaybackPlaylistSidebar();
         })
         .catch(() => {});
 
@@ -960,10 +1089,15 @@
 
       function playLocalVideo(video, activeItem = null, shouldAutoplay = true, playlistMeta = null) {
         const videoId = getVideoIdFromFilename(video.filename);
+        currentPlaylistPlayback = {
+          listId: String(playlistMeta?.listId || "").trim(),
+          index: String(playlistMeta?.index || "").trim(),
+        };
         activateLocalVideoListItem(activeItem);
         setupLocalVideoPlayerSource(videoPlayer, titleEl, onResetSeekBar, video);
         tryAutoplayLocalVideo(videoPlayer, shouldAutoplay);
         navigateToPlayerPageFromVideoId(videoId, onAfterNavigate, playlistMeta);
+        renderPlaybackPlaylistSidebar();
         // 再生開始の体感を優先して、重いサイド情報処理は次フレームへ遅延
         if (typeof requestAnimationFrame === "function") {
           requestAnimationFrame(() => {
@@ -1044,6 +1178,7 @@
           renderLocalVideoList(videoList, allLocalVideos, playLocalVideo, openOptionsMenu);
           onRenderHomeVideos?.(allLocalVideos);
           renderPlaylistUi();
+          renderPlaybackPlaylistSidebar();
           scheduleHomeInfoPrefetch();
 
           playPendingVideoIfAny(false);
