@@ -820,6 +820,7 @@
       }
 
       function openOptionsMenu(video, anchorButton) {
+        if (!video || !anchorButton) return;
         optionMenuVideo = video;
         const rect = anchorButton.getBoundingClientRect();
         const menuWidth = 250;
@@ -1059,6 +1060,7 @@
         playLocalVideo,
         playPendingVideoIfAny,
         playVideoById,
+        openVideoOptionsForVideo: (video, anchorElement) => openOptionsMenu(video, anchorElement),
         loadLocalVideos,
       };
     }

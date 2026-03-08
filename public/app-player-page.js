@@ -266,6 +266,9 @@
         onSelectVideo: (selectedVideo) => {
           localVideoController?.playLocalVideo(selectedVideo);
         },
+        onOpenVideoOptions: (video, anchorElement) => {
+          localVideoController?.openVideoOptionsForVideo?.(video, anchorElement);
+        },
       });
       homeVideoBrowser.initialize();
 
