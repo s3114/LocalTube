@@ -29,6 +29,7 @@
         --green: #4caf50;
         --blue: #2196f3;
         --black-panel: rgba(0, 0, 0, 0.62);
+        color-scheme: dark;
       }
 
       /* ==================================================
@@ -109,10 +110,19 @@
       /* ドロップダウン展開時のネイティブ配色をダーク寄りに固定 */
       select {
         color-scheme: dark;
+        background-color: #1b1b1b;
+        color: var(--text);
       }
 
-      select option {
+      select option,
+      select optgroup {
         background: #1b1b1b;
+        color: var(--text);
+      }
+
+      select option:checked,
+      select option:hover {
+        background: #2b2b2b;
         color: var(--text);
       }
 
