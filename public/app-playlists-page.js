@@ -1,6 +1,4 @@
 (function attachPlaylistPageModule(global) {
-  const PLAYLIST_STORAGE_KEY = "localtube.playlists.v1";
-
   function normalizePlaylistsState(rawState) {
     const source = rawState && typeof rawState === "object" ? rawState : {};
     const playlists = Array.isArray(source.playlists)
@@ -18,11 +16,12 @@
     return { playlists };
   }
 
-  function loadPlaylistsState() {
+  async function loadPlaylistsState(parseApiResponse) {
     try {
-      const raw = global.localStorage?.getItem(PLAYLIST_STORAGE_KEY);
-      if (!raw) return { playlists: [] };
-      return normalizePlaylistsState(JSON.parse(raw));
+      const response = await fetch("/api/settings");
+      const result = await parseApiResponse(response);
+      if (!result.ok) return { playlists: [] };
+      return normalizePlaylistsState(result.data?.playlistsState);
     } catch (_error) {
       return { playlists: [] };
     }
@@ -89,7 +88,7 @@
     async function render() {
       if (!grid || !isPlaylistPageActive()) return;
 
-      const state = loadPlaylistsState();
+      const state = await loadPlaylistsState(parseApiResponse);
       if (!state.playlists.length) {
         renderEmpty("プレイリストがありません");
         return;

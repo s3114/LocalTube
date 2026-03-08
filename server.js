@@ -12,6 +12,7 @@ const iconv = require("iconv-lite"); // 文字コード変換のため
 const {
   normalizeDirList,
   normalizeConfig,
+  normalizePlaylistsState,
 } = require("./server/config-store");
 const {
   registerSettingsWallpaperRoutes,
@@ -229,6 +230,7 @@ registerSettingsWallpaperRoutes(app, {
   loadConfig,
   saveConfig,
   normalizeDirList,
+  normalizePlaylistsState,
   getWallpaperPublicUrl: wallpaperService.getWallpaperPublicUrl,
   apiOk,
   apiError,
