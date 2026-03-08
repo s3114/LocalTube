@@ -32,7 +32,7 @@
     return { wrapEl, durationEl };
   }
 
-  function createHomeCardMetaElements(video) {
+  function createHomeCardMetaElements(video, onOpenOptions) {
     const metaEl = document.createElement("div");
     metaEl.className = "home-video-card-meta";
 
@@ -65,17 +65,29 @@
     textsEl.appendChild(statsEl);
     metaEl.appendChild(iconEl);
     metaEl.appendChild(textsEl);
+    if (typeof onOpenOptions === "function") {
+      const optionBtn = document.createElement("button");
+      optionBtn.type = "button";
+      optionBtn.className = "local-video-option-btn home-video-option-btn";
+      optionBtn.title = "オプション";
+      optionBtn.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+      optionBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onOpenOptions(video, optionBtn);
+      });
+      metaEl.appendChild(optionBtn);
+    }
 
     return { metaEl, refs: { titleEl, channelEl, statsEl, iconEl } };
   }
 
-  function createHomeVideoCardElement(video, onClick) {
+  function createHomeVideoCardElement(video, onClick, onOpenOptions = null) {
     const item = document.createElement("div");
     item.className = "home-video-card";
     const { wrapEl, durationEl } = createHomeCardThumbWrapElement(video);
     item.appendChild(wrapEl);
 
-    const { metaEl, refs } = createHomeCardMetaElements(video);
+    const { metaEl, refs } = createHomeCardMetaElements(video, onOpenOptions);
     item.appendChild(metaEl);
     item.addEventListener("click", () => onClick(video));
 

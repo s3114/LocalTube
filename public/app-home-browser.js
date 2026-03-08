@@ -694,11 +694,17 @@
     }
   }
 
-  function createHomeVideoCardFactory(onSelectVideo) {
+  function createHomeVideoCardFactory(onSelectVideo, onOpenVideoOptions) {
     return function createHomeVideoCard(video) {
-      return createHomeVideoCardElement(video, (selectedVideo) => {
-        onSelectVideo(selectedVideo);
-      });
+      return createHomeVideoCardElement(
+        video,
+        (selectedVideo) => {
+          onSelectVideo(selectedVideo);
+        },
+        onOpenVideoOptions
+          ? (selectedVideo, anchorElement) => onOpenVideoOptions(selectedVideo, anchorElement)
+          : null,
+      );
     };
   }
 
@@ -1043,6 +1049,7 @@
     filterFilepath,
     filterClearBtn,
     onSelectVideo,
+    onOpenVideoOptions = null,
     onMetric = (_name, _value, _meta) => {},
   }) {
     let allVideos = [];
@@ -1064,7 +1071,10 @@
       sortKey: "published",
       sortOrder: "desc",
     });
-    const createHomeVideoCard = createHomeVideoCardFactory(onSelectVideo);
+    const createHomeVideoCard = createHomeVideoCardFactory(
+      onSelectVideo,
+      onOpenVideoOptions,
+    );
     const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData);
     const thumbLazyLoader = createHomeThumbLazyLoader(homeVideoGrid);
     let fullInfoFetchPromise = null;
