@@ -29,7 +29,7 @@
     const [page, payload] = normalizedHash.split("/");
     const playerPayload = page === "player"
       ? parsePlayerRoutePayload(payload)
-      : { videoId: payload || "", listId: "", index: "" };
+      : { videoId: undefined };
 
     let pageId;
     switch (page) {
@@ -55,10 +55,8 @@
 
     return {
       page,
-      pageId,
       videoId: playerPayload.videoId,
-      listId: playerPayload.listId,
-      index: playerPayload.index,
+      pageId,
     };
   }
 
@@ -302,12 +300,13 @@
       }
 
       function routeFromHash() {
+        const normalizedHash = String(location.hash || "").replace("#", "");
+        const [, payload] = normalizedHash.split("/");
+        const parsedPayload = parsePlayerRoutePayload(payload);
         const {
           page,
           videoId,
           pageId,
-          listId,
-          index,
         } = resolvePageIdFromHash(location.hash);
 
         showPage(pageId);
@@ -315,8 +314,8 @@
 
         if (page === "player" && videoId) {
           appState.pendingVideoId = videoId;
-          appState.pendingPlaylistId = listId || "";
-          appState.pendingPlaylistIndex = index || "";
+          appState.pendingPlaylistId = parsedPayload.listId || "";
+          appState.pendingPlaylistIndex = parsedPayload.index || "";
           appState.lastPlayerHash = String(location.hash || "");
         } else if (page === "player" && String(location.hash || "").startsWith("#player/")) {
           appState.lastPlayerHash = String(location.hash || "");
