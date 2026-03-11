@@ -80,6 +80,10 @@
         "embedThumbnail",
         doc.getElementById("optEmbedThumbnail")?.checked ?? true,
       );
+      formData.append(
+        "forceIpv4",
+        doc.getElementById("optForceIpv4")?.checked ?? false,
+      );
       formData.append("drmProtect", doc.getElementById("optDrm").checked);
       formData.append("savePath", doc.getElementById("savePath").value);
       formData.append(

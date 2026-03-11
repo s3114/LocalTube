@@ -39,10 +39,8 @@ function createDownloadJobService({
       "--newline",
     ];
 
-    if (options.embedThumbnail !== false) {
-      args.push("--embed-thumbnail");
-    }
-
+    if (options.embedThumbnail !== false) args.push("--embed-thumbnail");
+    if (options.forceIpv4) args.push("--force-ipv4");
     if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
     if (options.downloadThumb) {
       args.push("--write-thumbnail");
