@@ -166,6 +166,49 @@ const appState = window.AppState || {
         });
       }
 
+      function initializeFormatToggle() {
+        const fmtSelect = document.getElementById("fmt");
+        const staticToggle = document.getElementById("optStaticFormat");
+        if (!fmtSelect || !staticToggle) return;
+
+        const dynamicOptions = Array.from(fmtSelect.options).map((option) => ({
+          value: option.value,
+          text: option.textContent,
+        }));
+
+        const staticOptions = [
+          { value: "301/300/94/93/92/91", text: "1080p（1920 x 1080）" },
+          { value: "300/94/93/92/91", text: "720p （1280 x 720 ）" },
+          { value: "94/93/92/91", text: "480p （720 x 480 ）" },
+          { value: "93/92/91", text: "360p （640 x 360 ）" },
+          { value: "92/91", text: "240p （ 426 x 240 ）" },
+          { value: "91", text: "144p （256 x 144 ）" },
+        ];
+
+        const applyOptions = (options) => {
+          const previousValue = fmtSelect.value;
+          fmtSelect.innerHTML = "";
+          options.forEach((option) => {
+            const opt = document.createElement("option");
+            opt.value = option.value;
+            opt.textContent = option.text;
+            fmtSelect.appendChild(opt);
+          });
+          if (options.some((opt) => opt.value === previousValue)) {
+            fmtSelect.value = previousValue;
+          } else {
+            fmtSelect.selectedIndex = 0;
+          }
+        };
+
+        const sync = () => {
+          applyOptions(staticToggle.checked ? staticOptions : dynamicOptions);
+        };
+
+        staticToggle.addEventListener("change", sync);
+        sync();
+      }
+
       // --- Actions ---
       const downloadActions = window.createDownloadActions({
         parseApiResponse,
@@ -197,6 +240,7 @@ const appState = window.AppState || {
       document.addEventListener("DOMContentLoaded", () => {
         registerServiceWorker();
         initializeSettingsAndSse();
+        initializeFormatToggle();
         headerRoutingController.initialize();
         playerPageController.initialize();
         playlistPageController.initialize();
