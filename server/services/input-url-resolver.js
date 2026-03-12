@@ -9,8 +9,9 @@ function createInputUrlResolver({ spawn, path, baseDir, logger }) {
   function getUrlsFromInput(url, cookiePath) {
     return new Promise((resolve, reject) => {
       const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
+      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
       let args = [];
-      const commonArgs = ["--skip-download", "--quiet", "--no-warnings"];
+      const commonArgs = ["--skip-download", "--quiet", "--no-warnings", "--ffmpeg-location", ffmpegPath];
       if (cookiePath) {
         commonArgs.push("--cookies", cookiePath);
       }

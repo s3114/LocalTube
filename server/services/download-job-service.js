@@ -21,6 +21,9 @@ function createDownloadJobService({
   function buildArgs(job, paths, settings) {
     const { url, options } = job;
     const { movieDir: targetMovieDir, thumbnailDir: targetThumbDir, tempDir } = paths;
+    const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+    const downloadThumbEnabled =
+      options.downloadThumb === true || options.downloadThumb === "true";
 
     const args = [
       url,
@@ -30,19 +33,29 @@ function createDownloadJobService({
       `home:${targetMovieDir}`,
       "-P",
       `temp:${tempDir}`,
-      "--add-metadata",
       "--ignore-errors",
       "--retries",
       "infinite",
       "--progress",
       "--no-color",
       "--newline",
+      "--ffmpeg-location",
+      ffmpegPath,
     ];
 
+    if (options.addMetadata !== false) args.push("--add-metadata");
     if (options.embedThumbnail !== false) args.push("--embed-thumbnail");
+    if (options.remuxVideo) {
+      args.push("--merge-output-format", "mp4");
+      args.push("--remux-video", "mp4");
+      args.push(
+        "--postprocessor-args",
+        "\"ffmpeg:-fflags +genpts -movflags +faststart\"",
+      );
+    }
     if (options.forceIpv4) args.push("--force-ipv4");
     if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
-    if (options.downloadThumb) {
+    if (downloadThumbEnabled) {
       args.push("--write-thumbnail");
       args.push("-P", `thumbnail:${targetThumbDir}`);
     }
@@ -105,7 +118,9 @@ function createDownloadJobService({
     if (!fs.existsSync(finalMovieDir)) {
       fs.mkdirSync(finalMovieDir, { recursive: true });
     }
-    if (job.options.downloadThumb && !fs.existsSync(finalThumbnailDir)) {
+    const downloadThumbEnabled =
+      job.options.downloadThumb === true || job.options.downloadThumb === "true";
+    if (downloadThumbEnabled && !fs.existsSync(finalThumbnailDir)) {
       fs.mkdirSync(finalThumbnailDir, { recursive: true });
     }
   }
@@ -214,7 +229,14 @@ function createDownloadJobService({
 
   function getTitle(ytDlpPath, url, cookiePath, settings) {
     return new Promise((resolve, reject) => {
-      const args = [url, "--get-title", "--no-warnings"];
+      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+      const args = [
+        url,
+        "--get-title",
+        "--no-warnings",
+        "--ffmpeg-location",
+        ffmpegPath,
+      ];
       if (cookiePath) {
         args.push("--cookies", cookiePath);
       } else if (settings && settings.selectedBrowser) {
@@ -250,7 +272,15 @@ function createDownloadJobService({
     if (typeof infoObj.channel_url !== "string") return infoObj;
 
     try {
-      const channelArgs = ["-J", "--no-playlist", "--playlist-items", "0"];
+      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+      const channelArgs = [
+        "-J",
+        "--no-playlist",
+        "--playlist-items",
+        "0",
+        "--ffmpeg-location",
+        ffmpegPath,
+      ];
       if (job.cookieFile?.path) {
         channelArgs.push("--cookies", job.cookieFile.path);
       } else if (settings && settings.selectedBrowser) {

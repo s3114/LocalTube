@@ -103,6 +103,10 @@ const appState = window.AppState || {
           optHistory: document.getElementById("optHistory"),
           optThumb: document.getElementById("optThumb"),
           optEmbedThumbnail: document.getElementById("optEmbedThumbnail"),
+          optAddMetadata: document.getElementById("optAddMetadata"),
+          optRemuxVideo: document.getElementById("optRemuxVideo"),
+          optStaticFormat: document.getElementById("optStaticFormat"),
+          optForceIpv4: document.getElementById("optForceIpv4"),
           optDrm: document.getElementById("optDrm"),
           optParallelDownloads: document.getElementById("optParallelDownloads"),
           parallelDownloadsValue: document.getElementById(
@@ -169,7 +173,7 @@ const appState = window.AppState || {
       function initializeFormatToggle() {
         const fmtSelect = document.getElementById("fmt");
         const staticToggle = document.getElementById("optStaticFormat");
-        if (!fmtSelect || !staticToggle) return;
+        if (!fmtSelect || !staticToggle || !fmtSelect.options) return;
 
         const dynamicOptions = Array.from(fmtSelect.options).map((option) => ({
           value: option.value,
@@ -177,12 +181,12 @@ const appState = window.AppState || {
         }));
 
         const staticOptions = [
-          { value: "301/300/94/93/92/91", text: "1080p（1920 x 1080）" },
-          { value: "300/94/93/92/91", text: "720p （1280 x 720 ）" },
-          { value: "94/93/92/91", text: "480p （720 x 480 ）" },
-          { value: "93/92/91", text: "360p （640 x 360 ）" },
-          { value: "92/91", text: "240p （ 426 x 240 ）" },
-          { value: "91", text: "144p （256 x 144 ）" },
+          { value: "301-0/301/300-0/300/94-0/94/93-0/93/92-0/92/91-0/91", text: "1080p（1920 x 1080）" },
+          { value: "300-0/300/94-0/94/93-0/93/92-0/92/91-0/91", text: "720p （1280 x 720 ）" },
+          { value: "94-0/94/93-0/93/92-0/92/91-0/91", text: "480p （720 x 480 ）" },
+          { value: "93-0/93/92-0/92/91-0/91", text: "360p （640 x 360 ）" },
+          { value: "92-0/92/91-0/91", text: "240p （ 426 x 240 ）" },
+          { value: "91-0/91", text: "144p （256 x 144 ）" },
         ];
 
         const applyOptions = (options) => {

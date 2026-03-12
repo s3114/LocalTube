@@ -81,6 +81,14 @@
         doc.getElementById("optEmbedThumbnail")?.checked ?? true,
       );
       formData.append(
+        "addMetadata",
+        doc.getElementById("optAddMetadata")?.checked ?? true,
+      );
+      formData.append(
+        "remuxVideo",
+        doc.getElementById("optRemuxVideo")?.checked ?? false,
+      );
+      formData.append(
         "forceIpv4",
         doc.getElementById("optForceIpv4")?.checked ?? false,
       );
