@@ -150,7 +150,21 @@ function clampNumberInRange(value, min, max, fallback) {
         elements.savePath.value = loadLocalSetting("savePath", "");
         elements.optHistory.checked = loadLocalSetting("optHistory", true);
         elements.optThumb.checked = loadLocalSetting("optThumb", true);
-        elements.optEmbedThumbnail.checked = loadLocalSetting("optEmbedThumbnail", true);
+        if (elements.optEmbedThumbnail) {
+          elements.optEmbedThumbnail.checked = loadLocalSetting("optEmbedThumbnail", true);
+        }
+        if (elements.optAddMetadata) {
+          elements.optAddMetadata.checked = loadLocalSetting("optAddMetadata", true);
+        }
+        if (elements.optRemuxVideo) {
+          elements.optRemuxVideo.checked = loadLocalSetting("optRemuxVideo", false);
+        }
+        if (elements.optStaticFormat) {
+          elements.optStaticFormat.checked = loadLocalSetting("optStaticFormat", false);
+        }
+        if (elements.optForceIpv4) {
+          elements.optForceIpv4.checked = loadLocalSetting("optForceIpv4", false);
+        }
         elements.optDrm.checked = loadLocalSetting("optDrm", false);
         const loadedParallel = loadLocalSetting("optParallelDownloads", "3");
         elements.optParallelDownloads.value = loadedParallel;
@@ -175,8 +189,20 @@ function clampNumberInRange(value, min, max, fallback) {
         elements.optThumb.addEventListener("change", (e) =>
           saveLocalSetting("optThumb", e.target.checked),
         );
-        elements.optEmbedThumbnail.addEventListener("change", (e) =>
+        elements.optEmbedThumbnail?.addEventListener("change", (e) =>
           saveLocalSetting("optEmbedThumbnail", e.target.checked),
+        );
+        elements.optAddMetadata?.addEventListener("change", (e) =>
+          saveLocalSetting("optAddMetadata", e.target.checked),
+        );
+        elements.optRemuxVideo?.addEventListener("change", (e) =>
+          saveLocalSetting("optRemuxVideo", e.target.checked),
+        );
+        elements.optStaticFormat?.addEventListener("change", (e) =>
+          saveLocalSetting("optStaticFormat", e.target.checked),
+        );
+        elements.optForceIpv4?.addEventListener("change", (e) =>
+          saveLocalSetting("optForceIpv4", e.target.checked),
         );
         elements.optDrm.addEventListener("change", (e) =>
           saveLocalSetting("optDrm", e.target.checked),

@@ -4,7 +4,6 @@ syorimachi_folder/
 karioki/
 AtomicParsley.exe
 deno.exe
-ffmpeg.exe
 yt-dlp.exe
 finished.txt
 config.json
@@ -14,3 +13,5 @@ wallpaper.jpg
 profiles/
 仮置きフォルダ/
 cache/
+
+https://www.youtube.com/watch?v=1NR_1G83uc0 -o "%(upload_date)s-%(title)s.%(ext)s" -P home:C:\dev\YoutubeDL\downloads\動画 -P temp:C:\dev\YoutubeDL\downloads --ignore-errors --retries infinite --progress --no-color --newline --ffmpeg-location C:\dev\YoutubeDL\ffmpeg.exe -f 301-0/301/300-0/300/94-0/94/93-0/93/92-0/92/91-0/91 --write-thumbnail -P thumbnail:C:\dev\YoutubeDL\downloads\サムネイル --cookies C:\WINDOWS\TEMP\c4414223185b91ba25495777efd9eb54 --concurrent-fragments 16
