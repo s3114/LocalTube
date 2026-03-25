@@ -45,14 +45,6 @@ function createDownloadJobService({
 
     if (options.addMetadata !== false) args.push("--add-metadata");
     if (options.embedThumbnail !== false) args.push("--embed-thumbnail");
-    if (options.remuxVideo) {
-      args.push("--merge-output-format", "mp4");
-      args.push("--remux-video", "mp4");
-      args.push(
-        "--postprocessor-args",
-        "\"ffmpeg:-fflags +genpts -movflags +faststart\"",
-      );
-    }
     if (options.forceIpv4) args.push("--force-ipv4");
     if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
     if (downloadThumbEnabled) {
@@ -403,6 +395,117 @@ function createDownloadJobService({
     return { infoFile, jobPendingDir };
   }
 
+  function findVideoFileForInfo(finalMovieDir, infoFile) {
+    const files = fs.readdirSync(finalMovieDir);
+    const videoExts = new Set([
+      ".mp4",
+      ".mkv",
+      ".webm",
+      ".flv",
+      ".mov",
+      ".m4v",
+      ".ts",
+      ".avi",
+      ".wmv",
+    ]);
+    const videoFiles = files
+      .filter((file) => {
+        const ext = path.extname(file).toLowerCase();
+        return ext !== ".json" && videoExts.has(ext);
+      })
+      .map((file) => path.join(finalMovieDir, file));
+
+    if (infoFile) {
+      const baseName = infoFile.replace(/\.info\.json$/i, "");
+      const matches = videoFiles
+        .filter((filePath) => path.basename(filePath).startsWith(`${baseName}.`))
+        .sort((a, b) => {
+          const aExt = path.extname(a).toLowerCase();
+          const bExt = path.extname(b).toLowerCase();
+          if (aExt === ".mp4" && bExt !== ".mp4") return -1;
+          if (bExt === ".mp4" && aExt !== ".mp4") return 1;
+          return a.localeCompare(b);
+        });
+
+      if (matches.length > 0) return matches[0];
+    }
+
+    if (videoFiles.length === 0) return null;
+    videoFiles.sort((a, b) => {
+      const aStat = fs.statSync(a);
+      const bStat = fs.statSync(b);
+      if (aStat.mtimeMs !== bStat.mtimeMs) return bStat.mtimeMs - aStat.mtimeMs;
+      return b.localeCompare(a);
+    });
+    return videoFiles[0];
+  }
+
+  async function runFfmpegRemux(inputPath) {
+    return new Promise((resolve, reject) => {
+      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+      const parsed = path.parse(inputPath);
+      const outputPath = path.join(parsed.dir, `${parsed.name}_fix.mp4`);
+      const finalPath = path.join(parsed.dir, `${parsed.name}.mp4`);
+
+      if (!fs.existsSync(inputPath)) {
+        reject(new Error(`入力ファイルが見つかりません: ${inputPath}`));
+        return;
+      }
+
+      if (fs.existsSync(outputPath)) {
+        fs.unlinkSync(outputPath);
+      }
+
+      const args = [
+        "-y",
+        "-fflags",
+        "+genpts",
+        "-i",
+        inputPath,
+        "-c",
+        "copy",
+        outputPath,
+      ];
+      const inputStat = fs.statSync(inputPath);
+      logger.info("ffmpeg 再エンコード実行", {
+        args: args.join(" "),
+        inputPath,
+        inputBytes: inputStat.size,
+      });
+      const ffmpeg = spawn(ffmpegPath, args, { windowsHide: true });
+
+      let stderrOutput = "";
+      ffmpeg.stderr.on("data", (data) => {
+        stderrOutput += data.toString();
+      });
+
+      ffmpeg.on("close", (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(
+              `ffmpegがエラーコード${code}で終了しました。Stderr: ${stderrOutput}`,
+            ),
+          );
+          return;
+        }
+
+        try {
+          if (fs.existsSync(inputPath)) {
+            fs.unlinkSync(inputPath);
+          }
+          fs.renameSync(outputPath, finalPath);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      ffmpeg.on("error", (err) => {
+        reject(new Error(`ffmpegプロセスの起動に失敗: ${err.message}`));
+      });
+    });
+  }
+
   async function runYtDlpDownload(job, settings, ytDlpPath, paths) {
     return new Promise((resolve, reject) => {
       const args = buildArgs(
@@ -482,6 +585,40 @@ function createDownloadJobService({
     }
 
     await runYtDlpDownload(job, settings, ytDlpPath, paths);
+
+    if (job.options.remuxVideo) {
+      const files = fs.readdirSync(paths.finalMovieDir);
+      const infoFile = files.find((f) => f.endsWith(".info.json"));
+      const targetVideoPath = findVideoFileForInfo(paths.finalMovieDir, infoFile);
+      if (!targetVideoPath) {
+        logger.warn("再エンコード対象が見つかりません", {
+          finalMovieDir: paths.finalMovieDir,
+        });
+      } else {
+        let lastError = null;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try {
+            await runFfmpegRemux(targetVideoPath);
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            logger.warn("再エンコードに失敗", {
+              attempt,
+              error: error.message,
+              targetVideoPath,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          }
+        }
+        if (lastError) {
+          logger.warn("再エンコードのリトライが失敗", {
+            error: lastError.message,
+            targetVideoPath,
+          });
+        }
+      }
+    }
 
     const isProcessingExtras =
       job.options.commentOptions && job.options.commentOptions !== "none";
