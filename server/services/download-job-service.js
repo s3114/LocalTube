@@ -17,13 +17,66 @@ function createDownloadJobService({
 }) {
   const logger = createLogger("download-job");
   const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
+  let cachedFfmpegCheck = null;
+
+  function getUsableFfmpegPath() {
+    if (cachedFfmpegCheck) {
+      return cachedFfmpegCheck.ok ? cachedFfmpegCheck.path : null;
+    }
+
+    const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+    try {
+      execFileSync(ffmpegPath, ["-version"], {
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      cachedFfmpegCheck = { ok: true, path: ffmpegPath };
+      return ffmpegPath;
+    } catch (error) {
+      cachedFfmpegCheck = {
+        ok: false,
+        path: ffmpegPath,
+        error,
+      };
+      logger.warn("ffmpeg 実行確認に失敗", {
+        ffmpegPath,
+        error: error.message,
+        status: error.status,
+      });
+      return null;
+    }
+  }
+
+  function assertFfmpegAvailable(job) {
+    const ffmpegPath = getUsableFfmpegPath();
+    if (ffmpegPath) return ffmpegPath;
+
+    const downloadVideoEnabled =
+      job.options.downloadVideo === true || job.options.downloadVideo === "true";
+    const needsFfmpeg =
+      (downloadVideoEnabled && job.options.embedThumbnail !== false) ||
+      (downloadVideoEnabled && job.options.addMetadata !== false) ||
+      (downloadVideoEnabled && Boolean(job.options.remuxVideo)) ||
+      (downloadVideoEnabled &&
+        Boolean(job.options.format && String(job.options.format).includes("+")));
+
+    if (!needsFfmpeg) return null;
+
+    const checkedPath = cachedFfmpegCheck?.path || path.join(baseDir, "ffmpeg.exe");
+    const status = cachedFfmpegCheck?.error?.status;
+    throw new Error(
+      `ffmpeg を起動できません: ${checkedPath}${typeof status === "number" ? ` (status=${status})` : ""}`,
+    );
+  }
 
   function buildArgs(job, paths, settings) {
     const { url, options } = job;
     const { movieDir: targetMovieDir, thumbnailDir: targetThumbDir, tempDir } = paths;
-    const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+    const ffmpegPath = getUsableFfmpegPath();
     const downloadThumbEnabled =
       options.downloadThumb === true || options.downloadThumb === "true";
+    const downloadVideoEnabled =
+      options.downloadVideo === true || options.downloadVideo === "true";
 
     const args = [
       url,
@@ -39,14 +92,21 @@ function createDownloadJobService({
       "--progress",
       "--no-color",
       "--newline",
-      "--ffmpeg-location",
-      ffmpegPath,
     ];
 
-    if (options.addMetadata !== false) args.push("--add-metadata");
-    if (options.embedThumbnail !== false) args.push("--embed-thumbnail");
+    if (ffmpegPath) {
+      args.push("--ffmpeg-location", ffmpegPath);
+    }
+
+    if (!downloadVideoEnabled) {
+      args.push("--skip-download");
+    }
+    if (downloadVideoEnabled && options.addMetadata !== false) args.push("--add-metadata");
+    if (downloadVideoEnabled && options.embedThumbnail !== false) args.push("--embed-thumbnail");
     if (options.forceIpv4) args.push("--force-ipv4");
-    if (options.format && !url.includes("abema.tv")) args.push("-f", options.format);
+    if (downloadVideoEnabled && options.format && !url.includes("abema.tv")) {
+      args.push("-f", options.format);
+    }
     if (downloadThumbEnabled) {
       args.push("--write-thumbnail");
       args.push("-P", `thumbnail:${targetThumbDir}`);
@@ -221,14 +281,15 @@ function createDownloadJobService({
 
   function getTitle(ytDlpPath, url, cookiePath, settings) {
     return new Promise((resolve, reject) => {
-      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
       const args = [
         url,
         "--get-title",
         "--no-warnings",
-        "--ffmpeg-location",
-        ffmpegPath,
       ];
+      const ffmpegPath = getUsableFfmpegPath();
+      if (ffmpegPath) {
+        args.push("--ffmpeg-location", ffmpegPath);
+      }
       if (cookiePath) {
         args.push("--cookies", cookiePath);
       } else if (settings && settings.selectedBrowser) {
@@ -264,15 +325,16 @@ function createDownloadJobService({
     if (typeof infoObj.channel_url !== "string") return infoObj;
 
     try {
-      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
       const channelArgs = [
         "-J",
         "--no-playlist",
         "--playlist-items",
         "0",
-        "--ffmpeg-location",
-        ffmpegPath,
       ];
+      const ffmpegPath = getUsableFfmpegPath();
+      if (ffmpegPath) {
+        channelArgs.push("--ffmpeg-location", ffmpegPath);
+      }
       if (job.cookieFile?.path) {
         channelArgs.push("--cookies", job.cookieFile.path);
       } else if (settings && settings.selectedBrowser) {
@@ -580,13 +642,16 @@ function createDownloadJobService({
     const paths = resolveOutputPaths(job);
     try {
       ensureCustomOutputDirs(job, paths);
+      assertFfmpegAvailable(job);
     } catch (error) {
       throw new Error(`保存先準備失敗: ${error.message}`);
     }
 
     await runYtDlpDownload(job, settings, ytDlpPath, paths);
 
-    if (job.options.remuxVideo) {
+    const downloadVideoEnabled =
+      job.options.downloadVideo === true || job.options.downloadVideo === "true";
+    if (downloadVideoEnabled && job.options.remuxVideo) {
       const files = fs.readdirSync(paths.finalMovieDir);
       const infoFile = files.find((f) => f.endsWith(".info.json"));
       const targetVideoPath = findVideoFileForInfo(paths.finalMovieDir, infoFile);
