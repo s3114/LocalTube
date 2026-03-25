@@ -504,12 +504,17 @@
         align-items: center;
         gap: 10px;
         margin-bottom: 10px;
+        padding-inline: 6px;
         width: 100%;
       }
 
       .field-label {
         font-weight: 600;
         white-space: nowrap;
+        width: 56px;
+        min-width: 56px;
+        text-align: right;
+        padding-right: 4px;
       }
 
       .url-box {
@@ -547,13 +552,45 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        padding-inline: 6px;
         width: 100%;
+      }
+
+      .field-row-download-toggles {
+        align-items: flex-start;
       }
 
       .field-row select,
       .field-row input {
         flex: 1;
         background: rgb(255 255 255 / 5%);
+      }
+
+      .download-toggle-group {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        width: 100%;
+      }
+
+      .download-inline-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 42px;
+        padding: 6px 10px;
+        border-radius: 12px;
+        background: rgb(255 255 255 / 5%);
+        min-width: 0;
+      }
+
+      .download-inline-toggle span:first-child {
+        color: var(--text);
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .options {
@@ -2951,6 +2988,15 @@
           width: 100%;
         }
 
+        .download-toggle-group {
+          flex-direction: column;
+        }
+
+        .download-inline-toggle {
+          justify-content: space-between;
+          width: 100%;
+        }
+
         .url-box button,
         #download-btn {
           width: 100%;
@@ -3587,10 +3633,13 @@
               </div>
             </div>
 
-            <div class="sidebar-local_movie" id="playback-playlist-section" style="display:none;">
+            <div class="sidebar-local_movie" id="playback-playlist-section"
+              style="display:none;">
               <div class="sidebar-header">
-                <div class="sidebar-title" id="playback-playlist-title">プレイリスト</div>
-                <button class="sidebar-toggle" data-target="playback-playlist-section">
+                <div class="sidebar-title"
+                  id="playback-playlist-title">プレイリスト</div>
+                <button class="sidebar-toggle"
+                  data-target="playback-playlist-section">
                   <i class="fa-solid fa-chevron-down"></i>
                 </button>
               </div>
@@ -3615,7 +3664,7 @@
         <div class="card card-layout">
           <div class="card-main">
             <div class="url-row">
-              <div class="field-label">URL ：</div>
+              <div class="field-label">URL</div>
               <div class="url-box">
                 <textarea
                   id="urls"
@@ -3627,7 +3676,7 @@
             </div>
             <div class="options">
               <div class="field-row">
-                <div class="field-label">画質：</div>
+                <div class="field-label">画質</div>
                 <select id="fmt">
                   <option
                     value="bv[height=4320][ext=mp4]+ba[ext=m4a]/bv[height=2160][ext=mp4]+ba[ext=m4a]/bv[height=1440][ext=mp4]+ba[ext=m4a]/bv[height=1080][ext=mp4]+ba[ext=m4a]/bv[height=720][ext=mp4]+ba[ext=m4a]/bv[height=480][ext=mp4]+ba[ext=m4a]/bv[height=360][ext=mp4]+ba[ext=m4a]/bv[height=240][ext=mp4]+ba[ext=m4a]/bv[height=144][ext=mp4]+ba[ext=m4a]">
@@ -3667,18 +3716,43 @@
                 </select>
               </div>
 
-              <div class="field-row">
-                <div class="field-label">ｺﾒﾝﾄ：</div>
-                <select id="comment-options">
-                  <option value="both">コメントとチャット</option>
-                  <option value="comments">動画のコメント</option>
-                  <option value="sub">ライブ中のチャット</option>
-                  <option value="none">ダウンロードしない</option>
-                </select>
+              <div class="field-row field-row-download-toggles">
+                <div class="field-label">DL</div>
+                <div class="download-toggle-group">
+
+                  <label class="download-inline-toggle">
+                    <span>コメント</span>
+                    <span class="switch">
+                      <input type="checkbox" id="optDownloadComments" checked />
+                      <span class="slider"></span>
+                    </span>
+                  </label>
+                  <label class="download-inline-toggle">
+                    <span>チャット</span>
+                    <span class="switch">
+                      <input type="checkbox" id="optDownloadChat" checked />
+                      <span class="slider"></span>
+                    </span>
+                  </label>
+                  <label class="download-inline-toggle">
+                    <span>サムネイル</span>
+                    <span class="switch">
+                      <input type="checkbox" id="optThumb" checked />
+                      <span class="slider"></span>
+                    </span>
+                  </label>
+                  <label class="download-inline-toggle">
+                    <span>動画</span>
+                    <span class="switch">
+                      <input type="checkbox" id="optDownloadVideo" checked />
+                      <span class="slider"></span>
+                    </span>
+                  </label>
+                </div>
               </div>
 
               <div class="field-row">
-                <div class="field-label">保存：</div>
+                <div class="field-label">保存</div>
                 <div class="url-box">
                   <input
                     type="text"
@@ -3755,16 +3829,6 @@
               </div>
               <div class="toggle">
                 <div>
-                  サムネイルをダウンロード
-                  <small>動画一覧・再生画面で使用</small>
-                </div>
-                <label class="switch">
-                  <input type="checkbox" id="optThumb" checked />
-                  <span class="slider"></span>
-                </label>
-              </div>
-              <div class="toggle">
-                <div>
                   動画へサムネイルを埋め込む
                   <small>動画ファイルにサムネイルを埋め込みます。</small>
                 </div>
@@ -3773,7 +3837,7 @@
                   <span class="slider"></span>
                 </label>
               </div>
-              <div class="toggle">
+              <!-- <div class="toggle">
                 <div>
                   メタデータを埋め込む
                   <small>動画ファイルへタイトルなどのメタデータを埋め込みます。</small>
@@ -3812,7 +3876,7 @@
                   <input type="checkbox" id="optForceIpv4" />
                   <span class="slider"></span>
                 </label>
-              </div>
+              </div> -->
               <div class="toggle">
                 <div>
                   DRM 保護を回避

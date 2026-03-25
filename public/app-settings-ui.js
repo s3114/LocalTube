@@ -172,10 +172,18 @@ function clampNumberInRange(value, min, max, fallback) {
         const loadedFragments = loadLocalSetting("optConcurrentFragments", "4");
         elements.optConcurrentFragments.value = loadedFragments;
         elements.concurrentFragmentsValue.textContent = loadedFragments;
-        elements.commentOptions.value = loadLocalSetting(
-          "commentOptions",
-          elements.commentOptions.value,
-        );
+        if (elements.optDownloadComments) {
+          elements.optDownloadComments.checked = loadLocalSetting(
+            "optDownloadComments",
+            true,
+          );
+        }
+        if (elements.optDownloadChat) {
+          elements.optDownloadChat.checked = loadLocalSetting("optDownloadChat", true);
+        }
+        if (elements.optDownloadVideo) {
+          elements.optDownloadVideo.checked = loadLocalSetting("optDownloadVideo", true);
+        }
 
         elements.fmt.addEventListener("change", (e) =>
           saveLocalSetting("fmt", e.target.value),
@@ -215,8 +223,14 @@ function clampNumberInRange(value, min, max, fallback) {
           elements.concurrentFragmentsValue.textContent = e.target.value;
           saveLocalSetting("optConcurrentFragments", e.target.value);
         });
-        elements.commentOptions.addEventListener("change", (e) =>
-          saveLocalSetting("commentOptions", e.target.value),
+        elements.optDownloadComments?.addEventListener("change", (e) =>
+          saveLocalSetting("optDownloadComments", e.target.checked),
+        );
+        elements.optDownloadChat?.addEventListener("change", (e) =>
+          saveLocalSetting("optDownloadChat", e.target.checked),
+        );
+        elements.optDownloadVideo?.addEventListener("change", (e) =>
+          saveLocalSetting("optDownloadVideo", e.target.checked),
         );
       }
 
