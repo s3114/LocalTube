@@ -126,7 +126,9 @@ const appState = window.AppState || {
           manualSelectBtn: document.getElementById("manual-select-btn"),
           noneSelectBtn: document.getElementById("none-select-btn"),
           cookiePathSet: document.getElementById("cookiePathSet"),
-          commentOptions: document.getElementById("comment-options"),
+          optDownloadComments: document.getElementById("optDownloadComments"),
+          optDownloadChat: document.getElementById("optDownloadChat"),
+          optDownloadVideo: document.getElementById("optDownloadVideo"),
           clearHistoryBtn: document.getElementById("clearHistoryBtn"),
           localVideoDirsInput: document.getElementById("local-video-dirs-input"),
           saveLocalVideoDirsBtn: document.getElementById(

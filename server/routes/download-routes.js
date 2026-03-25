@@ -50,6 +50,9 @@ function registerDownloadRoutes(
       parallelDownloads,
       concurrentFragments,
       commentOptions,
+      downloadComments,
+      downloadChat,
+      downloadVideo,
     } = req.body;
     const cookieFile = req.file;
 
@@ -79,6 +82,10 @@ function registerDownloadRoutes(
               remuxVideo: remuxVideo === true || remuxVideo === "true",
               forceIpv4: forceIpv4 === "true",
               drmProtect: drmProtect === "true",
+              downloadComments:
+                downloadComments === true || downloadComments === "true",
+              downloadChat: downloadChat === true || downloadChat === "true",
+              downloadVideo: downloadVideo === true || downloadVideo === "true",
               savePath,
               concurrentFragments,
               commentOptions,
