@@ -80,6 +80,8 @@ function createDownloadJobService({
 
     const args = [
       url,
+      "-t",
+      "sleep",
       "-o",
       "%(upload_date)s-%(title)s.%(ext)s",
       "-P",
