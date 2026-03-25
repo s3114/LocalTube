@@ -17,6 +17,16 @@
     return String(url || "").startsWith("https://");
   }
 
+  function resolveCommentOptions({
+    downloadComments = true,
+    downloadChat = true,
+  } = {}) {
+    if (downloadComments && downloadChat) return "both";
+    if (downloadComments) return "comments";
+    if (downloadChat) return "sub";
+    return "none";
+  }
+
   function createDownloadActions({
     parseApiResponse,
     fetchImpl = fetch,
@@ -71,6 +81,10 @@
     }
 
     function buildDownloadFormData(urlsInput) {
+      const downloadComments =
+        doc.getElementById("optDownloadComments")?.checked ?? true;
+      const downloadChat = doc.getElementById("optDownloadChat")?.checked ?? true;
+      const downloadVideo = doc.getElementById("optDownloadVideo")?.checked ?? true;
       const formData = new FormData();
       formData.append("urls", urlsInput.value);
       formData.append("format", doc.getElementById("fmt").value);
@@ -102,7 +116,13 @@
         "concurrentFragments",
         doc.getElementById("optConcurrentFragments").value,
       );
-      formData.append("commentOptions", doc.getElementById("comment-options").value);
+      formData.append(
+        "commentOptions",
+        resolveCommentOptions({ downloadComments, downloadChat }),
+      );
+      formData.append("downloadComments", downloadComments);
+      formData.append("downloadChat", downloadChat);
+      formData.append("downloadVideo", downloadVideo);
 
       const cookieFile = getSelectedCookieFile();
       if (cookieFile) {
@@ -126,9 +146,17 @@
     async function startDownload() {
       const downloadBtn = doc.getElementById("download-btn");
       const urlsInput = doc.getElementById("urls");
+      const downloadComments =
+        doc.getElementById("optDownloadComments")?.checked ?? true;
+      const downloadChat = doc.getElementById("optDownloadChat")?.checked ?? true;
+      const downloadVideo = doc.getElementById("optDownloadVideo")?.checked ?? true;
       setButtonDisabled(downloadBtn, true);
 
       try {
+        if (!downloadComments && !downloadChat && !downloadVideo) {
+          return;
+        }
+
         const urls = parseInputUrls(urlsInput);
         if (!urls) return;
 
@@ -158,5 +186,6 @@
   global.__appActionsTestUtils = {
     parseUrlsFromInputValue,
     isHttpsUrl,
+    resolveCommentOptions,
   };
 })(window);

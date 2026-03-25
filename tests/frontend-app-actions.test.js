@@ -17,6 +17,9 @@ function createDoc(values = {}) {
     fmt: { value: "best" },
     optHistory: { checked: true },
     optThumb: { checked: true },
+    optDownloadComments: { checked: true },
+    optDownloadChat: { checked: true },
+    optDownloadVideo: { checked: true },
     optDrm: { checked: false },
     savePath: { value: "" },
     optParallelDownloads: { value: "3" },
@@ -142,6 +145,32 @@ test("download action reports network error and re-enables button", async () => 
   assert.deepEqual(errors, ["network down"]);
 });
 
+test("download action does nothing when comments, chat, and video are all off", async () => {
+  loadActions();
+  const alerts = [];
+  const fetchCalls = [];
+  const { getElementById, elements } = createDoc({ urls: "https://example.com/video" });
+  elements.optDownloadComments.checked = false;
+  elements.optDownloadChat.checked = false;
+  elements.optDownloadVideo.checked = false;
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url, init });
+      return { __parsed: { ok: true, data: { isValid: true } } };
+    },
+    doc: { getElementById },
+    alertImpl: (msg) => alerts.push(msg),
+  });
+
+  await actions.startDownload();
+
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(alerts.length, 0);
+  assert.equal(elements["download-btn"].disabled, false);
+});
+
 test("app-actions pure utils parse URL inputs", () => {
   loadActions();
   const utils = global.__appActionsTestUtils;
@@ -165,4 +194,20 @@ test("app-actions pure utils validate HTTPS scheme", () => {
   assert.equal(utils.isHttpsUrl("https://example.com"), true);
   assert.equal(utils.isHttpsUrl("http://example.com"), false);
   assert.equal(utils.isHttpsUrl(""), false);
+  assert.equal(
+    utils.resolveCommentOptions({ downloadComments: true, downloadChat: true }),
+    "both",
+  );
+  assert.equal(
+    utils.resolveCommentOptions({ downloadComments: true, downloadChat: false }),
+    "comments",
+  );
+  assert.equal(
+    utils.resolveCommentOptions({ downloadComments: false, downloadChat: true }),
+    "sub",
+  );
+  assert.equal(
+    utils.resolveCommentOptions({ downloadComments: false, downloadChat: false }),
+    "none",
+  );
 });
