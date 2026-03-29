@@ -1,5 +1,44 @@
 const { createLogger } = require("../services/logger-service");
 
+function isSupportedYoutubeResolveUrl(url) {
+  const value = String(url || "").trim();
+  return (
+    /^https?:\/\/(www\.)?youtube\.com\/@[^/?#]+\/?$/i.test(value) ||
+    /^https?:\/\/(www\.)?youtube\.com\/channel\/UC[a-zA-Z0-9_-]{22}\/?$/i.test(value) ||
+    /^https?:\/\/(www\.)?youtube\.com\/watch\?[^#]*\bv=[^&]+/i.test(value) ||
+    /^https?:\/\/youtu\.be\/[^/?#]+/i.test(value)
+  );
+}
+
+function extractChannelIdFromHtml(html) {
+  const canonicalRegex = /<link\s+rel="canonical"\s+href="([^"]+)">/i;
+  const canonicalMatch = String(html || "").match(canonicalRegex);
+  if (canonicalMatch?.[1]) {
+    const channelIdMatch = canonicalMatch[1].match(
+      /youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/i,
+    );
+    if (channelIdMatch?.[1]) {
+      return channelIdMatch[1];
+    }
+  }
+
+  const patterns = [
+    /"channelId":"(UC[a-zA-Z0-9_-]{22})"/,
+    /itemprop="channelId"\s+content="(UC[a-zA-Z0-9_-]{22})"/i,
+    /"externalId":"(UC[a-zA-Z0-9_-]{22})"/,
+    /https?:\/\/www\.youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = String(html || "").match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
 function registerNetworkRoutes(app, deps) {
   const { fetchWithTimeout, apiOk, apiError, os } = deps;
   const logger = deps.logger || createLogger("route-network");
@@ -45,8 +84,12 @@ function registerNetworkRoutes(app, deps) {
   app.post("/api/resolve-handle", async (req, res) => {
     const { url } = req.body;
 
-    if (!url || !url.includes("youtube.com/@")) {
-      return apiError(res, 400, "有効なYouTubeハンドルURLを指定してください。");
+    if (!isSupportedYoutubeResolveUrl(url)) {
+      return apiError(
+        res,
+        400,
+        "有効なYouTubeチャンネルURL、ハンドルURL、または動画URLを指定してください。",
+      );
     }
 
     try {
@@ -75,27 +118,15 @@ function registerNetworkRoutes(app, deps) {
       }
 
       const html = await response.text();
-      const canonicalRegex = /<link\s+rel="canonical"\s+href="([^"]+)">/;
-      const canonicalMatch = html.match(canonicalRegex);
+      const channelId = extractChannelIdFromHtml(html);
 
-      if (!canonicalMatch || !canonicalMatch[1]) {
-        logger.warn("canonical URL not found", { url });
-        return apiError(res, 404, "チャンネルの正規URLが見つかりませんでした。");
-      }
-
-      const canonicalUrl = canonicalMatch[1];
-      const channelIdRegex = /youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/;
-      const channelIdMatch = canonicalUrl.match(channelIdRegex);
-
-      if (!channelIdMatch || !channelIdMatch[1]) {
-        logger.warn("channel ID not found in canonical URL", {
-          canonicalUrl,
+      if (!channelId) {
+        logger.warn("channel ID not found in HTML", {
           originalUrl: url,
         });
         return apiError(res, 404, "チャンネルIDを抽出できませんでした。");
       }
 
-      const channelId = channelIdMatch[1];
       apiOk(res, { channelId });
     } catch (error) {
       logger.error("handle resolution error", { error: error.message });
@@ -136,5 +167,7 @@ function registerNetworkRoutes(app, deps) {
 }
 
 module.exports = {
+  extractChannelIdFromHtml,
+  isSupportedYoutubeResolveUrl,
   registerNetworkRoutes,
 };
