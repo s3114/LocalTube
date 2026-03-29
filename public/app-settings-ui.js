@@ -586,34 +586,45 @@ function clampNumberInRange(value, min, max, fallback) {
         )
           return;
 
+        const buildMembershipPlaylistUrl = (channelId) => {
+          if (typeof channelId !== "string" || !channelId.startsWith("UC")) {
+            return "";
+          }
+          return `https://www.youtube.com/playlist?list=UUMO${channelId.substring(2)}`;
+        };
+
         let resolveTimeout;
         youtubeChannelUrlInput.addEventListener("input", () => {
           clearTimeout(resolveTimeout);
           const channelUrl = youtubeChannelUrlInput.value.trim();
           const channelRegex =
-            /^https?:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})$/;
+            /^https?:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})\/?$/;
           const handleRegex =
-            /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)$/;
+            /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)\/?$/;
+          const watchRegex =
+            /^https?:\/\/(www\.)?youtube\.com\/watch\?[^#]*\bv=[^&]+/;
+          const shortWatchRegex =
+            /^https?:\/\/youtu\.be\/[^/?#]+/;
           const channelMatch = channelUrl.match(channelRegex);
           const handleMatch = channelUrl.match(handleRegex);
+          const isWatchUrl = watchRegex.test(channelUrl) || shortWatchRegex.test(channelUrl);
 
           youtubePlaylistUrlOutput.value = "";
           channelUrlError.textContent = "";
           if (channelUrl === "") return;
 
           if (channelMatch) {
-            const channelId = channelMatch[1];
-            const playlistId = channelId.substring(2);
-            youtubePlaylistUrlOutput.value = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
+            const channelId = channelMatch[2];
+            youtubePlaylistUrlOutput.value = buildMembershipPlaylistUrl(channelId);
             return;
           }
-          if (!handleMatch) {
+          if (!handleMatch && !isWatchUrl) {
             channelUrlError.textContent =
-              "無効なYouTubeチャンネルURLまたはハンドルURLです。";
+              "無効なYouTubeチャンネルURL、ハンドルURL、または動画URLです。";
             return;
           }
 
-          channelUrlError.textContent = "ハンドルを解決中...";
+          channelUrlError.textContent = "チャンネル情報を取得中...";
           resolveTimeout = setTimeout(async () => {
             try {
               const response = await settingsUiDeps.fetchImpl("/api/resolve-handle", {
@@ -625,8 +636,7 @@ function clampNumberInRange(value, min, max, fallback) {
               if (result.ok) {
                 const channelId = result.data?.channelId;
                 if (!channelId) throw new Error("チャンネルIDの取得に失敗しました。");
-                const playlistId = channelId.substring(2);
-                youtubePlaylistUrlOutput.value = `https://www.youtube.com/playlist?list=UUMO${playlistId}`;
+                youtubePlaylistUrlOutput.value = buildMembershipPlaylistUrl(channelId);
                 channelUrlError.textContent = "";
               } else {
                 channelUrlError.textContent = `エラー: ${result.error || "チャンネルIDの取得に失敗しました。"}`;
