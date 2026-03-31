@@ -135,42 +135,42 @@ if errorlevel 1 (
   set "FFMPEG_TEMP_DIR=%SAVE_DIR%ffmpeg_temp"
   set "FFMPEG_EXE=%SAVE_DIR%ffmpeg.exe"
 
-  if exist "%FFMPEG_ZIP%" del "%FFMPEG_ZIP%" >nul 2>&1
-  if exist "%FFMPEG_TEMP_DIR%" rd /s /q "%FFMPEG_TEMP_DIR%"
+  if exist "!FFMPEG_ZIP!" del "!FFMPEG_ZIP!" >nul 2>&1
+  if exist "!FFMPEG_TEMP_DIR!" rd /s /q "!FFMPEG_TEMP_DIR!"
 
   echo ffmpeg command not found. Downloading package...
-  curl -L -o "%FFMPEG_ZIP%" "%FFMPEG_URL%"
+  curl -L -o "!FFMPEG_ZIP!" "!FFMPEG_URL!"
   if errorlevel 1 (
     echo ERROR: Failed to download ffmpeg package.
-    if exist "%FFMPEG_ZIP%" del "%FFMPEG_ZIP%" >nul 2>&1
+    if exist "!FFMPEG_ZIP!" del "!FFMPEG_ZIP!" >nul 2>&1
     pause
     exit /b 1
   )
 
   echo Extracting ffmpeg package...
-  powershell -NoProfile -Command "Expand-Archive -Path '%FFMPEG_ZIP%' -DestinationPath '%FFMPEG_TEMP_DIR%' -Force"
+  powershell -NoProfile -Command "Expand-Archive -Path '!FFMPEG_ZIP!' -DestinationPath '!FFMPEG_TEMP_DIR!' -Force"
   if errorlevel 1 (
     echo ERROR: Failed to extract ffmpeg package.
-    if exist "%FFMPEG_ZIP%" del "%FFMPEG_ZIP%" >nul 2>&1
-    if exist "%FFMPEG_TEMP_DIR%" rd /s /q "%FFMPEG_TEMP_DIR%"
+    if exist "!FFMPEG_ZIP!" del "!FFMPEG_ZIP!" >nul 2>&1
+    if exist "!FFMPEG_TEMP_DIR!" rd /s /q "!FFMPEG_TEMP_DIR!"
     pause
     exit /b 1
   )
 
   echo Deploying ffmpeg.exe...
-  powershell -NoProfile -Command "$exe = Get-ChildItem -Path '%FFMPEG_TEMP_DIR%' -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1 -ExpandProperty FullName; if (-not $exe) { exit 1 }; Copy-Item -LiteralPath $exe -Destination '%FFMPEG_EXE%' -Force"
+  powershell -NoProfile -Command "$exe = Get-ChildItem -Path '!FFMPEG_TEMP_DIR!' -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1 -ExpandProperty FullName; if (-not $exe) { exit 1 }; Copy-Item -LiteralPath $exe -Destination '!FFMPEG_EXE!' -Force"
   if errorlevel 1 (
     echo ERROR: ffmpeg.exe was not found in the downloaded package.
-    if exist "%FFMPEG_ZIP%" del "%FFMPEG_ZIP%" >nul 2>&1
-    if exist "%FFMPEG_TEMP_DIR%" rd /s /q "%FFMPEG_TEMP_DIR%"
+    if exist "!FFMPEG_ZIP!" del "!FFMPEG_ZIP!" >nul 2>&1
+    if exist "!FFMPEG_TEMP_DIR!" rd /s /q "!FFMPEG_TEMP_DIR!"
     pause
     exit /b 1
   )
 
-  if exist "%FFMPEG_TEMP_DIR%" rd /s /q "%FFMPEG_TEMP_DIR%"
-  if exist "%FFMPEG_ZIP%" del "%FFMPEG_ZIP%" >nul 2>&1
+  if exist "!FFMPEG_TEMP_DIR!" rd /s /q "!FFMPEG_TEMP_DIR!"
+  if exist "!FFMPEG_ZIP!" del "!FFMPEG_ZIP!" >nul 2>&1
 
-  if not exist "%FFMPEG_EXE%" (
+  if not exist "!FFMPEG_EXE!" (
     echo ERROR: ffmpeg.exe could not be placed in the application folder.
     pause
     exit /b 1
@@ -187,14 +187,14 @@ set "OPENH264_BZ2=%SAVE_DIR%openh264-2.5.1-win64.dll.bz2"
 set "OPENH264_DLL=%SAVE_DIR%openh264-2.5.1-win64.dll"
 set "OPENH264_TARGET=%SAVE_DIR%libopenh264.dll"
 
-if exist "%OPENH264_BZ2%" del "%OPENH264_BZ2%" >nul 2>&1
-if exist "%OPENH264_DLL%" del "%OPENH264_DLL%" >nul 2>&1
+if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
+if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
 
 echo Downloading OpenH264 package...
-curl -L -o "%OPENH264_BZ2%" "%OPENH264_URL%"
+curl -L -o "!OPENH264_BZ2!" "!OPENH264_URL!"
 if errorlevel 1 (
   echo ERROR: Failed to download OpenH264 package.
-  if exist "%OPENH264_BZ2%" del "%OPENH264_BZ2%" >nul 2>&1
+  if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
   pause
   exit /b 1
 )
@@ -203,58 +203,58 @@ echo Extracting OpenH264 package...
 set "OPENH264_EXTRACTED=0"
 where bunzip2 >nul 2>&1
 if not errorlevel 1 (
-  bunzip2 -f -k "%OPENH264_BZ2%" >nul 2>&1
+  bunzip2 -f -k "!OPENH264_BZ2!" >nul 2>&1
   if not errorlevel 1 set "OPENH264_EXTRACTED=1"
 )
 if "%OPENH264_EXTRACTED%"=="0" (
   where bzip2 >nul 2>&1
   if not errorlevel 1 (
-    bzip2 -d -f -k "%OPENH264_BZ2%" >nul 2>&1
+    bzip2 -d -f -k "!OPENH264_BZ2!" >nul 2>&1
     if not errorlevel 1 set "OPENH264_EXTRACTED=1"
   )
 )
 if "%OPENH264_EXTRACTED%"=="0" (
   where py >nul 2>&1
   if not errorlevel 1 (
-    py -3 -c "import bz2, pathlib; src = pathlib.Path(r'%OPENH264_BZ2%'); dst = pathlib.Path(r'%OPENH264_DLL%'); dst.write_bytes(bz2.decompress(src.read_bytes()))" >nul 2>&1
+    py -3 -c "import bz2, pathlib; src = pathlib.Path(r'!OPENH264_BZ2!'); dst = pathlib.Path(r'!OPENH264_DLL!'); dst.write_bytes(bz2.decompress(src.read_bytes()))" >nul 2>&1
     if not errorlevel 1 set "OPENH264_EXTRACTED=1"
   )
 )
 if "%OPENH264_EXTRACTED%"=="0" (
   where python >nul 2>&1
   if not errorlevel 1 (
-    python -c "import bz2, pathlib; src = pathlib.Path(r'%OPENH264_BZ2%'); dst = pathlib.Path(r'%OPENH264_DLL%'); dst.write_bytes(bz2.decompress(src.read_bytes()))" >nul 2>&1
+    python -c "import bz2, pathlib; src = pathlib.Path(r'!OPENH264_BZ2!'); dst = pathlib.Path(r'!OPENH264_DLL!'); dst.write_bytes(bz2.decompress(src.read_bytes()))" >nul 2>&1
     if not errorlevel 1 set "OPENH264_EXTRACTED=1"
   )
 )
 if "%OPENH264_EXTRACTED%"=="0" (
   echo ERROR: Failed to extract OpenH264 package. No usable BZip2 extractor was found.
-  if exist "%OPENH264_BZ2%" del "%OPENH264_BZ2%" >nul 2>&1
-  if exist "%OPENH264_DLL%" del "%OPENH264_DLL%" >nul 2>&1
+  if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
+  if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
   pause
   exit /b 1
 )
 
-if not exist "%OPENH264_DLL%" (
+if not exist "!OPENH264_DLL!" (
   echo ERROR: OpenH264 DLL was not found after extraction.
-  if exist "%OPENH264_BZ2%" del "%OPENH264_BZ2%" >nul 2>&1
+  if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
   pause
   exit /b 1
 )
 
-if exist "%OPENH264_TARGET%" del "%OPENH264_TARGET%" >nul 2>&1
-move /Y "%OPENH264_DLL%" "%OPENH264_TARGET%" >nul
+if exist "!OPENH264_TARGET!" del "!OPENH264_TARGET!" >nul 2>&1
+move /Y "!OPENH264_DLL!" "!OPENH264_TARGET!" >nul
 if errorlevel 1 (
   echo ERROR: Failed to place libopenh264.dll in the application folder.
-  if exist "%OPENH264_BZ2%" del "%OPENH264_BZ2%" >nul 2>&1
-  if exist "%OPENH264_DLL%" del "%OPENH264_DLL%" >nul 2>&1
+  if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
+  if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
   pause
   exit /b 1
 )
 
-if exist "%OPENH264_BZ2%" del "%OPENH264_BZ2%" >nul 2>&1
+if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
 
-if not exist "%OPENH264_TARGET%" (
+if not exist "!OPENH264_TARGET!" (
   echo ERROR: libopenh264.dll could not be created.
   pause
   exit /b 1
