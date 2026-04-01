@@ -214,6 +214,13 @@ if "%OPENH264_EXTRACTED%"=="0" (
   )
 )
 if "%OPENH264_EXTRACTED%"=="0" (
+  where tar >nul 2>&1
+  if not errorlevel 1 (
+    tar -x -f "!OPENH264_BZ2!" -C "!SAVE_DIR!" >nul 2>&1
+    if not errorlevel 1 set "OPENH264_EXTRACTED=1"
+  )
+)
+if "%OPENH264_EXTRACTED%"=="0" (
   where py >nul 2>&1
   if not errorlevel 1 (
     py -3 -c "import bz2, pathlib; src = pathlib.Path(r'!OPENH264_BZ2!'); dst = pathlib.Path(r'!OPENH264_DLL!'); dst.write_bytes(bz2.decompress(src.read_bytes()))" >nul 2>&1
@@ -229,6 +236,7 @@ if "%OPENH264_EXTRACTED%"=="0" (
 )
 if "%OPENH264_EXTRACTED%"=="0" (
   echo ERROR: Failed to extract OpenH264 package. No usable BZip2 extractor was found.
+  echo Tried: bunzip2, bzip2, tar.exe, py, python
   if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
   if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
   pause
