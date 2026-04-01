@@ -193,6 +193,12 @@ set "OPENH264_7Z_EXTRA=%OPENH264_HELPER_DIR%\7z-extra.7z"
 set "OPENH264_7ZR_URL=https://github.com/ip7z/7zip/releases/download/26.00/7zr.exe"
 set "OPENH264_7Z_EXTRA_URL=https://github.com/ip7z/7zip/releases/download/26.00/7z2600-extra.7z"
 
+if exist "!OPENH264_TARGET!" (
+  echo libopenh264.dll is already available.
+  echo OpenH264 setup completed.
+  goto OPENH264_DONE
+)
+
 if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
 if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
 if exist "!OPENH264_HELPER_DIR!" rd /s /q "!OPENH264_HELPER_DIR!" >nul 2>&1
@@ -286,6 +292,8 @@ if not exist "!OPENH264_TARGET!" (
   exit /b 1
 )
 echo OpenH264 setup completed.
+
+:OPENH264_DONE
 
 echo.
 echo [5/7] Checking and setting up yt-dlp...
