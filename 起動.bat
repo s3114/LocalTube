@@ -186,9 +186,16 @@ set "OPENH264_URL=http://ciscobinary.openh264.org/openh264-2.5.1-win64.dll.bz2"
 set "OPENH264_BZ2=%SAVE_DIR%openh264-2.5.1-win64.dll.bz2"
 set "OPENH264_DLL=%SAVE_DIR%openh264-2.5.1-win64.dll"
 set "OPENH264_TARGET=%SAVE_DIR%libopenh264.dll"
+set "OPENH264_HELPER_DIR=%SAVE_DIR%openh264_extract_tmp"
+set "OPENH264_7ZR=%OPENH264_HELPER_DIR%\7zr.exe"
+set "OPENH264_7ZA=%OPENH264_HELPER_DIR%\7za.exe"
+set "OPENH264_7Z_EXTRA=%OPENH264_HELPER_DIR%\7z-extra.7z"
+set "OPENH264_7ZR_URL=https://github.com/ip7z/7zip/releases/download/26.00/7zr.exe"
+set "OPENH264_7Z_EXTRA_URL=https://github.com/ip7z/7zip/releases/download/26.00/7z2600-extra.7z"
 
 if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
 if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
+if exist "!OPENH264_HELPER_DIR!" rd /s /q "!OPENH264_HELPER_DIR!" >nul 2>&1
 
 echo Downloading OpenH264 package...
 curl -L -o "!OPENH264_BZ2!" "!OPENH264_URL!"
@@ -214,13 +221,6 @@ if "%OPENH264_EXTRACTED%"=="0" (
   )
 )
 if "%OPENH264_EXTRACTED%"=="0" (
-  where tar >nul 2>&1
-  if not errorlevel 1 (
-    tar -x -f "!OPENH264_BZ2!" -C "!SAVE_DIR!" >nul 2>&1
-    if not errorlevel 1 set "OPENH264_EXTRACTED=1"
-  )
-)
-if "%OPENH264_EXTRACTED%"=="0" (
   where py >nul 2>&1
   if not errorlevel 1 (
     py -3 -c "import bz2, pathlib; src = pathlib.Path(r'!OPENH264_BZ2!'); dst = pathlib.Path(r'!OPENH264_DLL!'); dst.write_bytes(bz2.decompress(src.read_bytes()))" >nul 2>&1
@@ -235,10 +235,26 @@ if "%OPENH264_EXTRACTED%"=="0" (
   )
 )
 if "%OPENH264_EXTRACTED%"=="0" (
+  if not exist "!OPENH264_HELPER_DIR!" mkdir "!OPENH264_HELPER_DIR!"
+  echo No local BZip2 extractor found. Downloading temporary 7-Zip helper...
+  curl -L -o "!OPENH264_7ZR!" "!OPENH264_7ZR_URL!"
+  if not errorlevel 1 (
+    curl -L -o "!OPENH264_7Z_EXTRA!" "!OPENH264_7Z_EXTRA_URL!"
+    if not errorlevel 1 (
+      "!OPENH264_7ZR!" x "!OPENH264_7Z_EXTRA!" -o"!OPENH264_HELPER_DIR!" -y >nul 2>&1
+      if exist "!OPENH264_7ZA!" (
+        "!OPENH264_7ZA!" e -y "-o!SAVE_DIR!" "!OPENH264_BZ2!" >nul 2>&1
+        if not errorlevel 1 set "OPENH264_EXTRACTED=1"
+      )
+    )
+  )
+)
+if "%OPENH264_EXTRACTED%"=="0" (
   echo ERROR: Failed to extract OpenH264 package. No usable BZip2 extractor was found.
-  echo Tried: bunzip2, bzip2, tar.exe, py, python
+  echo Tried: bunzip2, bzip2, py, python, temporary 7-Zip helper
   if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
   if exist "!OPENH264_DLL!" del "!OPENH264_DLL!" >nul 2>&1
+  if exist "!OPENH264_HELPER_DIR!" rd /s /q "!OPENH264_HELPER_DIR!" >nul 2>&1
   pause
   exit /b 1
 )
@@ -246,6 +262,7 @@ if "%OPENH264_EXTRACTED%"=="0" (
 if not exist "!OPENH264_DLL!" (
   echo ERROR: OpenH264 DLL was not found after extraction.
   if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
+  if exist "!OPENH264_HELPER_DIR!" rd /s /q "!OPENH264_HELPER_DIR!" >nul 2>&1
   pause
   exit /b 1
 )
@@ -261,6 +278,7 @@ if errorlevel 1 (
 )
 
 if exist "!OPENH264_BZ2!" del "!OPENH264_BZ2!" >nul 2>&1
+if exist "!OPENH264_HELPER_DIR!" rd /s /q "!OPENH264_HELPER_DIR!" >nul 2>&1
 
 if not exist "!OPENH264_TARGET!" (
   echo ERROR: libopenh264.dll could not be created.
