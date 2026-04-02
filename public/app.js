@@ -129,6 +129,15 @@ const appState = window.AppState || {
           optDownloadComments: document.getElementById("optDownloadComments"),
           optDownloadChat: document.getElementById("optDownloadChat"),
           optDownloadVideo: document.getElementById("optDownloadVideo"),
+          ytDlpCustomCommandInput: document.getElementById(
+            "yt-dlp-custom-command-input",
+          ),
+          saveYtDlpCustomCommandBtn: document.getElementById(
+            "save-yt-dlp-custom-command-btn",
+          ),
+          ytDlpCustomCommandStatus: document.getElementById(
+            "yt-dlp-custom-command-status",
+          ),
           clearHistoryBtn: document.getElementById("clearHistoryBtn"),
           localVideoDirsInput: document.getElementById("local-video-dirs-input"),
           saveLocalVideoDirsBtn: document.getElementById(
