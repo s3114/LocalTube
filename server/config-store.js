@@ -10,6 +10,7 @@ const CONFIG_DEFAULTS = {
   enableFallbackThumbnails: true,
   wallpaperBlur: 2,
   wallpaperBrightness: 50,
+  ytDlpCustomCommand: "",
   playlistsState: {
     playlists: [],
     selectedId: "",
@@ -78,6 +79,7 @@ function normalizeConfig(config) {
       200,
       CONFIG_DEFAULTS.wallpaperBrightness,
     ),
+    ytDlpCustomCommand: String(raw.ytDlpCustomCommand || "").trim(),
     playlistsState: normalizePlaylistsState(raw.playlistsState),
   };
 }
