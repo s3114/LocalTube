@@ -138,6 +138,11 @@ const appState = window.AppState || {
           ytDlpCustomCommandStatus: document.getElementById(
             "yt-dlp-custom-command-status",
           ),
+          generateReportBtn: document.getElementById("generate-report-btn"),
+          reportGenerateStatus: document.getElementById("report-generate-status"),
+          reportModalBackdrop: document.getElementById("report-modal-backdrop"),
+          reportModalCancelBtn: document.getElementById("report-modal-cancel-btn"),
+          reportModalConfirmBtn: document.getElementById("report-modal-confirm-btn"),
           clearHistoryBtn: document.getElementById("clearHistoryBtn"),
           localVideoDirsInput: document.getElementById("local-video-dirs-input"),
           saveLocalVideoDirsBtn: document.getElementById(

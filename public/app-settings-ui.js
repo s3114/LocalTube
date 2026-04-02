@@ -1,6 +1,8 @@
 // Settings UI module extracted from app.js
 (function attachSettingsUi(global) {
 const DISCONNECT_RELOAD_DELAY_KEY = "localtube.disconnectReloadDelayMs";
+const COOKIE_MODE_STORAGE_KEY = "localtube.cookieSelectionMode";
+const COOKIE_UPDATED_AT_STORAGE_KEY = "localtube.cookieUpdatedAt";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
@@ -107,6 +109,76 @@ function clampNumberInRange(value, min, max, fallback) {
             : "カスタムコマンドは未設定です",
           "muted",
         );
+      }
+
+      function setCookieSelectionMetadata(mode) {
+        const normalizedMode = String(mode || "none");
+        const updatedAt = new Date().toISOString();
+        saveLocalSetting(COOKIE_MODE_STORAGE_KEY, normalizedMode);
+        saveLocalSetting(COOKIE_UPDATED_AT_STORAGE_KEY, updatedAt);
+        return updatedAt;
+      }
+
+      function readCookieSelectionMetadata() {
+        const mode = loadLocalSetting(COOKIE_MODE_STORAGE_KEY, "none");
+        const updatedAt = loadLocalSetting(COOKIE_UPDATED_AT_STORAGE_KEY, "");
+        let updatedAtLocal = "";
+
+        if (updatedAt) {
+          const date = new Date(updatedAt);
+          if (!Number.isNaN(date.getTime())) {
+            const yyyy = date.getFullYear();
+            const MM = String(date.getMonth() + 1).padStart(2, "0");
+            const dd = String(date.getDate()).padStart(2, "0");
+            const hh = String(date.getHours()).padStart(2, "0");
+            const mm = String(date.getMinutes()).padStart(2, "0");
+            const ss = String(date.getSeconds()).padStart(2, "0");
+            updatedAtLocal = `${yyyy}-${MM}-${dd} ${hh}:${mm}:${ss}`;
+          }
+        }
+
+        return {
+          mode,
+          updatedAt,
+          updatedAtLocal,
+        };
+      }
+
+      function extractFilenameFromDisposition(dispositionValue) {
+        const raw = String(dispositionValue || "");
+        if (!raw) return "";
+        const utf8Match = raw.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const simpleMatch = raw.match(/filename="?([^"]+)"?/i);
+        return simpleMatch ? simpleMatch[1] : "";
+      }
+
+      function buildDownloadSettingsSnapshot(elements) {
+        return {
+          formatValue: elements.fmt?.value || "",
+          formatText:
+            elements.fmt?.options?.[elements.fmt.selectedIndex]?.textContent || "",
+          savePath: elements.savePath?.value || "",
+          saveHistory: Boolean(elements.optHistory?.checked),
+          downloadThumb: Boolean(elements.optThumb?.checked),
+          embedThumbnail: Boolean(elements.optEmbedThumbnail?.checked),
+          addMetadata: Boolean(elements.optAddMetadata?.checked),
+          remuxVideo: Boolean(elements.optRemuxVideo?.checked),
+          staticFormat: Boolean(elements.optStaticFormat?.checked),
+          forceIpv4: Boolean(elements.optForceIpv4?.checked),
+          drmProtect: Boolean(elements.optDrm?.checked),
+          parallelDownloads: elements.optParallelDownloads?.value || "",
+          concurrentFragments: elements.optConcurrentFragments?.value || "",
+          downloadComments: Boolean(elements.optDownloadComments?.checked),
+          downloadChat: Boolean(elements.optDownloadChat?.checked),
+          downloadVideo: Boolean(elements.optDownloadVideo?.checked),
+        };
       }
 
       function getWallpaperStyleFromServerSettings(settings) {
@@ -856,6 +928,7 @@ function clampNumberInRange(value, min, max, fallback) {
           try {
             const result = await bridge.postSettings({ browser: "firefox" });
             if (result.ok) {
+              setCookieSelectionMetadata("firefox");
               elements.cookieStatusDisplay.textContent = "自動連携: Firefox";
               bridge.updateCookieButtonStyles(elements.setFirefoxBtn);
             }
@@ -875,6 +948,7 @@ function clampNumberInRange(value, min, max, fallback) {
           try {
             const result = await bridge.postSettings({ browser: "" });
             if (result.ok) {
+              setCookieSelectionMetadata("manual");
               elements.cookieStatusDisplay.textContent = `手動指定: ${file.name}`;
               bridge.updateCookieButtonStyles(elements.manualSelectBtn);
             }
@@ -888,6 +962,7 @@ function clampNumberInRange(value, min, max, fallback) {
           try {
             const result = await bridge.postSettings({ browser: "" });
             if (result.ok) {
+              setCookieSelectionMetadata("none");
               elements.cookieStatusDisplay.textContent = "設定されていません";
               bridge.updateCookieButtonStyles(elements.noneSelectBtn);
             }
@@ -1229,6 +1304,112 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
+      function initializeReportGenerationUI(elements) {
+        if (
+          !elements.generateReportBtn ||
+          !elements.reportGenerateStatus ||
+          !elements.reportModalBackdrop ||
+          !elements.reportModalCancelBtn ||
+          !elements.reportModalConfirmBtn
+        ) {
+          return;
+        }
+
+        const openModal = () => {
+          elements.reportModalBackdrop.classList.remove("hidden");
+        };
+        const closeModal = () => {
+          elements.reportModalBackdrop.classList.add("hidden");
+        };
+
+        elements.generateReportBtn.addEventListener("click", () => {
+          setSettingStatus(
+            elements.reportGenerateStatus,
+            "生成前の確認待ちです。",
+            "muted",
+          );
+          openModal();
+        });
+
+        elements.reportModalCancelBtn.addEventListener("click", () => {
+          closeModal();
+          setSettingStatus(
+            elements.reportGenerateStatus,
+            "生成をキャンセルしました。",
+            "muted",
+          );
+        });
+
+        elements.reportModalBackdrop.addEventListener("click", (event) => {
+          if (event.target === elements.reportModalBackdrop) {
+            closeModal();
+          }
+        });
+
+        elements.reportModalConfirmBtn.addEventListener("click", async () => {
+          closeModal();
+          elements.generateReportBtn.disabled = true;
+          elements.reportModalConfirmBtn.disabled = true;
+          elements.reportModalCancelBtn.disabled = true;
+          setSettingStatus(
+            elements.reportGenerateStatus,
+            "レポートを生成しています...",
+            "info",
+          );
+
+          try {
+            const response = await settingsUiDeps.fetchImpl("/api/report/download", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                currentUrl: global.location?.href || "",
+                browserUserAgent: global.navigator?.userAgent || "",
+                generatedAt: new Date().toISOString(),
+                cookieInfo: readCookieSelectionMetadata(),
+                downloadSettings: buildDownloadSettingsSnapshot(elements),
+              }),
+            });
+
+            if (!response.ok) {
+              const payload = await settingsUiDeps.parseApiResponseImpl(response);
+              throw new Error(payload.error || "レポート生成に失敗しました。");
+            }
+
+            const blob = await response.blob();
+            const objectUrl = global.URL.createObjectURL(blob);
+            const downloadLink = global.document.createElement("a");
+            downloadLink.href = objectUrl;
+            downloadLink.download =
+              extractFilenameFromDisposition(
+                response.headers.get("content-disposition"),
+              ) || "localtube-report.html";
+            global.document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+            global.URL.revokeObjectURL(objectUrl);
+
+            setSettingStatus(
+              elements.reportGenerateStatus,
+              "レポートをダウンロードしました。",
+              "success",
+            );
+          } catch (error) {
+            console.error("レポート生成に失敗:", error);
+            setSettingStatus(
+              elements.reportGenerateStatus,
+              error.message || "レポート生成に失敗しました。",
+              "error",
+            );
+          } finally {
+            elements.generateReportBtn.disabled = false;
+            elements.reportModalConfirmBtn.disabled = false;
+            elements.reportModalCancelBtn.disabled = false;
+          }
+        });
+      }
+
       
 function initializeSettingsUiController({
         elements,
@@ -1253,6 +1434,7 @@ function initializeSettingsUiController({
           onLocalVideosChanged,
         );
         initializeYtDlpCustomCommandSettingsUI(elements, bridge);
+        initializeReportGenerationUI(elements);
         initializeFallbackThumbnailSettingUI(
           elements,
           bridge,
