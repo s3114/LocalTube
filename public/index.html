@@ -2031,6 +2031,57 @@
         font-size: 12px;
       }
 
+      .report-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.58);
+        z-index: 3050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .report-modal-backdrop.hidden {
+        display: none;
+      }
+
+      .report-modal {
+        width: min(560px, calc(100vw - 32px));
+        background: #171717;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+      }
+
+      .report-modal-title {
+        margin: 0 0 10px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .report-modal-copy {
+        color: var(--subtext);
+        font-size: 13px;
+        margin-bottom: 12px;
+      }
+
+      .report-modal-list {
+        margin: 0 0 14px 18px;
+        padding: 0;
+      }
+
+      .report-modal-list li {
+        margin-bottom: 6px;
+        color: var(--text);
+      }
+
+      .report-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
       .playlist-controls {
         display: flex;
         gap: 6px;
@@ -4153,6 +4204,21 @@
 
               <div class="toggle">
                 <div>
+                  レポートの生成
+                  <small>現在の実行環境、設定、WARNログ、失敗情報などを HTML レポートとして保存します。</small>
+                  <small id="report-generate-status"
+                    class="settings-hint-blue"></small>
+                </div>
+                <div class="settings-inline-row settings-gap-8">
+                  <button id="generate-report-btn"
+                    class="btn-ui btn-blue">
+                    レポートの生成
+                  </button>
+                </div>
+              </div>
+
+              <div class="toggle">
+                <div>
                   サーバー再起動
                   <small>localhost:3000 を再起動します。クリック後に数秒通信が切断されます。</small>
                   <small id="server-restart-status"
@@ -4206,6 +4272,36 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="report-modal-backdrop"
+        class="report-modal-backdrop hidden">
+        <div class="report-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-modal-title">
+          <h3 id="report-modal-title"
+            class="report-modal-title">レポートの生成</h3>
+          <div class="report-modal-copy">
+            レポートには以下の情報が含まれます。
+          </div>
+          <ul class="report-modal-list">
+            <li>実行環境とバージョン情報</li>
+            <li>ダウンロード設定とカスタムコマンド設定有無</li>
+            <li>Cookie 取得方法と取得時刻</li>
+            <li>アプリ直下のフォルダ一覧とファイル内容</li>
+            <li>WARN ログと失敗した動画の URL / エラーメッセージ</li>
+          </ul>
+          <div class="report-modal-copy">
+            これらの内容に同意いただける場合のみ、生成してください。
+          </div>
+          <div class="report-modal-actions">
+            <button id="report-modal-cancel-btn"
+              class="btn-ui btn-gray">いいえ</button>
+            <button id="report-modal-confirm-btn"
+              class="btn-ui btn-blue">はい</button>
           </div>
         </div>
       </div>

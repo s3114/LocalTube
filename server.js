@@ -26,6 +26,7 @@ const { registerInfoRoutes } = require("./server/routes/info-routes");
 const { registerNetworkRoutes } = require("./server/routes/network-routes");
 const { registerScheduleRoutes } = require("./server/routes/schedule-routes");
 const { registerLogRoutes } = require("./server/routes/log-routes");
+const { registerReportRoutes } = require("./server/routes/report-routes");
 const { createSseBus } = require("./server/services/sse-bus");
 const { apiOk, apiError } = require("./server/services/http-utils");
 const {
@@ -288,6 +289,13 @@ registerScheduleRoutes(app, {
 
 registerLogRoutes(app, {
   ...routeBaseDeps,
+});
+
+registerReportRoutes(app, {
+  ...routeBaseDeps,
+  loadConfig,
+  jobHistory,
+  serverStartTime,
 });
 
 function scheduleServerRestart({ preferStartupBat }) {
