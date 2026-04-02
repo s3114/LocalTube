@@ -69,6 +69,53 @@ function createDownloadJobService({
     );
   }
 
+  function splitCustomCommandArgs(commandText) {
+    const text = String(commandText || "").trim();
+    if (!text) return [];
+
+    const args = [];
+    let current = "";
+    let quote = null;
+
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      const next = text[i + 1];
+
+      if (char === "\\" && quote && next === quote) {
+        current += next;
+        i += 1;
+        continue;
+      }
+
+      if ((char === '"' || char === "'")) {
+        if (!quote) {
+          quote = char;
+          continue;
+        }
+        if (quote === char) {
+          quote = null;
+          continue;
+        }
+      }
+
+      if (!quote && /\s/.test(char)) {
+        if (current) {
+          args.push(current);
+          current = "";
+        }
+        continue;
+      }
+
+      current += char;
+    }
+
+    if (current) {
+      args.push(current);
+    }
+
+    return args;
+  }
+
   function buildArgs(job, paths, settings) {
     const { url, options } = job;
     const { movieDir: targetMovieDir, thumbnailDir: targetThumbDir, tempDir } = paths;
@@ -140,6 +187,11 @@ function createDownloadJobService({
     if (options.commentOptions === "sub" || options.commentOptions === "both") {
       args.push("--write-subs");
       args.push("--sub-langs", "live_chat,all");
+    }
+
+    const customArgs = splitCustomCommandArgs(settings?.ytDlpCustomCommand);
+    if (customArgs.length > 0) {
+      args.push(...customArgs);
     }
 
     return args;

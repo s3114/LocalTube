@@ -95,6 +95,20 @@ function clampNumberInRange(value, min, max, fallback) {
         );
       }
 
+      function applyYtDlpCustomCommandFromServer(elements, settings) {
+        if (!elements.ytDlpCustomCommandInput) return;
+        elements.ytDlpCustomCommandInput.value = String(
+          settings.ytDlpCustomCommand || "",
+        );
+        setSettingStatus(
+          elements.ytDlpCustomCommandStatus,
+          elements.ytDlpCustomCommandInput.value
+            ? "カスタムコマンドを設定済み"
+            : "カスタムコマンドは未設定です",
+          "muted",
+        );
+      }
+
       function getWallpaperStyleFromServerSettings(settings) {
         const blurValue = clampNumberInRange(settings.wallpaperBlur, 0, 30, 0);
         const brightnessValue = clampNumberInRange(
@@ -815,6 +829,7 @@ function clampNumberInRange(value, min, max, fallback) {
             );
             applyLocalVideoDirsFromServer(elements, settings);
             applyFallbackThumbnailSettingFromServer(elements, settings);
+            applyYtDlpCustomCommandFromServer(elements, settings);
             const { blurValue, brightnessValue } =
               getWallpaperStyleFromServerSettings(settings);
             applyWallpaperStyle(null, blurValue, brightnessValue);
@@ -1180,6 +1195,40 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
+      function initializeYtDlpCustomCommandSettingsUI(elements, bridge) {
+        if (
+          !elements.ytDlpCustomCommandInput ||
+          !elements.saveYtDlpCustomCommandBtn ||
+          !elements.ytDlpCustomCommandStatus
+        ) {
+          return;
+        }
+
+        elements.saveYtDlpCustomCommandBtn.addEventListener("click", async () => {
+          const value = String(elements.ytDlpCustomCommandInput.value || "").trim();
+          setSettingStatus(elements.ytDlpCustomCommandStatus, "保存中...", "info");
+          try {
+            const result = await bridge.postSettings({ ytDlpCustomCommand: value });
+            if (!result.ok) {
+              throw new Error(result.error || "カスタムコマンドの保存に失敗しました。");
+            }
+            setSettingStatus(
+              elements.ytDlpCustomCommandStatus,
+              value ? "カスタムコマンドを保存しました" : "カスタムコマンドをクリアしました",
+              "success",
+            );
+            await bridge.loadServerSettings();
+          } catch (error) {
+            console.error("yt-dlp カスタムコマンド設定の保存に失敗:", error);
+            setSettingStatus(
+              elements.ytDlpCustomCommandStatus,
+              "保存に失敗しました。再試行してください。",
+              "error",
+            );
+          }
+        });
+      }
+
       
 function initializeSettingsUiController({
         elements,
@@ -1203,6 +1252,7 @@ function initializeSettingsUiController({
           bridge,
           onLocalVideosChanged,
         );
+        initializeYtDlpCustomCommandSettingsUI(elements, bridge);
         initializeFallbackThumbnailSettingUI(
           elements,
           bridge,

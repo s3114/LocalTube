@@ -144,6 +144,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         enableFallbackThumbnails,
         wallpaperBlur,
         wallpaperBrightness,
+        ytDlpCustomCommand,
         playlistsState,
       } = req.body || {};
       if (
@@ -152,6 +153,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         typeof enableFallbackThumbnails === "undefined" &&
         typeof wallpaperBlur === "undefined" &&
         typeof wallpaperBrightness === "undefined" &&
+        typeof ytDlpCustomCommand === "undefined" &&
         typeof playlistsState === "undefined"
       ) {
         return apiError(res, 400, "無効なリクエストです。");
@@ -176,6 +178,10 @@ function registerSettingsWallpaperRoutes(app, deps) {
       }
       if (typeof wallpaperBrightness !== "undefined") {
         currentConfig.wallpaperBrightness = Number(wallpaperBrightness);
+      }
+
+      if (typeof ytDlpCustomCommand !== "undefined") {
+        currentConfig.ytDlpCustomCommand = String(ytDlpCustomCommand || "").trim();
       }
 
       if (typeof playlistsState !== "undefined") {

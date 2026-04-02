@@ -15,3 +15,4 @@ profiles/
 cache/
 ffmpeg.exe
 .git-rewrite/
+libopenh264.dll

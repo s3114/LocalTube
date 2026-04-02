@@ -141,6 +141,22 @@ test("POST /api/settings persists browser selection", async () => {
   assert.equal(loaded.body.data.selectedBrowser, "firefox");
 });
 
+test("POST /api/settings persists yt-dlp custom command", async () => {
+  const payload = {
+    ytDlpCustomCommand: "--cookies-from-browser firefox --sleep-interval 5",
+  };
+  const save = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(save.status, 200);
+  assert.equal(save.body.ok, true);
+
+  const loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
+  assert.equal(loaded.body.data.ytDlpCustomCommand, payload.ytDlpCustomCommand);
+});
+
 test("POST /api/settings normalizes invalid localVideoDirs type to empty array", async () => {
   const save = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`, {
     method: "POST",

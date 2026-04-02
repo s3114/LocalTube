@@ -4127,6 +4127,30 @@
                 </label>
               </div>
 
+              <div class="toggle settings-toggle-top">
+                <div>
+                  yt-dlpへのカスタムコマンド
+                  <small>yt-dlpに手動でオプションをつけたい場合はここに記入してください。</small>
+                  <small id="yt-dlp-custom-command-status"
+                    class="settings-hint-blue"></small>
+                </div>
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-wide">
+                  <input
+                    type="text"
+                    id="yt-dlp-custom-command-input"
+                    placeholder="例: --cookies-from-browser firefox --sleep-interval 5"
+                    class="settings-input-full" />
+                  <div class="settings-actions-right">
+                    <button
+                      id="save-yt-dlp-custom-command-btn"
+                      class="btn-ui btn-blue">
+                      保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="toggle">
                 <div>
                   サーバー再起動
