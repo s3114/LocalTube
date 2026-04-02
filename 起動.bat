@@ -128,17 +128,16 @@ echo Node.js setup completed.
 
 echo.
 echo [3/7] Checking and setting up ffmpeg...
-ffmpeg -version >nul 2>&1
-if errorlevel 1 (
-  set "FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-  set "FFMPEG_ZIP=%SAVE_DIR%ffmpeg.zip"
-  set "FFMPEG_TEMP_DIR=%SAVE_DIR%ffmpeg_temp"
-  set "FFMPEG_EXE=%SAVE_DIR%ffmpeg.exe"
+set "FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+set "FFMPEG_ZIP=%SAVE_DIR%ffmpeg.zip"
+set "FFMPEG_TEMP_DIR=%SAVE_DIR%ffmpeg_temp"
+set "FFMPEG_EXE=%SAVE_DIR%ffmpeg.exe"
 
+if not exist "!FFMPEG_EXE!" (
   if exist "!FFMPEG_ZIP!" del "!FFMPEG_ZIP!" >nul 2>&1
   if exist "!FFMPEG_TEMP_DIR!" rd /s /q "!FFMPEG_TEMP_DIR!"
 
-  echo ffmpeg command not found. Downloading package...
+  echo ffmpeg.exe was not found in the application folder. Downloading package...
   curl -L -o "!FFMPEG_ZIP!" "!FFMPEG_URL!"
   if errorlevel 1 (
     echo ERROR: Failed to download ffmpeg package.
@@ -176,7 +175,7 @@ if errorlevel 1 (
     exit /b 1
   )
 ) else (
-  echo ffmpeg command is already available.
+  echo ffmpeg.exe is already available in the application folder.
 )
 echo ffmpeg setup completed.
 
