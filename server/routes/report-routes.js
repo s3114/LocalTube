@@ -275,7 +275,7 @@ function buildSettingsRows(settings, client) {
     {
       key: "yt-dlp カスタムコマンド",
       value: settings.ytDlpCustomCommand
-        ? "設定あり（内容は非表示）"
+        ? "設定あり"
         : "未設定",
     },
     {
@@ -313,7 +313,7 @@ function buildToolVersionsRows(toolVersions) {
 
 function buildWarnLogsHtml(entries) {
   if (!entries.length) {
-    return "<p>WARN ログはありません。</p>";
+    return "<p>WARN / ERROR ログはありません。</p>";
   }
 
   return entries
@@ -358,7 +358,7 @@ function buildReportHtml({
 }) {
   const now = new Date();
   const warnLogs = getLogEntries({ sinceId: 0, limit: 2000 }).filter(
-    (entry) => String(entry.level) === "warn",
+    (entry) => ["warn", "error"].includes(String(entry.level)),
   );
   const rootSnapshot = readRootDirectorySnapshot(baseDir);
   const toolVersions = readToolVersions(baseDir);
@@ -473,7 +473,7 @@ function buildReportHtml({
 
   <h2>5. エラー追跡情報</h2>
   <section>
-    <h3>WARN ログ</h3>
+    <h3>WARN / ERROR ログ</h3>
     ${buildWarnLogsHtml(warnLogs)}
   </section>
   <section>
