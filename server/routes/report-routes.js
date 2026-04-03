@@ -58,6 +58,16 @@ function formatDurationFromMs(ms) {
   return `${hours}時間 ${minutes}分 ${seconds}秒`;
 }
 
+function formatBytesToReadable(bytes) {
+  const num = Number(bytes || 0);
+  if (!Number.isFinite(num) || num < 0) return "不明";
+  const gb = 1024 ** 3;
+  const mb = 1024 ** 2;
+  if (num >= gb) return `${(num / gb).toFixed(1)} GB`;
+  if (num >= mb) return `${(num / mb).toFixed(1)} MB`;
+  return `${num} bytes`;
+}
+
 function maskPersonalPath(value) {
   const text = String(value || "");
   return text.replace(/^([A-Za-z]:\\Users\\)([^\\]+)(\\?)/i, "$1PCNAME$3");
@@ -202,6 +212,74 @@ function detectWindowsDisplayName() {
   if (major === "5" && minor === "1") return "WindowsXP";
 
   return `${os.type()} ${release}`;
+}
+
+function readStorageInfo(baseDir) {
+  if (process.platform !== "win32") {
+    return {
+      display: "不明",
+      raw: "",
+      totalBytes: 0,
+      freeBytes: 0,
+    };
+  }
+
+  const root = path.parse(baseDir).root;
+  const deviceId = root.replace(/[\\\/]+$/, "");
+  if (!deviceId) {
+    return {
+      display: "不明",
+      raw: "",
+      totalBytes: 0,
+      freeBytes: 0,
+    };
+  }
+
+  const command =
+    `$disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='${deviceId}'"; ` +
+    `if ($disk) { $disk | Select-Object DeviceID,VolumeName,Size,FreeSpace | ConvertTo-Json -Compress }`;
+  const result = spawnSync(
+    "powershell",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 4000,
+      shell: false,
+    },
+  );
+
+  if (result.error || result.status !== 0) {
+    return {
+      display: deviceId,
+      raw: "",
+      totalBytes: 0,
+      freeBytes: 0,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(String(result.stdout || "").trim());
+    const total = Number(parsed.Size || 0);
+    const free = Number(parsed.FreeSpace || 0);
+    const used = Math.max(0, total - free);
+    const label = parsed.VolumeName
+      ? `${parsed.DeviceID} (${parsed.VolumeName})`
+      : parsed.DeviceID || deviceId;
+    return {
+      display: `${label} 使用 ${formatBytesToReadable(used)} / 全体 ${formatBytesToReadable(total)} / 空き ${formatBytesToReadable(free)}`,
+      raw: `${label}`,
+      totalBytes: total,
+      freeBytes: free,
+    };
+  } catch {
+    return {
+      display: deviceId,
+      raw: "",
+      totalBytes: 0,
+      freeBytes: 0,
+    };
+  }
 }
 
 function readVersionText(baseDir) {
@@ -507,6 +585,14 @@ function buildReportHtml({
   const browserUserAgent = client?.browserUserAgent || "不明";
   const osDisplay = detectWindowsDisplayName();
   const osRaw = `${os.type()} ${os.release()} (${os.arch()})`;
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const cpuList = os.cpus() || [];
+  const firstCpu = cpuList[0];
+  const cpuDisplay = firstCpu
+    ? `${firstCpu.model} / ${cpuList.length} logical cores`
+    : "不明";
+  const storageInfo = readStorageInfo(baseDir);
 
   return `<!doctype html>
 <html lang="ja">
@@ -552,6 +638,14 @@ function buildReportHtml({
             value: escapeHtml(readVersionText(baseDir)),
           },
           {
+            key: "Node.js",
+            value: escapeHtml(process.version),
+          },
+          {
+            key: "ブラウザ",
+            value: `${escapeHtml(browserName)}<span class="sub-line">${escapeHtml(browserUserAgent)}</span>`,
+          },
+          {
             key: "サーバー起動時刻",
             value: escapeHtml(formatIsoToLocalText(startupAt.toISOString())),
           },
@@ -573,8 +667,22 @@ function buildReportHtml({
             value: `${escapeHtml(osDisplay)}<span class="sub-line">${escapeHtml(osRaw)}</span>`,
           },
           {
-            key: "Node.js",
-            value: escapeHtml(process.version),
+            key: "メモリ",
+            value: `${escapeHtml(formatBytesToReadable(totalMem))}`,
+          },
+          {
+            key: "CPU",
+            value: escapeHtml(cpuDisplay),
+          },
+          {
+            key: "ストレージ",
+            value: `${escapeHtml(
+              storageInfo.raw || "不明",
+            )}<span class="sub-line">空き: ${escapeHtml(
+              formatBytesToReadable(storageInfo.freeBytes),
+            )} / 全体: ${escapeHtml(
+              formatBytesToReadable(storageInfo.totalBytes),
+            )}</span>`,
           },
           {
             key: "ブラウザ",
