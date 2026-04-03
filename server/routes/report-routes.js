@@ -3,6 +3,7 @@ const path = require("path");
 const os = require("os");
 const { spawnSync } = require("child_process");
 const { getLogEntries } = require("../services/log-stream-service");
+const { getLocalTubeErrorHints } = require("../../shared/error-hints");
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -57,22 +58,149 @@ function formatDurationFromMs(ms) {
   return `${hours}時間 ${minutes}分 ${seconds}秒`;
 }
 
-function detectBrowserName(userAgent) {
+function maskPersonalPath(value) {
+  const text = String(value || "");
+  return text.replace(/^([A-Za-z]:\\Users\\)([^\\]+)(\\?)/i, "$1PCNAME$3");
+}
+
+function detectBrowserName(userAgent, brands = []) {
   const ua = String(userAgent || "");
-  if (/edg\//i.test(ua)) return "Edge";
-  if (/firefox\//i.test(ua)) return "Firefox";
-  if (/chrome\//i.test(ua)) return "Chrome";
-  if (/safari\//i.test(ua)) return "Safari";
+  const normalizedBrands = Array.isArray(brands)
+    ? brands.map((brand) => String(brand || "").toLowerCase())
+    : [];
+
+  const hasBrand = (needle) =>
+    normalizedBrands.some((brand) => brand.includes(String(needle).toLowerCase()));
+
+  if (hasBrand("Microsoft Edge") || /edg\//i.test(ua)) return "Edge";
+  if (hasBrand("Opera") || /(?:opr|opera)\//i.test(ua)) return "Opera";
+  if (hasBrand("Vivaldi") || /vivaldi/i.test(ua)) return "Vivaldi";
+  if (hasBrand("Brave") || /brave/i.test(ua)) return "Brave";
+  if (hasBrand("Arc") || /arc\//i.test(ua)) return "Arc";
+  if (hasBrand("Samsung Internet") || /samsungbrowser\//i.test(ua)) {
+    return "Samsung Internet";
+  }
+  if (hasBrand("DuckDuckGo") || /duckduckgo/i.test(ua)) return "DuckDuckGo";
+  if (hasBrand("NAVER Whale") || /whale\//i.test(ua)) return "Whale";
+  if (hasBrand("Yandex") || /yabrowser\//i.test(ua)) return "Yandex";
+  if (hasBrand("Firefox") || /firefox\//i.test(ua)) return "Firefox";
+  if (/msie|trident/i.test(ua)) return "Internet Explorer";
+  if (hasBrand("Chromium") || /chromium\//i.test(ua)) return "Chromium";
+  if (hasBrand("Google Chrome") || /chrome\//i.test(ua)) return "Chrome";
+  if (hasBrand("Safari") || (/safari\//i.test(ua) && !/chrome|chromium|edg|opr/i.test(ua))) {
+    return "Safari";
+  }
   return "不明";
 }
 
+function readWindowsRegistryValue(valueName) {
+  const result = spawnSync(
+    "reg",
+    [
+      "query",
+      "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+      "/v",
+      valueName,
+    ],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 3000,
+      shell: false,
+    },
+  );
+
+  if (result.error || result.status !== 0) return "";
+  const output = String(result.stdout || "");
+  const line = output
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .find((item) => item.toLowerCase().startsWith(valueName.toLowerCase()));
+  if (!line) return "";
+  const parts = line.split(/\s{2,}/).filter(Boolean);
+  return parts[parts.length - 1] || "";
+}
+
+function getWindowsRegistryInfo() {
+  const productName = readWindowsRegistryValue("ProductName");
+  const displayVersion = readWindowsRegistryValue("DisplayVersion");
+  const releaseId = readWindowsRegistryValue("ReleaseId");
+  const currentBuild = readWindowsRegistryValue("CurrentBuild");
+  const currentBuildNumber = readWindowsRegistryValue("CurrentBuildNumber");
+  const ubr = readWindowsRegistryValue("UBR");
+
+  return {
+    productName,
+    displayVersion,
+    releaseId,
+    currentBuild: currentBuild || currentBuildNumber,
+    ubr,
+  };
+}
+
+function normalizeWindowsProductName(productName, releaseText) {
+  const normalizedProductName = String(productName || "").trim();
+  const release = String(releaseText || os.release());
+  const build = Number.parseInt(release.split(".")[2] || "0", 10);
+
+  if (build >= 22000 && /^Windows 10\b/i.test(normalizedProductName)) {
+    return normalizedProductName.replace(/^Windows 10\b/i, "Windows 11");
+  }
+
+  return normalizedProductName;
+}
+
 function detectWindowsDisplayName() {
+  if (process.platform === "win32") {
+    const registryInfo = getWindowsRegistryInfo();
+    const productName = normalizeWindowsProductName(
+      registryInfo.productName,
+      os.release(),
+    );
+    const displayVersion = String(
+      registryInfo.displayVersion || registryInfo.releaseId || "",
+    ).trim();
+
+    if (productName && displayVersion) {
+      return `${productName} ${displayVersion}`;
+    }
+    if (productName) {
+      return productName;
+    }
+  }
+
   const release = os.release();
-  if (release.startsWith("10.0.26100")) return "Windows11 24H2";
-  if (release.startsWith("10.0.22631")) return "Windows11 23H2";
-  if (release.startsWith("10.0.22621")) return "Windows11 22H2";
-  if (release.startsWith("10.0.22000")) return "Windows11 21H2";
-  if (release.startsWith("10.0.")) return "Windows";
+  const [major, minor, buildText] = String(release).split(".");
+  const build = Number.parseInt(buildText || "0", 10);
+
+  if (major === "10" && minor === "0") {
+    if (build >= 26100) return "Windows11 24H2以降";
+    if (build >= 22631) return "Windows11 23H2";
+    if (build >= 22621) return "Windows11 22H2";
+    if (build >= 22000) return "Windows11 21H2";
+    if (build >= 19045) return "Windows10 22H2";
+    if (build >= 19044) return "Windows10 21H2";
+    if (build >= 19043) return "Windows10 21H1";
+    if (build >= 19042) return "Windows10 20H2";
+    if (build >= 19041) return "Windows10 2004";
+    if (build >= 18363) return "Windows10 1909";
+    if (build >= 18362) return "Windows10 1903";
+    if (build >= 17763) return "Windows10 1809";
+    if (build >= 17134) return "Windows10 1803";
+    if (build >= 16299) return "Windows10 1709";
+    if (build >= 15063) return "Windows10 1703";
+    if (build >= 14393) return "Windows10 1607";
+    if (build >= 10586) return "Windows10 1511";
+    if (build >= 10240) return "Windows10 1507";
+    return "Windows10";
+  }
+
+  if (major === "6" && minor === "3") return "Windows8.1";
+  if (major === "6" && minor === "2") return "Windows8";
+  if (major === "6" && minor === "1") return "Windows7";
+  if (major === "6" && minor === "0") return "WindowsVista";
+  if (major === "5" && minor === "1") return "WindowsXP";
+
   return `${os.type()} ${release}`;
 }
 
@@ -337,15 +465,23 @@ function buildFailedJobsHtml(jobHistory) {
   }
 
   return failedJobs
-    .map(
-      (job) => `
+    .map((job) => {
+      const errorText = String(job.progress?.eta || "不明");
+      const hints = getLocalTubeErrorHints(errorText);
+      const hintHtml = hints.length
+        ? `<div><strong>案内:</strong><ul>${hints
+            .map((hint) => `<li>${escapeHtml(hint)}</li>`)
+            .join("")}</ul></div>`
+        : "";
+      return `
         <div class="log-card">
           <div><strong>URL:</strong> ${escapeHtml(job.url || "不明")}</div>
-          <div><strong>LocalTube エラー:</strong> ${escapeHtml(job.progress?.eta || "不明")}</div>
+          <div><strong>LocalTube エラー:</strong> ${escapeHtml(errorText)}</div>
           <div><strong>ジョブID:</strong> ${escapeHtml(job.id || "")}</div>
+          ${hintHtml}
         </div>
-      `,
-    )
+      `;
+    })
     .join("");
 }
 
@@ -364,7 +500,10 @@ function buildReportHtml({
   const toolVersions = readToolVersions(baseDir);
   const startupAt = new Date(serverStartTime);
   const downloadSettingsRows = buildSettingsRows(settings, client);
-  const browserName = detectBrowserName(client?.browserUserAgent);
+  const browserName = detectBrowserName(
+    client?.browserUserAgent,
+    client?.browserBrands,
+  );
   const browserUserAgent = client?.browserUserAgent || "不明";
   const osDisplay = detectWindowsDisplayName();
   const osRaw = `${os.type()} ${os.release()} (${os.arch()})`;
@@ -400,6 +539,7 @@ function buildReportHtml({
 <body>
   <h1>LocalTube レポート</h1>
   <p class="muted">生成時刻: ${escapeHtml(formatIsoToLocalText(now.toISOString()))}</p>
+  <p class="muted">アプリのパス: ${escapeHtml(maskPersonalPath(baseDir))}</p>
 
   <h2>1. 実行環境</h2>
   <div class="grid">

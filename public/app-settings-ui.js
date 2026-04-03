@@ -181,6 +181,14 @@ function clampNumberInRange(value, min, max, fallback) {
         };
       }
 
+      function readBrowserBrands() {
+        const brands = global.navigator?.userAgentData?.brands;
+        if (!Array.isArray(brands)) return [];
+        return brands
+          .map((entry) => String(entry?.brand || "").trim())
+          .filter(Boolean);
+      }
+
       function getWallpaperStyleFromServerSettings(settings) {
         const blurValue = clampNumberInRange(settings.wallpaperBlur, 0, 30, 0);
         const brightnessValue = clampNumberInRange(
@@ -1366,6 +1374,7 @@ function clampNumberInRange(value, min, max, fallback) {
               body: JSON.stringify({
                 currentUrl: global.location?.href || "",
                 browserUserAgent: global.navigator?.userAgent || "",
+                browserBrands: readBrowserBrands(),
                 generatedAt: new Date().toISOString(),
                 cookieInfo: readCookieSelectionMetadata(),
                 downloadSettings: buildDownloadSettingsSnapshot(elements),
