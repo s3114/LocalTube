@@ -4288,11 +4288,11 @@
             レポートには以下の情報が含まれます。
           </div>
           <ul class="report-modal-list">
-            <li>実行環境とバージョン情報</li>
-            <li>ダウンロード設定とカスタムコマンド設定有無</li>
-            <li>Cookie 取得方法と取得時刻</li>
-            <li>アプリ直下のフォルダ一覧とファイル内容</li>
-            <li>WARN ログと失敗した動画の URL / エラーメッセージ</li>
+            <li>OSや使用ブラウザ</li>
+            <li>LocalTubeの設定情報</li>
+            <li>LocalTubeのフォルダ構造、パス</li>
+            <li>依存ツールのバージョン情報</li>
+            <li>一部ログと失敗した動画のURL、エラーメッセージ</li>
           </ul>
           <div class="report-modal-copy">
             これらの内容に同意いただける場合のみ、生成してください。
@@ -4308,6 +4308,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/shared/error-hints.js"></script>
     <script src="/app-core.js"></script>
     <script src="/app-feedback.js"></script>
     <script src="/app-home-cards.js"></script>

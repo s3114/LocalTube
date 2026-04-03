@@ -41,34 +41,9 @@
       }
 
       const errorMessage = job.progress.eta || "エラー";
-      const hints = [];
-      if (errorMessage.includes("Sign in to confirm you’re not a bot")) {
-        hints.push("Cookieファイルを指定し、再度ダウンロードを実行してください。");
-      }
-      if (errorMessage.includes("skipped as they are DRM protected")) {
-        hints.push(
-          "DRM保護の動画のトグルを有効にし再度ダウンロードを実行してください。",
-        );
-      }
-      if (errorMessage.includes("Join this channel to get access to members")) {
-        hints.push("正しいCookieファイルを指定し、再度ダウンロードを実行してください。");
-      }
-      if (errorMessage.includes("Requested format is not available")) {
-        hints.push(
-          "このエラーは様々な理由で発生します。最大の原因はショート動画のDLです。詳しくはサポートサーバーにて質問して下さい。",
-        );
-      }
-      if (errorMessage.includes("HTTP Error 403: Forbidden")) {
-        hints.push(
-          "情報不足にて確実な対処方法が確立していません。詳しくはサポートサーバーにて質問して下さい。",
-        );
-      }
-      if (errorMessage.includes("Unsupported URL: ")) {
-        hints.push("そのURLはサポートされていません。");
-      }
-      if (errorMessage.includes("' is not a valid URL")) {
-        hints.push("URLが有効ではありません。");
-      }
+      const hints = Array.isArray(global.getLocalTubeErrorHints?.(errorMessage))
+        ? global.getLocalTubeErrorHints(errorMessage)
+        : [];
 
       return { width: "100%", text: errorMessage, hints };
     }
