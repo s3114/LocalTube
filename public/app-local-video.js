@@ -131,6 +131,59 @@
       return `pl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     }
 
+    function createLocalVideoThumbLazyLoader(container) {
+      let observer = null;
+
+      function hydrateThumb(img) {
+        if (!(img instanceof HTMLImageElement)) return;
+        const src = String(img.dataset.thumbSrc || "").trim();
+        if (!src) return;
+        img.src = src;
+        delete img.dataset.thumbSrc;
+      }
+
+      function observe() {
+        if (!container) return;
+        const pendingImages = container.querySelectorAll(
+          "img.local-video-thumb[data-thumb-src]",
+        );
+        if (!pendingImages.length) return;
+
+        if (!("IntersectionObserver" in global)) {
+          pendingImages.forEach(hydrateThumb);
+          return;
+        }
+
+        if (!observer) {
+          observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                hydrateThumb(entry.target);
+                observer?.unobserve(entry.target);
+              });
+            },
+            {
+              root: container,
+              rootMargin: "240px 0px",
+            },
+          );
+        }
+
+        pendingImages.forEach((img) => observer.observe(img));
+      }
+
+      function disconnect() {
+        observer?.disconnect();
+        observer = null;
+      }
+
+      return {
+        observe,
+        disconnect,
+      };
+    }
+
     function createLocalVideoListItemElement(video, onClick, onOpenOptions) {
       const item = document.createElement("div");
       item.className = "local-video-item";
@@ -138,8 +191,14 @@
 
       if (video.thumb) {
         const thumbImg = document.createElement("img");
-        thumbImg.src = video.thumb;
         thumbImg.className = "local-video-thumb";
+        thumbImg.dataset.thumbSrc = video.thumb;
+        thumbImg.loading = "lazy";
+        thumbImg.decoding = "async";
+        thumbImg.alt = video.title || video.filename || "thumbnail";
+        thumbImg.onerror = () => {
+          thumbImg.src = "/none_icon.jpg";
+        };
         item.appendChild(thumbImg);
       } else {
         const thumbPlaceholder = document.createElement("div");
@@ -345,20 +404,42 @@
     }
 
     function renderLocalVideoList(videoList, videos, onSelect, onOpenOptions) {
+      videoList.__localThumbLazyLoader?.disconnect?.();
       videoList.innerHTML = "";
       if (videos.length === 0) {
         videoList.innerHTML = '<div class="status-subtext">動画が見つかりません</div>';
         return;
       }
-      videos.forEach((video) => {
-        videoList.appendChild(
-          createLocalVideoListItemElement(
-            video,
-            (selectedVideo, selectedItem) => onSelect(selectedVideo, selectedItem),
-            onOpenOptions,
-          ),
-        );
-      });
+      const thumbLazyLoader = createLocalVideoThumbLazyLoader(videoList);
+      videoList.__localThumbLazyLoader = thumbLazyLoader;
+      const renderChunkSize = 40;
+      let cursor = 0;
+
+      function renderChunk() {
+        const fragment = document.createDocumentFragment();
+        const end = Math.min(cursor + renderChunkSize, videos.length);
+        for (; cursor < end; cursor += 1) {
+          const video = videos[cursor];
+          fragment.appendChild(
+            createLocalVideoListItemElement(
+              video,
+              (selectedVideo, selectedItem) => onSelect(selectedVideo, selectedItem),
+              onOpenOptions,
+            ),
+          );
+        }
+        videoList.appendChild(fragment);
+        thumbLazyLoader.observe();
+
+        if (cursor >= videos.length) return;
+        if (typeof global.requestAnimationFrame === "function") {
+          global.requestAnimationFrame(renderChunk);
+          return;
+        }
+        setTimeout(renderChunk, 0);
+      }
+
+      renderChunk();
     }
 
     function showLocalVideoListLoadError(videoList, homeVideoGrid) {
