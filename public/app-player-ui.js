@@ -462,26 +462,51 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         if (!chatContainer) return;
 
         const currentSec = Math.floor(videoPlayer.currentTime);
-        const lines = chatContainer.querySelectorAll(".chat-line[data-time]");
-        if (lines.length === 0) return;
+        if (chatContainer.__lastSyncedSecond === currentSec) return;
+        chatContainer.__lastSyncedSecond = currentSec;
+        const timedLines = Array.isArray(chatContainer.__chatTimedLines)
+          ? chatContainer.__chatTimedLines
+          : [];
+        if (timedLines.length === 0) return;
 
         let target = null;
-        for (const line of lines) {
-          const t = parseInt(line.dataset.time, 10);
-          if (t <= currentSec) {
-            target = line;
-          } else {
-            break;
+        let cursor = Number.isInteger(chatContainer.__chatTimedIndex)
+          ? chatContainer.__chatTimedIndex
+          : 0;
+        cursor = Math.max(0, Math.min(cursor, timedLines.length - 1));
+
+        if (timedLines[cursor]?.timeSec > currentSec) {
+          let low = 0;
+          let high = cursor;
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            if (timedLines[mid].timeSec <= currentSec) {
+              target = timedLines[mid].line;
+              cursor = mid;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
           }
+        } else {
+          while (
+            cursor + 1 < timedLines.length &&
+            timedLines[cursor + 1].timeSec <= currentSec
+          ) {
+            cursor += 1;
+          }
+          target = timedLines[cursor]?.line || null;
         }
         if (!target) return;
+        chatContainer.__chatTimedIndex = cursor;
+
+        const targetTime = String(target.dataset.time || "");
+        if (chatContainer.__lastChatTargetTime === targetTime) return;
+        chatContainer.__lastChatTargetTime = targetTime;
 
         const targetOffset =
           target.offsetTop - chatContainer.clientHeight / 2 + target.clientHeight / 2;
-        chatContainer.scrollTo({
-          top: Math.max(0, targetOffset),
-          behavior: "smooth",
-        });
+        chatContainer.scrollTop = Math.max(0, targetOffset);
       }
 
       function createPlayerPlaybackActions(videoPlayer) {
@@ -703,6 +728,20 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         );
         const actions = createPlayerPlaybackActions(videoPlayer);
 
+        function releasePlayerResources() {
+          try {
+            videoPlayer.pause();
+          } catch (_error) {
+            // noop
+          }
+          try {
+            videoPlayer.removeAttribute("src");
+            videoPlayer.load();
+          } catch (_error) {
+            // noop
+          }
+        }
+
         function initializePlayerUiBindings() {
           seekSync.initializeSeekBarState();
           seekSync.bindTimeUpdateEvents(() => {
@@ -731,6 +770,8 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
             "visibilitychange",
             seekSync.updateSmoothSeekLoopState,
           );
+          window.addEventListener("pagehide", releasePlayerResources);
+          window.addEventListener("beforeunload", releasePlayerResources);
         }
 
         return {
