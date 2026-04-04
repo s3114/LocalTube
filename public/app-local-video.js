@@ -320,22 +320,55 @@
       ui.commentEmpty.style.display = "none";
     }
 
-    function renderVideoLiveChatMessages(chatContainer, messages) {
+    function renderVideoLiveChatMessages(
+      chatContainer,
+      messages,
+      {
+        shouldContinue = () => true,
+        onChunkRendered = () => {},
+        onCompleted = () => {},
+      } = {},
+    ) {
       const timedLines = [];
-      messages.forEach((msg) => {
-        const line = createChatLineElementFromMessage(msg);
-        if (line) {
-          chatContainer.appendChild(line);
+      const chunkSize = 120;
+      let offset = 0;
+
+      const renderChunk = () => {
+        if (!shouldContinue()) return;
+        const fragment = document.createDocumentFragment();
+        const end = Math.min(offset + chunkSize, messages.length);
+
+        for (; offset < end; offset += 1) {
+          const msg = messages[offset];
+          const line = createChatLineElementFromMessage(msg);
+          if (!line) continue;
+          fragment.appendChild(line);
           const timeSec = Number.parseInt(line.dataset.time || "", 10);
           if (Number.isFinite(timeSec)) {
             timedLines.push({ timeSec, line });
           }
         }
-      });
-      chatContainer.__chatTimedLines = timedLines;
-      chatContainer.__chatTimedIndex = 0;
-      chatContainer.__lastSyncedSecond = undefined;
-      chatContainer.__lastChatTargetTime = "";
+
+        chatContainer.appendChild(fragment);
+        chatContainer.__chatTimedLines = timedLines;
+        chatContainer.__chatTimedIndex = 0;
+        chatContainer.__lastSyncedSecond = undefined;
+        chatContainer.__lastChatTargetTime = "";
+        onChunkRendered();
+
+        if (offset >= messages.length) {
+          onCompleted();
+          return;
+        }
+
+        if (typeof global.requestAnimationFrame === "function") {
+          global.requestAnimationFrame(renderChunk);
+          return;
+        }
+        setTimeout(renderChunk, 0);
+      };
+
+      renderChunk();
     }
 
     function setVideoLiveChatLoadingState(ui, message) {
@@ -527,8 +560,19 @@
           }
 
           if (ui.chatEmpty) ui.chatEmpty.style.display = "none";
-          renderVideoLiveChatMessages(ui.chatContainer, messages);
-          ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
+          renderVideoLiveChatMessages(ui.chatContainer, messages, {
+            shouldContinue: () => currentChatToken === chatRequestToken,
+            onChunkRendered: () => {
+              if (currentChatToken !== chatRequestToken) return;
+              if (ui.chatContainer.scrollTop === 0) {
+                ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
+              }
+            },
+            onCompleted: () => {
+              if (currentChatToken !== chatRequestToken) return;
+              ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
+            },
+          });
           onMetric("chat_load_ms", performance.now() - startedAt, {
             count: messages.length,
           });
