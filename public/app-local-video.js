@@ -321,17 +321,30 @@
     }
 
     function renderVideoLiveChatMessages(chatContainer, messages) {
+      const timedLines = [];
       messages.forEach((msg) => {
         const line = createChatLineElementFromMessage(msg);
         if (line) {
           chatContainer.appendChild(line);
+          const timeSec = Number.parseInt(line.dataset.time || "", 10);
+          if (Number.isFinite(timeSec)) {
+            timedLines.push({ timeSec, line });
+          }
         }
       });
+      chatContainer.__chatTimedLines = timedLines;
+      chatContainer.__chatTimedIndex = 0;
+      chatContainer.__lastSyncedSecond = undefined;
+      chatContainer.__lastChatTargetTime = "";
     }
 
     function setVideoLiveChatLoadingState(ui, message) {
       if (!ui.chatContainer || !ui.chatEmpty) return;
       ui.chatContainer.innerHTML = "";
+      ui.chatContainer.__chatTimedLines = [];
+      ui.chatContainer.__chatTimedIndex = 0;
+      ui.chatContainer.__lastSyncedSecond = undefined;
+      ui.chatContainer.__lastChatTargetTime = "";
       ui.chatEmpty.style.display = "block";
       ui.chatEmpty.textContent = message;
     }
@@ -1161,6 +1174,9 @@
 
       function scheduleHomeInfoPrefetch() {
         if (!onPrefetchHomeInfos) return;
+        if (!document.getElementById("page-home")?.classList.contains("active-page")) {
+          return;
+        }
         if (typeof window.requestIdleCallback === "function") {
           window.requestIdleCallback(() => onPrefetchHomeInfos());
           return;
