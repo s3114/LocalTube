@@ -1163,6 +1163,16 @@
         return true;
       }
 
+      function applyLocalVideos(videos) {
+        allLocalVideos = Array.isArray(videos) ? videos : [];
+        renderLocalVideoList(videoList, allLocalVideos, playLocalVideo, openOptionsMenu);
+        onRenderHomeVideos?.(allLocalVideos);
+        renderPlaylistUi();
+        renderPlaybackPlaylistSidebar();
+        scheduleHomeInfoPrefetch();
+        playPendingVideoIfAny(false);
+      }
+
       async function loadLocalVideos(forceRefresh = false) {
         const startedAt = performance.now();
         try {
@@ -1173,15 +1183,7 @@
             throw new Error(result.error || "動画一覧の取得に失敗しました。");
           }
           const videos = result.data;
-          allLocalVideos = Array.isArray(videos) ? videos : [];
-
-          renderLocalVideoList(videoList, allLocalVideos, playLocalVideo, openOptionsMenu);
-          onRenderHomeVideos?.(allLocalVideos);
-          renderPlaylistUi();
-          renderPlaybackPlaylistSidebar();
-          scheduleHomeInfoPrefetch();
-
-          playPendingVideoIfAny(false);
+          applyLocalVideos(videos);
           onMetric("local_videos_load_ms", performance.now() - startedAt, {
             count: allLocalVideos.length,
           });
@@ -1197,6 +1199,7 @@
         playVideoById,
         openVideoOptionsForVideo: (video, anchorElement) => openOptionsMenu(video, anchorElement),
         loadLocalVideos,
+        applyLocalVideos,
       };
     }
 

@@ -168,8 +168,8 @@ const appState = window.AppState || {
         };
         initializeSettingsUiController({
           elements,
-          onLocalVideosChanged: async () => {
-            await window.refreshLocalVideos?.();
+          onLocalVideosChanged: async (videos) => {
+            await window.refreshLocalVideos?.(videos);
           },
           dependencies: {
             parseApiResponseImpl: parseApiResponse,

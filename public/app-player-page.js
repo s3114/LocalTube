@@ -336,7 +336,13 @@
           tryResolvePendingPlayerVideo();
         }
       });
-      global.refreshLocalVideos = () => localVideoController.loadLocalVideos(true);
+      global.refreshLocalVideos = (videos) => {
+        if (Array.isArray(videos)) {
+          localVideoController.applyLocalVideos(videos);
+          return Promise.resolve();
+        }
+        return localVideoController.loadLocalVideos(true);
+      };
     }
 
     return {

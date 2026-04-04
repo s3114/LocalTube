@@ -1096,6 +1096,7 @@ function clampNumberInRange(value, min, max, fallback) {
         if (!result.ok) {
           throw new Error(result.error || "手動スキャンに失敗しました。");
         }
+        return Array.isArray(result.data) ? result.data : [];
       }
 
       async function saveFallbackThumbnailSettingWithRecovery(bridge, enabled) {
@@ -1200,13 +1201,13 @@ function clampNumberInRange(value, min, max, fallback) {
               "フォルダーを保存しました。手動スキャンを実行中...",
               "info",
             );
-            await triggerLocalVideoScanRefresh();
+            const refreshedVideos = await triggerLocalVideoScanRefresh();
             setSettingStatus(
               elements.localVideoDirsStatus,
-              "フォルダーを保存し、手動スキャンを完了しました。",
+              `フォルダーを保存し、手動スキャンを完了しました。(${refreshedVideos.length}件)`,
               "success",
             );
-            await onLocalVideosChanged?.();
+            await onLocalVideosChanged?.(refreshedVideos);
           } catch (error) {
             console.error("ローカル動画フォルダー設定の保存に失敗:", error);
             const recoveredDirs = await recoverLocalVideoDirsOnSaveError(
@@ -1225,12 +1226,13 @@ function clampNumberInRange(value, min, max, fallback) {
                   "フォルダー保存済み。手動スキャンを実行中...",
                   "info",
                 );
-                await triggerLocalVideoScanRefresh();
+                const refreshedVideos = await triggerLocalVideoScanRefresh();
                 setSettingStatus(
                   elements.localVideoDirsStatus,
-                  "フォルダーを保存し、手動スキャンを完了しました。",
+                  `フォルダーを保存し、手動スキャンを完了しました。(${refreshedVideos.length}件)`,
                   "success",
                 );
+                await onLocalVideosChanged?.(refreshedVideos);
               } catch (scanError) {
                 console.error("手動スキャンの実行に失敗:", scanError);
                 setSettingStatus(
@@ -1239,7 +1241,6 @@ function clampNumberInRange(value, min, max, fallback) {
                   "error",
                 );
               }
-              await onLocalVideosChanged?.();
               return;
             }
             setSettingStatus(
