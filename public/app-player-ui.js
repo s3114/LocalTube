@@ -531,9 +531,6 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
       }
 
       function createPlayerSeekSyncController(videoPlayer, seekBar, timeDisplay) {
-        let smoothSeekRafId = null;
-        let targetProgress = 0;
-
         function resetSeekBar() {
           seekBar.value = 0;
           seekBar.style.setProperty("--progress", "0%");
@@ -555,53 +552,19 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
           if (!videoPlayer.duration) return;
           const cur = Math.floor(videoPlayer.currentTime);
           const dur = Math.floor(videoPlayer.duration);
-          targetProgress = (videoPlayer.currentTime / videoPlayer.duration) * 100;
           timeDisplay.textContent = `${formatVideoTime(cur)} / ${formatVideoTime(dur)}`;
-        }
-
-        function shouldRunSmoothSeekLoop() {
-          const playerPage = document.getElementById("page-player");
-          return !document.hidden && !!playerPage && playerPage.classList.contains("active-page");
-        }
-
-        function smoothSeek() {
-          if (!videoPlayer.duration || isNaN(videoPlayer.duration)) {
-            targetProgress = 0;
-            seekBar.value = 0;
-            seekBar.style.setProperty("--progress", "0%");
-            smoothSeekRafId = requestAnimationFrame(smoothSeek);
-            return;
-          }
-
-          const current = parseFloat(seekBar.value) || 0;
-          const diff = targetProgress - current;
-          const easing = 0.001;
-          const newValue = current + diff * easing;
-
-          seekBar.value = newValue;
-          seekBar.style.setProperty("--progress", `${newValue}%`);
-          smoothSeekRafId = requestAnimationFrame(smoothSeek);
-        }
-
-        function updateSmoothSeekLoopState() {
-          if (shouldRunSmoothSeekLoop()) {
-            if (smoothSeekRafId === null) {
-              smoothSeekRafId = requestAnimationFrame(smoothSeek);
-            }
-            return;
-          }
-
-          if (smoothSeekRafId !== null) {
-            cancelAnimationFrame(smoothSeekRafId);
-            smoothSeekRafId = null;
-          }
         }
 
         function bindTimeUpdateEvents(onTimeupdateExtra) {
           videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
           videoPlayer.addEventListener("timeupdate", syncPlaybackClockWithVideo);
+          videoPlayer.addEventListener("loadedmetadata", syncSeekBarWithVideo);
+          videoPlayer.addEventListener("loadedmetadata", syncPlaybackClockWithVideo);
+          videoPlayer.addEventListener("seeked", syncSeekBarWithVideo);
+          videoPlayer.addEventListener("seeked", syncPlaybackClockWithVideo);
           if (onTimeupdateExtra) {
             videoPlayer.addEventListener("timeupdate", onTimeupdateExtra);
+            videoPlayer.addEventListener("seeked", () => onTimeupdateExtra());
           }
         }
 
@@ -621,7 +584,7 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
 
         return {
           resetSeekBar,
-          updateSmoothSeekLoopState,
+          updateSmoothSeekLoopState() {},
           bindTimeUpdateEvents,
           bindSeekBarInput,
           initializeSeekBarState,
