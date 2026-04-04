@@ -508,6 +508,7 @@
       let infoRequestToken = 0;
       let chatAbortController = null;
       let chatRequestToken = 0;
+      let chatLoadTimerId = null;
       const ui = getVideoDataUiElements();
       const commentRenderer = createCommentRenderer(linkify);
 
@@ -583,6 +584,16 @@
         }
       }
 
+      function scheduleLiveChatLoad(videoBaseName, delayMs = 1500) {
+        if (chatLoadTimerId) {
+          clearTimeout(chatLoadTimerId);
+        }
+        chatLoadTimerId = setTimeout(() => {
+          chatLoadTimerId = null;
+          loadLiveChat(videoBaseName);
+        }, delayMs);
+      }
+
       function loadCurrentVideoSideData(videoId) {
         const startedAt = performance.now();
         infoRequestToken += 1;
@@ -606,7 +617,7 @@
             onError("info.json 読み込み失敗:", error);
           });
 
-        loadLiveChat(videoId);
+        scheduleLiveChatLoad(videoId);
       }
 
       return {
