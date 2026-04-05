@@ -4008,7 +4008,7 @@
                   <small>チャンネルURLから自動的に再生リストURLを生成します。</small>
                 </div>
                 <div
-                  class="settings-stack settings-stack-8 settings-stack-tool">
+                  class="settings-stack settings-stack-8 settings-stack-wide">
                   <input
                     type="text"
                     id="youtubeChannelUrlInput"
@@ -4026,8 +4026,10 @@
                       class="settings-input-flex" />
                     <button
                       id="copyPlaylistUrlBtn"
-                      class="btn-ui btn-blue btn-tight btn-copy">
-                      コピー
+                      class="btn-ui btn-gray btn-tight btn-copy"
+                      title="コピー"
+                      aria-label="コピー">
+                      <i class="fa-regular fa-copy"></i>
                     </button>
                   </div>
                 </div>
@@ -4040,7 +4042,7 @@
                     class="settings-hint-blue">待機中...</small>
                 </div>
                 <div
-                  class="settings-stack settings-stack-8 settings-stack-tool">
+                  class="settings-stack settings-stack-8 settings-stack-wide">
                   <div class="settings-inline-row settings-gap-8">
                     <input
                       type="text"
@@ -4049,26 +4051,19 @@
                       placeholder="LAN内IPを表示"
                       class="settings-input-flex" />
                     <button id="refreshLocalLanIpBtn"
-                      class="btn-ui btn-blue btn-tight btn-copy">
-                      更新
+                      class="btn-ui btn-gray btn-tight btn-copy"
+                      title="更新"
+                      aria-label="更新">
+                      <i class="fa-solid fa-rotate-right"></i>
                     </button>
                     <button
                       id="copyLocalLanIpBtn"
-                      class="btn-ui btn-gray btn-tight btn-copy">
-                      コピー
+                      class="btn-ui btn-gray btn-tight btn-copy"
+                      title="コピー"
+                      aria-label="コピー">
+                      <i class="fa-regular fa-copy"></i>
                     </button>
                   </div>
-                </div>
-              </div>
-              <div class="toggle">
-                <div>
-                  サポートサーバーはこちら
-                </div>
-                <div
-                  class="settings-stack settings-stack-8 settings-stack-tool">
-                  <a href="https://discord.gg/hzvfKJ8TMw"
-                    target="_blank"
-                    rel="noopener noreferrer">https://discord.gg/hzvfKJ8TMw</a>
                 </div>
               </div>
             </div>
@@ -4247,6 +4242,25 @@
                     class="btn-ui btn-gray">
                     強制終了
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-layout card-margin-top-20">
+          <div class="card-main">
+            <h2>インフォーメーション</h2>
+            <div class="options">
+              <div class="toggle">
+                <div>
+                  サポートサーバーはこちら
+                </div>
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-wide">
+                  <a href="https://discord.gg/hzvfKJ8TMw"
+                    target="_blank"
+                    rel="noopener noreferrer">https://discord.gg/hzvfKJ8TMw</a>
                 </div>
               </div>
             </div>
