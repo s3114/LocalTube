@@ -4081,8 +4081,10 @@
                 </div>
                 <button
                   id="clearHistoryBtn"
-                  class="btn-ui btn-red">
-                  履歴を削除
+                  class="btn-ui btn-red"
+                  title="履歴を削除"
+                  aria-label="履歴を削除">
+                  <i class="fa-solid fa-trash"></i>
                 </button>
               </div>
               <div class="toggle settings-toggle-top">
@@ -4126,13 +4128,17 @@
                       class="settings-hidden-input" />
                     <button
                       id="wallpaper-select-btn"
-                      class="btn-ui btn-blue">
-                      参照
+                      class="btn-ui btn-blue"
+                      title="壁紙を選択"
+                      aria-label="壁紙を選択">
+                      <i class="fa-regular fa-folder-open"></i>
                     </button>
                     <button
                       id="wallpaper-clear-btn"
-                      class="btn-ui btn-gray">
-                      クリア
+                      class="btn-ui btn-gray"
+                      title="壁紙をクリア"
+                      aria-label="壁紙をクリア">
+                      <i class="fa-solid fa-xmark"></i>
                     </button>
                   </div>
                   <div class="settings-inline-row settings-inline-right">
@@ -4234,13 +4240,17 @@
                     class="btn-ui btn-red">
                     更新して再起動
                   </button>
-                  <button id="btn-restart-server-node"
-                    class="btn-ui btn-gray">
-                    再起動
+                    <button id="btn-restart-server-node"
+                    class="btn-ui btn-gray"
+                    title="再起動"
+                    aria-label="再起動">
+                    <i class="fa-solid fa-rotate-right"></i>
                   </button>
                   <button id="btn-shutdown-server"
-                    class="btn-ui btn-gray">
-                    強制終了
+                    class="btn-ui btn-gray"
+                    title="強制終了"
+                    aria-label="強制終了">
+                    <i class="fa-solid fa-power-off"></i>
                   </button>
                 </div>
               </div>
@@ -4281,8 +4291,10 @@
                   class="settings-stack settings-stack-8 settings-stack-log">
                   <div class="settings-inline-row settings-gap-8">
                     <button id="console-log-clear-btn"
-                      class="btn-ui btn-gray">
-                      表示をクリア
+                      class="btn-ui btn-gray"
+                      title="表示をクリア"
+                      aria-label="表示をクリア">
+                      <i class="fa-solid fa-trash"></i>
                     </button>
                     <label class="switch" title="自動追従を一時停止">
                       <input type="checkbox" id="console-log-pause" />
