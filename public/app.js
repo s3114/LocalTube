@@ -67,6 +67,13 @@ const appState = window.AppState || {
         formatChannelSubscribers,
         normalizeLiveChatBaseName,
         parseNdjsonMessages,
+        extractNonEmptyNdjsonLines:
+          window.extractNonEmptyNdjsonLines ||
+          ((text) =>
+            String(text || "")
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0)),
         getVideoIdFromFilename,
         createCommentRenderer,
         createChatLineElementFromMessage,

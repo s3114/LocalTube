@@ -10,6 +10,7 @@
     formatChannelSubscribers,
     normalizeLiveChatBaseName,
     parseNdjsonMessages,
+    extractNonEmptyNdjsonLines,
     getVideoIdFromFilename,
     createCommentRenderer,
     createChatLineElementFromMessage,
@@ -322,7 +323,7 @@
 
     function renderVideoLiveChatMessages(
       chatContainer,
-      messages,
+      messageSource,
       {
         shouldContinue = () => true,
         onChunkRendered = () => {},
@@ -332,14 +333,26 @@
       const timedLines = [];
       const chunkSize = 120;
       let offset = 0;
+      const sourceItems = Array.isArray(messageSource)
+        ? messageSource
+        : extractNonEmptyNdjsonLines(messageSource);
 
       const renderChunk = () => {
         if (!shouldContinue()) return;
         const fragment = document.createDocumentFragment();
-        const end = Math.min(offset + chunkSize, messages.length);
+        const end = Math.min(offset + chunkSize, sourceItems.length);
 
         for (; offset < end; offset += 1) {
-          const msg = messages[offset];
+          const rawItem = sourceItems[offset];
+          let msg = rawItem;
+          if (typeof rawItem === "string") {
+            try {
+              msg = JSON.parse(rawItem);
+            } catch (error) {
+              console.warn("パース失敗した行:", rawItem, error);
+              continue;
+            }
+          }
           const line = createChatLineElementFromMessage(msg);
           if (!line) continue;
           fragment.appendChild(line);
@@ -356,7 +369,7 @@
         chatContainer.__lastChatTargetTime = "";
         onChunkRendered();
 
-        if (offset >= messages.length) {
+        if (offset >= sourceItems.length) {
           onCompleted();
           return;
         }
@@ -550,9 +563,9 @@
           });
           const text = await res.text();
           if (currentChatToken !== chatRequestToken) return;
-          const messages = parseNdjsonMessages(text);
+          const messageLines = extractNonEmptyNdjsonLines(text);
 
-          if (messages.length === 0) {
+          if (messageLines.length === 0) {
             if (ui.chatEmpty) ui.chatEmpty.textContent = "チャットがありません";
             onMetric("chat_load_ms", performance.now() - startedAt, {
               count: 0,
@@ -561,7 +574,7 @@
           }
 
           if (ui.chatEmpty) ui.chatEmpty.style.display = "none";
-          renderVideoLiveChatMessages(ui.chatContainer, messages, {
+          renderVideoLiveChatMessages(ui.chatContainer, messageLines, {
             shouldContinue: () => currentChatToken === chatRequestToken,
             onChunkRendered: () => {
               if (currentChatToken !== chatRequestToken) return;
@@ -575,7 +588,7 @@
             },
           });
           onMetric("chat_load_ms", performance.now() - startedAt, {
-            count: messages.length,
+            count: messageLines.length,
           });
         } catch (error) {
           if (error?.name === "AbortError") return;
