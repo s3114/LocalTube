@@ -3,6 +3,7 @@
 const DISCONNECT_RELOAD_DELAY_KEY = "localtube.disconnectReloadDelayMs";
 const COOKIE_MODE_STORAGE_KEY = "localtube.cookieSelectionMode";
 const COOKIE_UPDATED_AT_STORAGE_KEY = "localtube.cookieUpdatedAt";
+const UPDATE_HISTORY_FILTER_STORAGE_KEY = "localtube.updateHistoryFilter";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
@@ -1313,6 +1314,47 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
+      function initializeUpdateHistoryFilterUI() {
+        const buttons = Array.from(
+          global.document?.querySelectorAll?.("[data-update-filter]") || [],
+        );
+        const items = Array.from(
+          global.document?.querySelectorAll?.(".info-updates-item[data-version]") || [],
+        );
+        if (!buttons.length || !items.length) return;
+
+        const isMinorOnlyVersion = (version) => {
+          const match = String(version || "").trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+          if (!match) return true;
+          return match[3] === "0";
+        };
+
+        const applyFilter = (mode) => {
+          const normalizedMode = mode === "all" ? "all" : "minor-only";
+          buttons.forEach((button) => {
+            button.classList.toggle(
+              "active",
+              button.dataset.updateFilter === normalizedMode,
+            );
+          });
+          items.forEach((item) => {
+            const version = item.dataset.version || "";
+            const shouldShow =
+              normalizedMode === "all" ? true : isMinorOnlyVersion(version);
+            item.classList.toggle("info-updates-item-hidden", !shouldShow);
+          });
+          saveLocalSetting(UPDATE_HISTORY_FILTER_STORAGE_KEY, normalizedMode);
+        };
+
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => {
+            applyFilter(button.dataset.updateFilter || "minor-only");
+          });
+        });
+
+        applyFilter(loadLocalSetting(UPDATE_HISTORY_FILTER_STORAGE_KEY, "minor-only"));
+      }
+
       function initializeReportGenerationUI(elements) {
         if (
           !elements.generateReportBtn ||
@@ -1434,6 +1476,7 @@ function initializeSettingsUiController({
         initializeConsoleLogViewer();
         initializeYoutubePlaylistConverterUI();
         initializeLocalLanIpToolUI();
+        initializeUpdateHistoryFilterUI();
 
         const bridge = createSettingsServerBridge(elements);
         initializeCookieSettingsUI(elements, bridge);

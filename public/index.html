@@ -1508,6 +1508,40 @@
         list-style: none;
       }
 
+      .info-updates-toolbar {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+
+      .info-updates-filter-btn {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--subtext);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.2s ease,
+          color 0.2s ease,
+          border-color 0.2s ease;
+      }
+
+      .info-updates-filter-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+
+      .info-updates-filter-btn.active {
+        background: rgba(58, 160, 255, 0.16);
+        color: var(--text);
+        border-color: rgba(58, 160, 255, 0.45);
+      }
+
       .info-updates-item {
         display: grid;
         grid-template-columns: 88px 72px 1fr;
@@ -1515,6 +1549,10 @@
         padding: 6px 0;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
         font-size: 14px;
+      }
+
+      .info-updates-item.info-updates-item-hidden {
+        display: none !important;
       }
 
       .info-updates-item:first-child {
@@ -4346,187 +4384,190 @@
                 <div class="settings-stack settings-stack-8 settings-stack-wide">
                   <details class="info-updates-details">
                     <summary>更新履歴を表示</summary>
+                    <div class="info-updates-toolbar">
+                      <button
+                        type="button"
+                        class="info-updates-filter-btn active"
+                        data-update-filter="minor-only">
+                        メジャーバージョン
+                      </button>
+                      <button
+                        type="button"
+                        class="info-updates-filter-btn"
+                        data-update-filter="all">
+                        細かい調整
+                      </button>
+                    </div>
                     <ul class="info-updates-list">
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.10.0">
+                        <span class="info-updates-date">2026/04/05</span>
+                        <span class="info-updates-version">v1.10.1</span>
+                        <span class="info-updates-content">バージョン表示を切り替えれるように</span>
+                      </li>
+                      <li class="info-updates-item" data-version="1.10.0">
                         <span class="info-updates-date">2026/04/05</span>
                         <span class="info-updates-version">v1.10.0</span>
                         <span class="info-updates-content">更新履歴の表示機能を追加</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.9.0">
                         <span class="info-updates-date">2026/04/05</span>
                         <span class="info-updates-version">v1.9.0</span>
                         <span class="info-updates-content">ライブチャット関連の軽量化</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.8.1">
                         <span class="info-updates-date">2026/04/04</span>
                         <span class="info-updates-version">v1.8.1</span>
                         <span class="info-updates-content">レポート内容にPCスペックを追加</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.8.0">
                         <span class="info-updates-date">2026/04/03</span>
                         <span class="info-updates-version">v1.8.0</span>
                         <span class="info-updates-content">レポート機能の追加</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.7.0">
                         <span class="info-updates-date">2026/04/02</span>
                         <span class="info-updates-version">v1.7.0</span>
                         <span class="info-updates-content">yt-dlpへカスタムオプションの追加、インストーラーの処理の改善</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.6.4">
                         <span class="info-updates-date">2026/04/01</span>
                         <span class="info-updates-version">v1.6.4</span>
                         <span class="info-updates-content">libopenh264.dllがインストール時に含まれるように</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.6.3">
                         <span class="info-updates-date">2026/03/31</span>
                         <span class="info-updates-version">v1.6.3</span>
                         <span class="info-updates-content">ffmpegのインストールをwingetからgithubに変更</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.6.2">
                         <span class="info-updates-date">2026/03/29</span>
                         <span class="info-updates-version">v1.6.2</span>
                         <span class="info-updates-content">メン限プレイリストURLの取得できる幅を強化</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.6.1">
                         <span class="info-updates-date">2026/03/26</span>
                         <span class="info-updates-version">v1.6.1</span>
                         <span class="info-updates-content">yt-dlpのForbidden 403等の対策を追加、DLオプションUIの改善</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.6.0">
                         <span class="info-updates-date">2026/03/25</span>
                         <span class="info-updates-version">v1.6.0</span>
                         <span class="info-updates-content">yt-dlpがm3u8のみしか受け付けない際の対策、プレイリスト機能を追加</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.5.1">
                         <span class="info-updates-date">2026/03/09</span>
                         <span class="info-updates-version">v1.5.1</span>
                         <span class="info-updates-content">サムネイルの結合を切り替えれるように</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.5.0">
                         <span class="info-updates-date">2026/03/09</span>
                         <span class="info-updates-version">v1.5.0</span>
                         <span class="info-updates-content">サムネイルの結合を切り替えれるように</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.4.2">
                         <span class="info-updates-date">2026/03/08</span>
                         <span class="info-updates-version">v1.4.2</span>
                         <span class="info-updates-content">設定UIの微調整</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.4.1">
                         <span class="info-updates-date">2026/03/08</span>
                         <span class="info-updates-version">v1.4.1</span>
                         <span class="info-updates-content">起動.batに関する修正、READMEの更新</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.4.0">
                         <span class="info-updates-date">2026/02/14</span>
                         <span class="info-updates-version">v1.4.0</span>
                         <span class="info-updates-content">タイムスタンプの実装、コメント絞り込み機能の実装</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.3.2">
                         <span class="info-updates-date">2026/02/14</span>
                         <span class="info-updates-version">v1.3.2</span>
                         <span class="info-updates-content">スマホのホームページのUI調整</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.3.1">
                         <span class="info-updates-date">2026/02/14</span>
                         <span class="info-updates-version">v1.3.1</span>
                         <span class="info-updates-content">スマホからのIPコピーを調整</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.3.0">
                         <span class="info-updates-date">2026/02/14</span>
                         <span class="info-updates-version">v1.3.0</span>
                         <span class="info-updates-content">LAN内デバイスからアクセスするためのIPを表示</span>
                       </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.2.0">
                         <span class="info-updates-date">2026/02/14</span>
                         <span class="info-updates-version">v1.2.0</span>
                         <span class="info-updates-content">PWAに対応し、スマホ版でのUIを実装</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.9">
                         <span class="info-updates-date">2026/02/14</span>
                         <span class="info-updates-version">v1.1.9</span>
                         <span class="info-updates-content">概要欄のUIを調整、ダウンロード処理完了後の処理の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.8">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.8</span>
                         <span class="info-updates-content">gitテスト、ダウンロード処理の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.7">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.7</span>
                         <span class="info-updates-content">再起動処理の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.6">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.6</span>
                         <span class="info-updates-content">再起動処理の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.5">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.5</span>
                         <span class="info-updates-content">再起動処理の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.4">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.4</span>
                         <span class="info-updates-content">動画描画の最適化</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.3">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.3</span>
                         <span class="info-updates-content">ローカル動画指定の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.2">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.2</span>
                         <span class="info-updates-content">ローカル動画指定の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.1">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.1</span>
                         <span class="info-updates-content">メインdirがCドライブにない際のcookie指定の調整</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.1.0">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.1.0</span>
                         <span class="info-updates-content">コンソールログを実装</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.0.3">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.0.3</span>
                         <span class="info-updates-content">設定UIの調整、自動起動に対応</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.0.2">
                         <span class="info-updates-date">2026/02/13</span>
                         <span class="info-updates-version">v1.0.2</span>
                         <span class="info-updates-content">仮サムネの実装</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.0.1">
                         <span class="info-updates-date">2026/02/12</span>
                         <span class="info-updates-version">v1.0.1</span>
                         <span class="info-updates-content">進捗バーをコメントに対応、最適化</span>
                       </li>
-                      </li>
-                      <li class="info-updates-item">
+                      <li class="info-updates-item" data-version="1.0.0">
                         <span class="info-updates-date">2026/02/12</span>
                         <span class="info-updates-version">v1.0.0</span>
                         <span class="info-updates-content">外部に公開</span>
-                      </li>
                       </li>
                     </ul>
                   </details>
