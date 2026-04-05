@@ -457,12 +457,26 @@ function bindPlayButton(videoPlayer, btnPlay) {
       }
 
       
-function syncLiveChatScrollForCurrentTime(videoPlayer) {
+function syncLiveChatScrollForCurrentTime(
+        videoPlayer,
+        { force = false, syncChatReplayForCurrentTime = null } = {},
+      ) {
         const chatContainer = document.getElementById("chat-messages");
         if (!chatContainer) return;
+        if (typeof syncChatReplayForCurrentTime === "function") {
+          const handled = syncChatReplayForCurrentTime(
+            Math.floor(videoPlayer.currentTime),
+            { force },
+          );
+          if (handled) return;
+        }
+        if (!force && chatContainer.__chatRenderCompleted !== true) return;
+        if (!force && Number(chatContainer.__chatUserPausedUntil || 0) > Date.now()) {
+          return;
+        }
 
         const currentSec = Math.floor(videoPlayer.currentTime);
-        if (chatContainer.__lastSyncedSecond === currentSec) return;
+        if (!force && chatContainer.__lastSyncedSecond === currentSec) return;
         chatContainer.__lastSyncedSecond = currentSec;
         const timedLines = Array.isArray(chatContainer.__chatTimedLines)
           ? chatContainer.__chatTimedLines
@@ -507,6 +521,44 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         const targetOffset =
           target.offsetTop - chatContainer.clientHeight / 2 + target.clientHeight / 2;
         chatContainer.scrollTop = Math.max(0, targetOffset);
+      }
+
+      function bindChatManualScrollPause() {
+        const chatContainer = document.getElementById("chat-messages");
+        if (!chatContainer || chatContainer.__chatManualPauseBound) return;
+        chatContainer.__chatManualPauseBound = true;
+
+        const pauseAutoSync = (durationMs = 5000) => {
+          chatContainer.__chatUserPausedUntil = Date.now() + durationMs;
+        };
+
+        const maybeResumeAutoSync = () => {
+          const maxScrollTop = Math.max(
+            0,
+            chatContainer.scrollHeight - chatContainer.clientHeight,
+          );
+          if (maxScrollTop === 0) {
+            chatContainer.__chatUserPausedUntil = 0;
+            return;
+          }
+          const distanceFromBottom = maxScrollTop - chatContainer.scrollTop;
+          if (distanceFromBottom <= 24) {
+            chatContainer.__chatUserPausedUntil = 0;
+          }
+        };
+
+        chatContainer.addEventListener("wheel", () => pauseAutoSync(), {
+          passive: true,
+        });
+        chatContainer.addEventListener("touchstart", () => pauseAutoSync(), {
+          passive: true,
+        });
+        chatContainer.addEventListener("pointerdown", () => pauseAutoSync(), {
+          passive: true,
+        });
+        chatContainer.addEventListener("scroll", maybeResumeAutoSync, {
+          passive: true,
+        });
       }
 
       function createPlayerPlaybackActions(videoPlayer) {
@@ -563,8 +615,12 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
           videoPlayer.addEventListener("seeked", syncSeekBarWithVideo);
           videoPlayer.addEventListener("seeked", syncPlaybackClockWithVideo);
           if (onTimeupdateExtra) {
-            videoPlayer.addEventListener("timeupdate", onTimeupdateExtra);
-            videoPlayer.addEventListener("seeked", () => onTimeupdateExtra());
+            videoPlayer.addEventListener("timeupdate", () =>
+              onTimeupdateExtra({ force: false }),
+            );
+            videoPlayer.addEventListener("seeked", () =>
+              onTimeupdateExtra({ force: true }),
+            );
           }
         }
 
@@ -683,6 +739,7 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         onToggleFullscreen,
         onSidebarToggled,
         renderSortedComments,
+        syncChatReplayForCurrentTime,
       }) {
         const seekSync = createPlayerSeekSyncController(
           videoPlayer,
@@ -706,9 +763,13 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         }
 
         function initializePlayerUiBindings() {
+          bindChatManualScrollPause();
           seekSync.initializeSeekBarState();
-          seekSync.bindTimeUpdateEvents(() => {
-            syncLiveChatScrollForCurrentTime(videoPlayer);
+          seekSync.bindTimeUpdateEvents(({ force }) => {
+            syncLiveChatScrollForCurrentTime(videoPlayer, {
+              force,
+              syncChatReplayForCurrentTime,
+            });
           });
           seekSync.bindSeekBarInput();
           bindPlayButton(videoPlayer, btnPlay);

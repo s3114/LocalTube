@@ -1,5 +1,6 @@
 const { createLogger } = require("../services/logger-service");
 const fsp = require("node:fs/promises");
+const readline = require("node:readline");
 
 function registerLiveChatRoutes(app, deps) {
   const { fs, path, baseDir, apiError, getLocalVideoDirs } = deps;
@@ -269,6 +270,69 @@ function registerLiveChatRoutes(app, deps) {
     return null;
   }
 
+  function getChatTimeSecFromMessage(msg) {
+    const timeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
+    if (!Number.isFinite(timeMs)) return null;
+    return Math.floor(timeMs / 1000);
+  }
+
+  async function readLiveChatWindow(chatFile, { startSec, endSec, limit }) {
+    const items = [];
+    let hasMoreAfter = false;
+    let hasMoreBefore = false;
+    const maxItems = Math.max(1, Math.min(1000, Number(limit) || 300));
+    const fromSec = Math.max(0, Number(startSec) || 0);
+    const toSec = Math.max(fromSec, Number(endSec) || fromSec + 60);
+
+    const stream = fs.createReadStream(chatFile, { encoding: "utf8" });
+    const rl = readline.createInterface({
+      input: stream,
+      crlfDelay: Infinity,
+    });
+
+    try {
+      for await (const rawLine of rl) {
+        const line = String(rawLine || "").trim();
+        if (!line) continue;
+
+        let parsed = null;
+        try {
+          parsed = JSON.parse(line);
+        } catch (_error) {
+          continue;
+        }
+
+        const timeSec = getChatTimeSecFromMessage(parsed);
+        if (!Number.isFinite(timeSec)) continue;
+        if (timeSec < fromSec) {
+          hasMoreBefore = true;
+          continue;
+        }
+        if (timeSec > toSec) {
+          hasMoreAfter = true;
+          break;
+        }
+        if (items.length >= maxItems) {
+          hasMoreAfter = true;
+          break;
+        }
+
+        items.push(parsed);
+      }
+    } finally {
+      rl.close();
+      stream.destroy();
+    }
+
+    return {
+      items,
+      startSec: fromSec,
+      endSec: toSec,
+      hasMoreBefore,
+      hasMoreAfter,
+    };
+  }
+
   app.get("/api/live-chat/:videoFile", async (req, res) => {
     try {
       const videoFile = decodeURIComponent(req.params.videoFile);
@@ -278,6 +342,20 @@ function registerLiveChatRoutes(app, deps) {
       if (!chatFile || !fs.existsSync(chatFile)) {
         logger.warn("chat file not found", { chatFile });
         return apiError(res, 404, "対応するライブチャットがありません");
+      }
+
+      const hasWindowQuery =
+        req.query &&
+        (req.query.startSec !== undefined ||
+          req.query.endSec !== undefined ||
+          req.query.limit !== undefined);
+      if (hasWindowQuery) {
+        const payload = await readLiveChatWindow(chatFile, {
+          startSec: req.query.startSec,
+          endSec: req.query.endSec,
+          limit: req.query.limit,
+        });
+        return res.json(payload);
       }
 
       res.setHeader("Content-Type", "application/json; charset=utf-8");

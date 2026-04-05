@@ -321,6 +321,217 @@
       ui.commentEmpty.style.display = "none";
     }
 
+    function createChatReplayState(chatContainer, videoBaseName) {
+      const replayState = {
+        mode: "windowed",
+        videoBaseName,
+        windowBeforeSec: 20,
+        windowAfterSec: 45,
+        preloadAheadSec: 15,
+        limit: 400,
+        maxRendered: 250,
+        queue: [],
+        currentRangeStartSec: 0,
+        currentRangeEndSec: 0,
+        hasMoreAfter: true,
+        hasMoreBefore: false,
+        isFetching: false,
+        requestVersion: 0,
+        lastSyncSec: -1,
+      };
+      chatContainer.__chatReplayState = replayState;
+      chatContainer.__chatRenderCompleted = true;
+      chatContainer.__chatTimedLines = [];
+      chatContainer.__chatTimedIndex = 0;
+      chatContainer.__lastSyncedSecond = undefined;
+      chatContainer.__lastChatTargetTime = "";
+      return replayState;
+    }
+
+    function resetChatReplayState(chatContainer, videoBaseName) {
+      if (!chatContainer) return null;
+      chatContainer.innerHTML = "";
+      chatContainer.__chatUserPausedUntil = 0;
+      return createChatReplayState(chatContainer, videoBaseName);
+    }
+
+    function getReplayTimeSecFromMessage(msg) {
+      const timeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
+      return Number.isFinite(timeMs) ? Math.floor(timeMs / 1000) : null;
+    }
+
+    function trimRenderedChatLines(chatContainer, maxRendered) {
+      while (chatContainer.childElementCount > maxRendered) {
+        chatContainer.firstElementChild?.remove();
+      }
+    }
+
+    function scrollChatReplayToBottom(chatContainer, { force = false } = {}) {
+      if (!chatContainer) return;
+      if (!force && Number(chatContainer.__chatUserPausedUntil || 0) > Date.now()) {
+        return;
+      }
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function appendReplayMessages(chatContainer, messages, { forceScroll = false } = {}) {
+      if (!chatContainer || !Array.isArray(messages) || messages.length === 0) return;
+      const fragment = document.createDocumentFragment();
+      messages.forEach((msg) => {
+        const line = createChatLineElementFromMessage(msg);
+        if (!line) return;
+        fragment.appendChild(line);
+      });
+      chatContainer.appendChild(fragment);
+      const replayState = chatContainer.__chatReplayState;
+      trimRenderedChatLines(chatContainer, replayState?.maxRendered || 250);
+      scrollChatReplayToBottom(chatContainer, { force: forceScroll });
+    }
+
+    async function fetchChatReplayWindow(
+      videoBaseName,
+      startSec,
+      endSec,
+      limit,
+      signal = undefined,
+    ) {
+      const base = normalizeLiveChatBaseName(videoBaseName);
+      const query = new URLSearchParams({
+        startSec: String(Math.max(0, Math.floor(startSec))),
+        endSec: String(Math.max(0, Math.floor(endSec))),
+        limit: String(Math.max(1, limit || 400)),
+      });
+      const response = await fetch(
+        `/api/live-chat/${encodeURIComponent(base)}?${query.toString()}`,
+        { signal },
+      );
+      const parsed = await parseApiResponse(response);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "ライブチャットの取得に失敗しました");
+      }
+      return parsed.data || parsed.raw || {};
+    }
+
+    async function loadChatReplayWindowForTime(chatContainer, videoBaseName, currentSec) {
+      const replayState =
+        resetChatReplayState(chatContainer, videoBaseName) ||
+        createChatReplayState(chatContainer, videoBaseName);
+      const startSec = Math.max(0, currentSec - replayState.windowBeforeSec);
+      const endSec = currentSec + replayState.windowAfterSec;
+      replayState.requestVersion += 1;
+      const requestVersion = replayState.requestVersion;
+      replayState.isFetching = true;
+      const payload = await fetchChatReplayWindow(
+        videoBaseName,
+        startSec,
+        endSec,
+        replayState.limit,
+        undefined,
+      );
+      if (requestVersion !== replayState.requestVersion) return;
+
+      replayState.currentRangeStartSec = payload.startSec ?? startSec;
+      replayState.currentRangeEndSec = payload.endSec ?? endSec;
+      replayState.hasMoreAfter = payload.hasMoreAfter !== false;
+      replayState.hasMoreBefore = payload.hasMoreBefore === true;
+
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const past = [];
+      const future = [];
+      items.forEach((msg) => {
+        const timeSec = getReplayTimeSecFromMessage(msg);
+        if (!Number.isFinite(timeSec)) return;
+        if (timeSec <= currentSec) {
+          past.push(msg);
+        } else {
+          future.push(msg);
+        }
+      });
+
+      appendReplayMessages(chatContainer, past.slice(-replayState.maxRendered), {
+        forceScroll: true,
+      });
+      replayState.queue = future;
+      replayState.lastSyncSec = currentSec;
+      replayState.isFetching = false;
+      chatContainer.__chatRenderCompleted = true;
+    }
+
+    async function fetchNextChatReplayWindow(chatContainer, currentSec) {
+      const replayState = chatContainer?.__chatReplayState;
+      if (!chatContainer || !replayState || replayState.isFetching || !replayState.hasMoreAfter) {
+        return;
+      }
+
+      if (currentSec + replayState.preloadAheadSec < replayState.currentRangeEndSec) {
+        return;
+      }
+
+      replayState.isFetching = true;
+      replayState.requestVersion += 1;
+      const requestVersion = replayState.requestVersion;
+      const nextStartSec = replayState.currentRangeEndSec + 1;
+      const nextEndSec = nextStartSec + replayState.windowAfterSec;
+
+      try {
+        const payload = await fetchChatReplayWindow(
+          replayState.videoBaseName,
+          nextStartSec,
+          nextEndSec,
+          replayState.limit,
+          undefined,
+        );
+        if (requestVersion !== replayState.requestVersion) return;
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        replayState.queue.push(...items);
+        replayState.currentRangeEndSec = payload.endSec ?? nextEndSec;
+        replayState.hasMoreAfter = payload.hasMoreAfter !== false;
+      } catch (error) {
+        onError("loadNextLiveChatWindow error:", error);
+      } finally {
+        if (requestVersion === replayState.requestVersion) {
+          replayState.isFetching = false;
+        }
+      }
+    }
+
+    function syncChatReplayWithPlayback(chatContainer, currentSec, { force = false } = {}) {
+      const replayState = chatContainer?.__chatReplayState;
+      if (!chatContainer || !replayState || replayState.mode !== "windowed") {
+        return false;
+      }
+
+      if (force) {
+        void loadChatReplayWindowForTime(
+          chatContainer,
+          replayState.videoBaseName,
+          currentSec,
+        ).catch((error) => {
+          onError("seeked live chat reload error:", error);
+        });
+        return true;
+      }
+
+      if (replayState.lastSyncSec === currentSec) return true;
+      replayState.lastSyncSec = currentSec;
+
+      const due = [];
+      while (replayState.queue.length > 0) {
+        const next = replayState.queue[0];
+        const timeSec = getReplayTimeSecFromMessage(next);
+        if (!Number.isFinite(timeSec) || timeSec > currentSec) break;
+        due.push(replayState.queue.shift());
+      }
+
+      if (due.length > 0) {
+        appendReplayMessages(chatContainer, due, { forceScroll: false });
+      }
+
+      void fetchNextChatReplayWindow(chatContainer, currentSec);
+      return true;
+    }
+
     function renderVideoLiveChatMessages(
       chatContainer,
       messageSource,
@@ -331,12 +542,21 @@
       } = {},
     ) {
       const timedLines = [];
-      const chunkSize = 24;
-      const chunkBudgetMs = 8;
+      const chunkSize = 8;
+      const chunkBudgetMs = 4;
       let offset = 0;
       const sourceItems = Array.isArray(messageSource)
         ? messageSource
         : extractNonEmptyNdjsonLines(messageSource);
+      chatContainer.__chatRenderCompleted = false;
+
+      const scheduleNextChunk = () => {
+        if (typeof global.requestIdleCallback === "function") {
+          global.requestIdleCallback(renderChunk, { timeout: 50 });
+          return;
+        }
+        setTimeout(renderChunk, 16);
+      };
 
       const renderChunk = () => {
         if (!shouldContinue()) return;
@@ -381,18 +601,15 @@
         onChunkRendered();
 
         if (offset >= sourceItems.length) {
+          chatContainer.__chatRenderCompleted = true;
           onCompleted();
           return;
         }
 
-        if (typeof global.requestAnimationFrame === "function") {
-          global.requestAnimationFrame(renderChunk);
-          return;
-        }
-        setTimeout(renderChunk, 0);
+        scheduleNextChunk();
       };
 
-      renderChunk();
+      scheduleNextChunk();
     }
 
     function setVideoLiveChatLoadingState(ui, message) {
@@ -402,6 +619,9 @@
       ui.chatContainer.__chatTimedIndex = 0;
       ui.chatContainer.__lastSyncedSecond = undefined;
       ui.chatContainer.__lastChatTargetTime = "";
+      ui.chatContainer.__chatRenderCompleted = false;
+      ui.chatContainer.__chatUserPausedUntil = 0;
+      ui.chatContainer.__chatReplayState = null;
       ui.chatEmpty.style.display = "block";
       ui.chatEmpty.textContent = message;
     }
@@ -555,7 +775,6 @@
         const startedAt = performance.now();
         chatRequestToken += 1;
         const currentChatToken = chatRequestToken;
-        let didScrollToBottom = false;
         if (chatAbortController) {
           chatAbortController.abort();
         }
@@ -568,40 +787,22 @@
           }
 
           setVideoLiveChatLoadingState(ui, "チャットを読み込み中…");
-
-          const base = normalizeLiveChatBaseName(videoBaseName);
-          const res = await fetch(`/api/live-chat/${encodeURIComponent(base)}`, {
-            signal: chatAbortController.signal,
-          });
-          const text = await res.text();
           if (currentChatToken !== chatRequestToken) return;
-          const messageLines = extractNonEmptyNdjsonLines(text);
-
-          if (messageLines.length === 0) {
+          const currentSec = Math.floor(Number(document.getElementById("local-player")?.currentTime) || 0);
+          await loadChatReplayWindowForTime(ui.chatContainer, videoBaseName, currentSec);
+          if (currentChatToken !== chatRequestToken) return;
+          const replayState = ui.chatContainer.__chatReplayState;
+          const initialCount =
+            ui.chatContainer.childElementCount + (replayState?.queue?.length || 0);
+          if (initialCount === 0) {
             if (ui.chatEmpty) ui.chatEmpty.textContent = "チャットがありません";
-            onMetric("chat_load_ms", performance.now() - startedAt, {
-              count: 0,
-            });
+            onMetric("chat_load_ms", performance.now() - startedAt, { count: 0 });
             return;
           }
 
           if (ui.chatEmpty) ui.chatEmpty.style.display = "none";
-          renderVideoLiveChatMessages(ui.chatContainer, messageLines, {
-            shouldContinue: () => currentChatToken === chatRequestToken,
-            onChunkRendered: () => {
-              if (currentChatToken !== chatRequestToken) return;
-              if (!didScrollToBottom && ui.chatContainer.scrollTop === 0) {
-                ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
-                didScrollToBottom = true;
-              }
-            },
-            onCompleted: () => {
-              if (currentChatToken !== chatRequestToken) return;
-              ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
-            },
-          });
           onMetric("chat_load_ms", performance.now() - startedAt, {
-            count: messageLines.length,
+            count: initialCount,
           });
         } catch (error) {
           if (error?.name === "AbortError") return;
@@ -648,6 +849,9 @@
 
       return {
         loadCurrentVideoSideData,
+        syncChatReplayForCurrentTime(currentSec, options) {
+          return syncChatReplayWithPlayback(ui.chatContainer, currentSec, options);
+        },
         renderSortedComments(sorted) {
           commentRenderer.renderComments(sorted);
         },
