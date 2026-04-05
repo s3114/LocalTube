@@ -289,6 +289,8 @@
         renderSortedComments: (sorted) => {
           videoDataController.renderSortedComments(sorted);
         },
+        syncChatReplayForCurrentTime: (currentSec, options) =>
+          videoDataController.syncChatReplayForCurrentTime(currentSec, options),
       });
 
       localVideoController = createLocalVideoController({

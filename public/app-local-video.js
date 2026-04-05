@@ -10,6 +10,7 @@
     formatChannelSubscribers,
     normalizeLiveChatBaseName,
     parseNdjsonMessages,
+    extractNonEmptyNdjsonLines,
     getVideoIdFromFilename,
     createCommentRenderer,
     createChatLineElementFromMessage,
@@ -131,6 +132,59 @@
       return `pl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     }
 
+    function createLocalVideoThumbLazyLoader(container) {
+      let observer = null;
+
+      function hydrateThumb(img) {
+        if (!(img instanceof HTMLImageElement)) return;
+        const src = String(img.dataset.thumbSrc || "").trim();
+        if (!src) return;
+        img.src = src;
+        delete img.dataset.thumbSrc;
+      }
+
+      function observe() {
+        if (!container) return;
+        const pendingImages = container.querySelectorAll(
+          "img.local-video-thumb[data-thumb-src]",
+        );
+        if (!pendingImages.length) return;
+
+        if (!("IntersectionObserver" in global)) {
+          pendingImages.forEach(hydrateThumb);
+          return;
+        }
+
+        if (!observer) {
+          observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                hydrateThumb(entry.target);
+                observer?.unobserve(entry.target);
+              });
+            },
+            {
+              root: container,
+              rootMargin: "240px 0px",
+            },
+          );
+        }
+
+        pendingImages.forEach((img) => observer.observe(img));
+      }
+
+      function disconnect() {
+        observer?.disconnect();
+        observer = null;
+      }
+
+      return {
+        observe,
+        disconnect,
+      };
+    }
+
     function createLocalVideoListItemElement(video, onClick, onOpenOptions) {
       const item = document.createElement("div");
       item.className = "local-video-item";
@@ -138,8 +192,14 @@
 
       if (video.thumb) {
         const thumbImg = document.createElement("img");
-        thumbImg.src = video.thumb;
         thumbImg.className = "local-video-thumb";
+        thumbImg.dataset.thumbSrc = video.thumb;
+        thumbImg.loading = "lazy";
+        thumbImg.decoding = "async";
+        thumbImg.alt = video.title || video.filename || "thumbnail";
+        thumbImg.onerror = () => {
+          thumbImg.src = "/none_icon.jpg";
+        };
         item.appendChild(thumbImg);
       } else {
         const thumbPlaceholder = document.createElement("div");
@@ -261,18 +321,346 @@
       ui.commentEmpty.style.display = "none";
     }
 
-    function renderVideoLiveChatMessages(chatContainer, messages) {
+    function createChatReplayState(chatContainer, videoBaseName) {
+      const replayState = {
+        mode: "windowed",
+        videoBaseName,
+        windowBeforeSec: 20,
+        windowAfterSec: 45,
+        preloadAheadSec: 15,
+        limit: 400,
+        maxRendered: 250,
+        queue: [],
+        currentRangeStartSec: 0,
+        currentRangeEndSec: 0,
+        hasMoreAfter: true,
+        hasMoreBefore: false,
+        isFetching: false,
+        requestVersion: 0,
+        lastSyncSec: -1,
+      };
+      chatContainer.__chatReplayState = replayState;
+      chatContainer.__chatRenderCompleted = true;
+      chatContainer.__chatTimedLines = [];
+      chatContainer.__chatTimedIndex = 0;
+      chatContainer.__lastSyncedSecond = undefined;
+      chatContainer.__lastChatTargetTime = "";
+      return replayState;
+    }
+
+    function resetChatReplayState(chatContainer, videoBaseName) {
+      if (!chatContainer) return null;
+      chatContainer.innerHTML = "";
+      chatContainer.__chatUserPausedUntil = 0;
+      return createChatReplayState(chatContainer, videoBaseName);
+    }
+
+    function getReplayTimeSecFromMessage(msg) {
+      const rawTimeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
+      const timeMs = Number(rawTimeMs);
+      return Number.isFinite(timeMs) ? Math.floor(timeMs / 1000) : null;
+    }
+
+    function trimRenderedChatLines(chatContainer, maxRendered) {
+      while (chatContainer.childElementCount > maxRendered) {
+        chatContainer.firstElementChild?.remove();
+      }
+    }
+
+    function scrollChatReplayToBottom(chatContainer, { force = false } = {}) {
+      if (!chatContainer) return;
+      if (!force && Number(chatContainer.__chatUserPausedUntil || 0) > Date.now()) {
+        return;
+      }
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function appendReplayMessages(chatContainer, messages, { forceScroll = false } = {}) {
+      if (!chatContainer || !Array.isArray(messages) || messages.length === 0) return;
+      const fragment = document.createDocumentFragment();
       messages.forEach((msg) => {
         const line = createChatLineElementFromMessage(msg);
-        if (line) {
-          chatContainer.appendChild(line);
+        if (!line) return;
+        fragment.appendChild(line);
+      });
+      chatContainer.appendChild(fragment);
+      const replayState = chatContainer.__chatReplayState;
+      trimRenderedChatLines(chatContainer, replayState?.maxRendered || 250);
+      scrollChatReplayToBottom(chatContainer, { force: forceScroll });
+    }
+
+    async function fetchChatReplayWindow(
+      videoBaseName,
+      startSec,
+      endSec,
+      limit,
+      signal = undefined,
+    ) {
+      const base = normalizeLiveChatBaseName(videoBaseName);
+      const query = new URLSearchParams({
+        startSec: String(Math.max(0, Math.floor(startSec))),
+        endSec: String(Math.max(0, Math.floor(endSec))),
+        limit: String(Math.max(1, limit || 400)),
+      });
+      const response = await fetch(
+        `/api/live-chat/${encodeURIComponent(base)}?${query.toString()}`,
+        { signal },
+      );
+      const parsed = await parseApiResponse(response);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "ライブチャットの取得に失敗しました");
+      }
+      return parsed.data || parsed.raw || {};
+    }
+
+    async function loadChatReplayWindowForTime(chatContainer, videoBaseName, currentSec) {
+      const replayState =
+        resetChatReplayState(chatContainer, videoBaseName) ||
+        createChatReplayState(chatContainer, videoBaseName);
+      const startSec = Math.max(0, currentSec - replayState.windowBeforeSec);
+      const endSec = currentSec + replayState.windowAfterSec;
+      replayState.requestVersion += 1;
+      const requestVersion = replayState.requestVersion;
+      replayState.isFetching = true;
+      const payload = await fetchChatReplayWindow(
+        videoBaseName,
+        startSec,
+        endSec,
+        replayState.limit,
+        undefined,
+      );
+      if (requestVersion !== replayState.requestVersion) return;
+
+      replayState.currentRangeStartSec = payload.startSec ?? startSec;
+      replayState.currentRangeEndSec = payload.endSec ?? endSec;
+      replayState.hasMoreAfter = payload.hasMoreAfter !== false;
+      replayState.hasMoreBefore = payload.hasMoreBefore === true;
+
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const past = [];
+      const future = [];
+      items.forEach((msg) => {
+        const timeSec = getReplayTimeSecFromMessage(msg);
+        if (!Number.isFinite(timeSec)) return;
+        if (timeSec <= currentSec) {
+          past.push(msg);
+        } else {
+          future.push(msg);
         }
       });
+
+      appendReplayMessages(chatContainer, past.slice(-replayState.maxRendered), {
+        forceScroll: true,
+      });
+      replayState.queue = future;
+      replayState.lastSyncSec = currentSec;
+      replayState.isFetching = false;
+      chatContainer.__chatRenderCompleted = true;
+    }
+
+    async function primeFutureChatReplayWindow(chatContainer, currentSec, maxWindows = 8) {
+      const replayState = chatContainer?.__chatReplayState;
+      if (!chatContainer || !replayState) return 0;
+      if ((replayState.queue?.length || 0) > 0) return replayState.queue.length;
+
+      let probeStartSec = replayState.currentRangeEndSec + 1;
+      for (let attempt = 0; attempt < maxWindows; attempt += 1) {
+        if (!replayState.hasMoreAfter) break;
+        const probeEndSec = probeStartSec + replayState.windowAfterSec;
+        const payload = await fetchChatReplayWindow(
+          replayState.videoBaseName,
+          probeStartSec,
+          probeEndSec,
+          replayState.limit,
+          undefined,
+        );
+
+        replayState.currentRangeStartSec = payload.startSec ?? probeStartSec;
+        replayState.currentRangeEndSec = payload.endSec ?? probeEndSec;
+        replayState.hasMoreAfter = payload.hasMoreAfter !== false;
+        replayState.hasMoreBefore = true;
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const future = items.filter((msg) => {
+          const timeSec = getReplayTimeSecFromMessage(msg);
+          return Number.isFinite(timeSec) && timeSec > currentSec;
+        });
+        if (future.length > 0) {
+          replayState.queue = future;
+          return future.length;
+        }
+
+        probeStartSec = replayState.currentRangeEndSec + 1;
+      }
+
+      return 0;
+    }
+
+    async function fetchNextChatReplayWindow(chatContainer, currentSec) {
+      const replayState = chatContainer?.__chatReplayState;
+      if (!chatContainer || !replayState || replayState.isFetching || !replayState.hasMoreAfter) {
+        return;
+      }
+
+      if (currentSec + replayState.preloadAheadSec < replayState.currentRangeEndSec) {
+        return;
+      }
+
+      replayState.isFetching = true;
+      replayState.requestVersion += 1;
+      const requestVersion = replayState.requestVersion;
+      const nextStartSec = replayState.currentRangeEndSec + 1;
+      const nextEndSec = nextStartSec + replayState.windowAfterSec;
+
+      try {
+        const payload = await fetchChatReplayWindow(
+          replayState.videoBaseName,
+          nextStartSec,
+          nextEndSec,
+          replayState.limit,
+          undefined,
+        );
+        if (requestVersion !== replayState.requestVersion) return;
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        replayState.queue.push(...items);
+        replayState.currentRangeEndSec = payload.endSec ?? nextEndSec;
+        replayState.hasMoreAfter = payload.hasMoreAfter !== false;
+      } catch (error) {
+        onError("loadNextLiveChatWindow error:", error);
+      } finally {
+        if (requestVersion === replayState.requestVersion) {
+          replayState.isFetching = false;
+        }
+      }
+    }
+
+    function syncChatReplayWithPlayback(chatContainer, currentSec, { force = false } = {}) {
+      const replayState = chatContainer?.__chatReplayState;
+      if (!chatContainer || !replayState || replayState.mode !== "windowed") {
+        return false;
+      }
+
+      if (force) {
+        void loadChatReplayWindowForTime(
+          chatContainer,
+          replayState.videoBaseName,
+          currentSec,
+        ).catch((error) => {
+          onError("seeked live chat reload error:", error);
+        });
+        return true;
+      }
+
+      if (replayState.lastSyncSec === currentSec) return true;
+      replayState.lastSyncSec = currentSec;
+
+      const due = [];
+      while (replayState.queue.length > 0) {
+        const next = replayState.queue[0];
+        const timeSec = getReplayTimeSecFromMessage(next);
+        if (!Number.isFinite(timeSec) || timeSec > currentSec) break;
+        due.push(replayState.queue.shift());
+      }
+
+      if (due.length > 0) {
+        appendReplayMessages(chatContainer, due, { forceScroll: false });
+      }
+
+      void fetchNextChatReplayWindow(chatContainer, currentSec);
+      return true;
+    }
+
+    function renderVideoLiveChatMessages(
+      chatContainer,
+      messageSource,
+      {
+        shouldContinue = () => true,
+        onChunkRendered = () => {},
+        onCompleted = () => {},
+      } = {},
+    ) {
+      const timedLines = [];
+      const chunkSize = 8;
+      const chunkBudgetMs = 4;
+      let offset = 0;
+      const sourceItems = Array.isArray(messageSource)
+        ? messageSource
+        : extractNonEmptyNdjsonLines(messageSource);
+      chatContainer.__chatRenderCompleted = false;
+
+      const scheduleNextChunk = () => {
+        if (typeof global.requestIdleCallback === "function") {
+          global.requestIdleCallback(renderChunk, { timeout: 50 });
+          return;
+        }
+        setTimeout(renderChunk, 16);
+      };
+
+      const renderChunk = () => {
+        if (!shouldContinue()) return;
+        const fragment = document.createDocumentFragment();
+        const startedAt = performance.now();
+        let renderedCount = 0;
+
+        for (; offset < sourceItems.length; offset += 1) {
+          const rawItem = sourceItems[offset];
+          let msg = rawItem;
+          if (typeof rawItem === "string") {
+            try {
+              msg = JSON.parse(rawItem);
+            } catch (error) {
+              console.warn("パース失敗した行:", rawItem, error);
+              continue;
+            }
+          }
+          const line = createChatLineElementFromMessage(msg);
+          if (!line) continue;
+          fragment.appendChild(line);
+          const timeSec = Number.parseInt(line.dataset.time || "", 10);
+          if (Number.isFinite(timeSec)) {
+            timedLines.push({ timeSec, line });
+          }
+          renderedCount += 1;
+
+          if (
+            renderedCount >= chunkSize ||
+            performance.now() - startedAt >= chunkBudgetMs
+          ) {
+            offset += 1;
+            break;
+          }
+        }
+
+        chatContainer.appendChild(fragment);
+        chatContainer.__chatTimedLines = timedLines;
+        chatContainer.__chatTimedIndex = 0;
+        chatContainer.__lastSyncedSecond = undefined;
+        chatContainer.__lastChatTargetTime = "";
+        onChunkRendered();
+
+        if (offset >= sourceItems.length) {
+          chatContainer.__chatRenderCompleted = true;
+          onCompleted();
+          return;
+        }
+
+        scheduleNextChunk();
+      };
+
+      scheduleNextChunk();
     }
 
     function setVideoLiveChatLoadingState(ui, message) {
       if (!ui.chatContainer || !ui.chatEmpty) return;
       ui.chatContainer.innerHTML = "";
+      ui.chatContainer.__chatTimedLines = [];
+      ui.chatContainer.__chatTimedIndex = 0;
+      ui.chatContainer.__lastSyncedSecond = undefined;
+      ui.chatContainer.__lastChatTargetTime = "";
+      ui.chatContainer.__chatRenderCompleted = false;
+      ui.chatContainer.__chatUserPausedUntil = 0;
+      ui.chatContainer.__chatReplayState = null;
       ui.chatEmpty.style.display = "block";
       ui.chatEmpty.textContent = message;
     }
@@ -345,20 +733,42 @@
     }
 
     function renderLocalVideoList(videoList, videos, onSelect, onOpenOptions) {
+      videoList.__localThumbLazyLoader?.disconnect?.();
       videoList.innerHTML = "";
       if (videos.length === 0) {
         videoList.innerHTML = '<div class="status-subtext">動画が見つかりません</div>';
         return;
       }
-      videos.forEach((video) => {
-        videoList.appendChild(
-          createLocalVideoListItemElement(
-            video,
-            (selectedVideo, selectedItem) => onSelect(selectedVideo, selectedItem),
-            onOpenOptions,
-          ),
-        );
-      });
+      const thumbLazyLoader = createLocalVideoThumbLazyLoader(videoList);
+      videoList.__localThumbLazyLoader = thumbLazyLoader;
+      const renderChunkSize = 40;
+      let cursor = 0;
+
+      function renderChunk() {
+        const fragment = document.createDocumentFragment();
+        const end = Math.min(cursor + renderChunkSize, videos.length);
+        for (; cursor < end; cursor += 1) {
+          const video = videos[cursor];
+          fragment.appendChild(
+            createLocalVideoListItemElement(
+              video,
+              (selectedVideo, selectedItem) => onSelect(selectedVideo, selectedItem),
+              onOpenOptions,
+            ),
+          );
+        }
+        videoList.appendChild(fragment);
+        thumbLazyLoader.observe();
+
+        if (cursor >= videos.length) return;
+        if (typeof global.requestAnimationFrame === "function") {
+          global.requestAnimationFrame(renderChunk);
+          return;
+        }
+        setTimeout(renderChunk, 0);
+      }
+
+      renderChunk();
     }
 
     function showLocalVideoListLoadError(videoList, homeVideoGrid) {
@@ -381,6 +791,7 @@
       let infoRequestToken = 0;
       let chatAbortController = null;
       let chatRequestToken = 0;
+      let chatLoadTimerId = null;
       const ui = getVideoDataUiElements();
       const commentRenderer = createCommentRenderer(linkify);
 
@@ -415,34 +826,50 @@
           }
 
           setVideoLiveChatLoadingState(ui, "チャットを読み込み中…");
-
-          const base = normalizeLiveChatBaseName(videoBaseName);
-          const res = await fetch(`/api/live-chat/${encodeURIComponent(base)}`, {
-            signal: chatAbortController.signal,
-          });
-          const text = await res.text();
           if (currentChatToken !== chatRequestToken) return;
-          const messages = parseNdjsonMessages(text);
-
-          if (messages.length === 0) {
+          const currentSec = Math.floor(Number(document.getElementById("local-player")?.currentTime) || 0);
+          await loadChatReplayWindowForTime(ui.chatContainer, videoBaseName, currentSec);
+          if (currentChatToken !== chatRequestToken) return;
+          const replayState = ui.chatContainer.__chatReplayState;
+          const initialCount =
+            ui.chatContainer.childElementCount + (replayState?.queue?.length || 0);
+          if (initialCount === 0) {
+            const futureCount = replayState?.hasMoreAfter
+              ? await primeFutureChatReplayWindow(ui.chatContainer, currentSec)
+              : 0;
+            if (currentChatToken !== chatRequestToken) return;
+            if (futureCount > 0) {
+              if (ui.chatEmpty) ui.chatEmpty.textContent = "この時間帯のチャットを待機中…";
+              onMetric("chat_load_ms", performance.now() - startedAt, {
+                count: futureCount,
+                deferred: true,
+              });
+              return;
+            }
             if (ui.chatEmpty) ui.chatEmpty.textContent = "チャットがありません";
-            onMetric("chat_load_ms", performance.now() - startedAt, {
-              count: 0,
-            });
+            onMetric("chat_load_ms", performance.now() - startedAt, { count: 0 });
             return;
           }
 
           if (ui.chatEmpty) ui.chatEmpty.style.display = "none";
-          renderVideoLiveChatMessages(ui.chatContainer, messages);
-          ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
           onMetric("chat_load_ms", performance.now() - startedAt, {
-            count: messages.length,
+            count: initialCount,
           });
         } catch (error) {
           if (error?.name === "AbortError") return;
           onError("loadLiveChat error:", error);
           if (ui.chatEmpty) ui.chatEmpty.textContent = "チャットの読み込みに失敗しました";
         }
+      }
+
+      function scheduleLiveChatLoad(videoBaseName, delayMs = 1500) {
+        if (chatLoadTimerId) {
+          clearTimeout(chatLoadTimerId);
+        }
+        chatLoadTimerId = setTimeout(() => {
+          chatLoadTimerId = null;
+          loadLiveChat(videoBaseName);
+        }, delayMs);
       }
 
       function loadCurrentVideoSideData(videoId) {
@@ -468,11 +895,14 @@
             onError("info.json 読み込み失敗:", error);
           });
 
-        loadLiveChat(videoId);
+        scheduleLiveChatLoad(videoId);
       }
 
       return {
         loadCurrentVideoSideData,
+        syncChatReplayForCurrentTime(currentSec, options) {
+          return syncChatReplayWithPlayback(ui.chatContainer, currentSec, options);
+        },
         renderSortedComments(sorted) {
           commentRenderer.renderComments(sorted);
         },
@@ -1080,6 +1510,9 @@
 
       function scheduleHomeInfoPrefetch() {
         if (!onPrefetchHomeInfos) return;
+        if (!document.getElementById("page-home")?.classList.contains("active-page")) {
+          return;
+        }
         if (typeof window.requestIdleCallback === "function") {
           window.requestIdleCallback(() => onPrefetchHomeInfos());
           return;

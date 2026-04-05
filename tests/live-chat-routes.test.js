@@ -81,3 +81,66 @@ test("live-chat-routes resolves file with .live_chat.json suffix", async () => {
 
   await fsp.rm(tempDir, { recursive: true, force: true });
 });
+
+test("live-chat-routes returns a time window when query is provided", async () => {
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ytdl-livechat-window-test-"));
+  const chatDir = path.join(tempDir, "downloads", "ライブチャット");
+  await fsp.mkdir(chatDir, { recursive: true });
+  const chatPath = path.join(chatDir, "sample.live_chat.json");
+  await fsp.writeFile(
+    chatPath,
+    [
+      JSON.stringify({
+        replayChatItemAction: {
+          videoOffsetTimeMsec: 1000,
+          actions: [{ addChatItemAction: { item: { liveChatTextMessageRenderer: {} } } }],
+        },
+      }),
+      JSON.stringify({
+        replayChatItemAction: {
+          videoOffsetTimeMsec: 6000,
+          actions: [{ addChatItemAction: { item: { liveChatTextMessageRenderer: {} } } }],
+        },
+      }),
+      JSON.stringify({
+        replayChatItemAction: {
+          videoOffsetTimeMsec: 12000,
+          actions: [{ addChatItemAction: { item: { liveChatTextMessageRenderer: {} } } }],
+        },
+      }),
+    ].join("\n"),
+    "utf-8",
+  );
+
+  const app = createCaptureApp();
+  let sentJson = null;
+  registerLiveChatRoutes(app, {
+    fs,
+    path,
+    baseDir: tempDir,
+    apiError: () => {},
+  });
+
+  const handler = app.routes.get("/api/live-chat/:videoFile");
+  await handler(
+    {
+      params: { videoFile: "sample" },
+      query: { startSec: "5", endSec: "10", limit: "50" },
+    },
+    {
+      json(payload) {
+        sentJson = payload;
+      },
+      setHeader() {},
+    },
+  );
+
+  assert.equal(Array.isArray(sentJson?.items), true);
+  assert.equal(sentJson.items.length, 1);
+  assert.equal(sentJson.startSec, 5);
+  assert.equal(sentJson.endSec, 10);
+  assert.equal(sentJson.hasMoreBefore, true);
+  assert.equal(sentJson.hasMoreAfter, true);
+
+  await fsp.rm(tempDir, { recursive: true, force: true });
+});
