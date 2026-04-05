@@ -331,7 +331,8 @@
       } = {},
     ) {
       const timedLines = [];
-      const chunkSize = 120;
+      const chunkSize = 24;
+      const chunkBudgetMs = 8;
       let offset = 0;
       const sourceItems = Array.isArray(messageSource)
         ? messageSource
@@ -340,9 +341,10 @@
       const renderChunk = () => {
         if (!shouldContinue()) return;
         const fragment = document.createDocumentFragment();
-        const end = Math.min(offset + chunkSize, sourceItems.length);
+        const startedAt = performance.now();
+        let renderedCount = 0;
 
-        for (; offset < end; offset += 1) {
+        for (; offset < sourceItems.length; offset += 1) {
           const rawItem = sourceItems[offset];
           let msg = rawItem;
           if (typeof rawItem === "string") {
@@ -359,6 +361,15 @@
           const timeSec = Number.parseInt(line.dataset.time || "", 10);
           if (Number.isFinite(timeSec)) {
             timedLines.push({ timeSec, line });
+          }
+          renderedCount += 1;
+
+          if (
+            renderedCount >= chunkSize ||
+            performance.now() - startedAt >= chunkBudgetMs
+          ) {
+            offset += 1;
+            break;
           }
         }
 
@@ -544,6 +555,7 @@
         const startedAt = performance.now();
         chatRequestToken += 1;
         const currentChatToken = chatRequestToken;
+        let didScrollToBottom = false;
         if (chatAbortController) {
           chatAbortController.abort();
         }
@@ -578,8 +590,9 @@
             shouldContinue: () => currentChatToken === chatRequestToken,
             onChunkRendered: () => {
               if (currentChatToken !== chatRequestToken) return;
-              if (ui.chatContainer.scrollTop === 0) {
+              if (!didScrollToBottom && ui.chatContainer.scrollTop === 0) {
                 ui.chatContainer.scrollTop = ui.chatContainer.scrollHeight;
+                didScrollToBottom = true;
               }
             },
             onCompleted: () => {
