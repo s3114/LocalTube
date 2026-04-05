@@ -2184,6 +2184,79 @@
         gap: 8px;
       }
 
+      .feedback-modal {
+        width: min(760px, calc(100vw - 32px));
+        max-height: min(84vh, 920px);
+        overflow: auto;
+      }
+
+      .feedback-modal-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .feedback-modal-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+        gap: 12px 16px;
+        align-items: start;
+      }
+
+      .feedback-modal-label {
+        padding-top: 10px;
+        color: var(--subtext);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .feedback-modal-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .feedback-modal-field input,
+      .feedback-modal-field select,
+      .feedback-modal-field textarea {
+        width: 100%;
+        background: #1b1b1b;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+      }
+
+      .feedback-modal-field textarea {
+        min-height: 160px;
+        resize: vertical;
+      }
+
+      .feedback-modal-help {
+        color: var(--subtext);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .feedback-modal-box {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 10px;
+        padding: 12px;
+      }
+
+      @media (max-width: 700px) {
+        .feedback-modal-grid {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .feedback-modal-label {
+          padding-top: 0;
+        }
+      }
+
       .playlist-controls {
         display: flex;
         gap: 6px;
@@ -4367,7 +4440,6 @@
               <div class="toggle">
                 <div>
                   サポートサーバーはこちら
-                  <small>困ったときの案内先として使用してください。</small>
                 </div>
                 <div
                   class="settings-stack settings-stack-8 settings-stack-wide">
@@ -4573,6 +4645,18 @@
                   </details>
                 </div>
               </div>
+              <div class="toggle">
+                <div>
+                  フィードバック
+                  <small>専用GUIを開いて、内容を整理しながら送信用の下書きを作成できます。</small>
+                </div>
+                <div class="settings-inline-row settings-gap-8">
+                  <button id="open-feedback-modal-btn"
+                    class="btn-ui btn-blue">フィードバックを開く</button>
+                  <small id="feedback-modal-status"
+                    class="settings-hint-blue">未入力です</small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4638,6 +4722,61 @@
               class="btn-ui btn-gray">いいえ</button>
             <button id="report-modal-confirm-btn"
               class="btn-ui btn-blue">はい</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="feedback-modal-backdrop"
+        class="report-modal-backdrop hidden">
+        <div class="report-modal feedback-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-modal-title">
+          <h3 id="feedback-modal-title"
+            class="report-modal-title">フィードバック</h3>
+          <div class="report-modal-copy">
+            ここでは LocalTube 内で使うフィードバック内容を整理できます。送信方法は次の段階で接続します。
+          </div>
+          <div class="feedback-modal-form">
+            <div class="feedback-modal-grid">
+              <div class="feedback-modal-label">種別</div>
+              <div class="feedback-modal-field">
+                <select id="feedback-category-select">
+                  <option value="bug">不具合報告</option>
+                  <option value="feature">改善要望</option>
+                  <option value="question">質問</option>
+                  <option value="other">その他</option>
+                </select>
+              </div>
+
+              <div class="feedback-modal-label">タイトル</div>
+              <div class="feedback-modal-field">
+                <input id="feedback-title-input"
+                  type="text"
+                  maxlength="120"
+                  placeholder="例: ライブチャットが表示されない" />
+              </div>
+
+              <div class="feedback-modal-label">内容</div>
+              <div class="feedback-modal-field">
+                <textarea id="feedback-message-input"
+                  placeholder="再現手順、期待した動作、実際の動作などを書けるようにしておきます。"></textarea>
+              </div>
+
+              <div class="feedback-modal-label">補足</div>
+              <div class="feedback-modal-field">
+                <div class="feedback-modal-box feedback-modal-help">
+                  今後ここに、レポート添付や Googleフォーム連携などを追加できるようにする想定です。<br />
+                  今回はまず、設定ページの上に重なる専用GUIとして使える状態まで整えています。
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="report-modal-actions">
+            <button id="feedback-modal-cancel-btn"
+              class="btn-ui btn-gray">閉じる</button>
+            <button id="feedback-modal-confirm-btn"
+              class="btn-ui btn-blue">保存して閉じる</button>
           </div>
         </div>
       </div>

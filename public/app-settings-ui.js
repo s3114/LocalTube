@@ -1462,6 +1462,78 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
+      function initializeFeedbackModalUI(elements) {
+        if (
+          !elements.openFeedbackModalBtn ||
+          !elements.feedbackModalStatus ||
+          !elements.feedbackModalBackdrop ||
+          !elements.feedbackModalCancelBtn ||
+          !elements.feedbackModalConfirmBtn ||
+          !elements.feedbackCategorySelect ||
+          !elements.feedbackTitleInput ||
+          !elements.feedbackMessageInput
+        ) {
+          return;
+        }
+
+        const openModal = () => {
+          elements.feedbackModalBackdrop.classList.remove("hidden");
+          global.requestAnimationFrame?.(() => {
+            elements.feedbackTitleInput.focus?.();
+          });
+        };
+
+        const closeModal = () => {
+          elements.feedbackModalBackdrop.classList.add("hidden");
+        };
+
+        const updateStatus = () => {
+          const title = String(elements.feedbackTitleInput.value || "").trim();
+          const message = String(elements.feedbackMessageInput.value || "").trim();
+          const hasContent = title || message;
+          setSettingStatus(
+            elements.feedbackModalStatus,
+            hasContent
+              ? `入力中: ${elements.feedbackCategorySelect.options[elements.feedbackCategorySelect.selectedIndex]?.textContent || "フィードバック"}`
+              : "未入力です",
+            hasContent ? "success" : "muted",
+          );
+        };
+
+        elements.openFeedbackModalBtn.addEventListener("click", () => {
+          updateStatus();
+          openModal();
+        });
+
+        elements.feedbackModalCancelBtn.addEventListener("click", () => {
+          closeModal();
+          updateStatus();
+        });
+
+        elements.feedbackModalConfirmBtn.addEventListener("click", () => {
+          closeModal();
+          updateStatus();
+        });
+
+        elements.feedbackModalBackdrop.addEventListener("click", (event) => {
+          if (event.target === elements.feedbackModalBackdrop) {
+            closeModal();
+            updateStatus();
+          }
+        });
+
+        [
+          elements.feedbackCategorySelect,
+          elements.feedbackTitleInput,
+          elements.feedbackMessageInput,
+        ].forEach((element) => {
+          element?.addEventListener("input", updateStatus);
+          element?.addEventListener("change", updateStatus);
+        });
+
+        updateStatus();
+      }
+
       
 function initializeSettingsUiController({
         elements,
@@ -1488,6 +1560,7 @@ function initializeSettingsUiController({
         );
         initializeYtDlpCustomCommandSettingsUI(elements, bridge);
         initializeReportGenerationUI(elements);
+        initializeFeedbackModalUI(elements);
         initializeFallbackThumbnailSettingUI(
           elements,
           bridge,
