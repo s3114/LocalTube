@@ -75,6 +75,7 @@ const publicDir = process.env.YTDL_PUBLIC_DIR
 // --------------------------------------------------
 app.use(express.static(publicDir)); // 'public' ディレクトリ内の静的ファイルを提供
 app.use(express.json()); // JSONリクエストボディをパースするためのミドルウェアを追加
+app.use("/shared", express.static(path.join(__dirname, "shared")));
 app.use("/downloads", express.static(path.join(__dirname, "downloads")));
 
 // ■ ファイルアップロードの設定
