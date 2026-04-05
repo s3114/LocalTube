@@ -457,30 +457,107 @@ function bindPlayButton(videoPlayer, btnPlay) {
       }
 
       
-function syncLiveChatScrollForCurrentTime(videoPlayer) {
+function syncLiveChatScrollForCurrentTime(
+        videoPlayer,
+        { force = false, syncChatReplayForCurrentTime = null } = {},
+      ) {
         const chatContainer = document.getElementById("chat-messages");
         if (!chatContainer) return;
+        if (typeof syncChatReplayForCurrentTime === "function") {
+          const handled = syncChatReplayForCurrentTime(
+            Math.floor(videoPlayer.currentTime),
+            { force },
+          );
+          if (handled) return;
+        }
+        if (!force && chatContainer.__chatRenderCompleted !== true) return;
+        if (!force && Number(chatContainer.__chatUserPausedUntil || 0) > Date.now()) {
+          return;
+        }
 
         const currentSec = Math.floor(videoPlayer.currentTime);
-        const lines = chatContainer.querySelectorAll(".chat-line[data-time]");
-        if (lines.length === 0) return;
+        if (!force && chatContainer.__lastSyncedSecond === currentSec) return;
+        chatContainer.__lastSyncedSecond = currentSec;
+        const timedLines = Array.isArray(chatContainer.__chatTimedLines)
+          ? chatContainer.__chatTimedLines
+          : [];
+        if (timedLines.length === 0) return;
 
         let target = null;
-        for (const line of lines) {
-          const t = parseInt(line.dataset.time, 10);
-          if (t <= currentSec) {
-            target = line;
-          } else {
-            break;
+        let cursor = Number.isInteger(chatContainer.__chatTimedIndex)
+          ? chatContainer.__chatTimedIndex
+          : 0;
+        cursor = Math.max(0, Math.min(cursor, timedLines.length - 1));
+
+        if (timedLines[cursor]?.timeSec > currentSec) {
+          let low = 0;
+          let high = cursor;
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            if (timedLines[mid].timeSec <= currentSec) {
+              target = timedLines[mid].line;
+              cursor = mid;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
           }
+        } else {
+          while (
+            cursor + 1 < timedLines.length &&
+            timedLines[cursor + 1].timeSec <= currentSec
+          ) {
+            cursor += 1;
+          }
+          target = timedLines[cursor]?.line || null;
         }
         if (!target) return;
+        chatContainer.__chatTimedIndex = cursor;
+
+        const targetTime = String(target.dataset.time || "");
+        if (chatContainer.__lastChatTargetTime === targetTime) return;
+        chatContainer.__lastChatTargetTime = targetTime;
 
         const targetOffset =
           target.offsetTop - chatContainer.clientHeight / 2 + target.clientHeight / 2;
-        chatContainer.scrollTo({
-          top: Math.max(0, targetOffset),
-          behavior: "smooth",
+        chatContainer.scrollTop = Math.max(0, targetOffset);
+      }
+
+      function bindChatManualScrollPause() {
+        const chatContainer = document.getElementById("chat-messages");
+        if (!chatContainer || chatContainer.__chatManualPauseBound) return;
+        chatContainer.__chatManualPauseBound = true;
+
+        const pauseAutoSync = (durationMs = 5000) => {
+          chatContainer.__chatUserPausedUntil = Date.now() + durationMs;
+        };
+
+        const maybeResumeAutoSync = () => {
+          const maxScrollTop = Math.max(
+            0,
+            chatContainer.scrollHeight - chatContainer.clientHeight,
+          );
+          if (maxScrollTop === 0) {
+            chatContainer.__chatUserPausedUntil = 0;
+            return;
+          }
+          const distanceFromBottom = maxScrollTop - chatContainer.scrollTop;
+          if (distanceFromBottom <= 24) {
+            chatContainer.__chatUserPausedUntil = 0;
+          }
+        };
+
+        chatContainer.addEventListener("wheel", () => pauseAutoSync(), {
+          passive: true,
+        });
+        chatContainer.addEventListener("touchstart", () => pauseAutoSync(), {
+          passive: true,
+        });
+        chatContainer.addEventListener("pointerdown", () => pauseAutoSync(), {
+          passive: true,
+        });
+        chatContainer.addEventListener("scroll", maybeResumeAutoSync, {
+          passive: true,
         });
       }
 
@@ -506,9 +583,6 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
       }
 
       function createPlayerSeekSyncController(videoPlayer, seekBar, timeDisplay) {
-        let smoothSeekRafId = null;
-        let targetProgress = 0;
-
         function resetSeekBar() {
           seekBar.value = 0;
           seekBar.style.setProperty("--progress", "0%");
@@ -530,53 +604,23 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
           if (!videoPlayer.duration) return;
           const cur = Math.floor(videoPlayer.currentTime);
           const dur = Math.floor(videoPlayer.duration);
-          targetProgress = (videoPlayer.currentTime / videoPlayer.duration) * 100;
           timeDisplay.textContent = `${formatVideoTime(cur)} / ${formatVideoTime(dur)}`;
-        }
-
-        function shouldRunSmoothSeekLoop() {
-          const playerPage = document.getElementById("page-player");
-          return !document.hidden && !!playerPage && playerPage.classList.contains("active-page");
-        }
-
-        function smoothSeek() {
-          if (!videoPlayer.duration || isNaN(videoPlayer.duration)) {
-            targetProgress = 0;
-            seekBar.value = 0;
-            seekBar.style.setProperty("--progress", "0%");
-            smoothSeekRafId = requestAnimationFrame(smoothSeek);
-            return;
-          }
-
-          const current = parseFloat(seekBar.value) || 0;
-          const diff = targetProgress - current;
-          const easing = 0.001;
-          const newValue = current + diff * easing;
-
-          seekBar.value = newValue;
-          seekBar.style.setProperty("--progress", `${newValue}%`);
-          smoothSeekRafId = requestAnimationFrame(smoothSeek);
-        }
-
-        function updateSmoothSeekLoopState() {
-          if (shouldRunSmoothSeekLoop()) {
-            if (smoothSeekRafId === null) {
-              smoothSeekRafId = requestAnimationFrame(smoothSeek);
-            }
-            return;
-          }
-
-          if (smoothSeekRafId !== null) {
-            cancelAnimationFrame(smoothSeekRafId);
-            smoothSeekRafId = null;
-          }
         }
 
         function bindTimeUpdateEvents(onTimeupdateExtra) {
           videoPlayer.addEventListener("timeupdate", syncSeekBarWithVideo);
           videoPlayer.addEventListener("timeupdate", syncPlaybackClockWithVideo);
+          videoPlayer.addEventListener("loadedmetadata", syncSeekBarWithVideo);
+          videoPlayer.addEventListener("loadedmetadata", syncPlaybackClockWithVideo);
+          videoPlayer.addEventListener("seeked", syncSeekBarWithVideo);
+          videoPlayer.addEventListener("seeked", syncPlaybackClockWithVideo);
           if (onTimeupdateExtra) {
-            videoPlayer.addEventListener("timeupdate", onTimeupdateExtra);
+            videoPlayer.addEventListener("timeupdate", () =>
+              onTimeupdateExtra({ force: false }),
+            );
+            videoPlayer.addEventListener("seeked", () =>
+              onTimeupdateExtra({ force: true }),
+            );
           }
         }
 
@@ -596,7 +640,7 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
 
         return {
           resetSeekBar,
-          updateSmoothSeekLoopState,
+          updateSmoothSeekLoopState() {},
           bindTimeUpdateEvents,
           bindSeekBarInput,
           initializeSeekBarState,
@@ -695,6 +739,7 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         onToggleFullscreen,
         onSidebarToggled,
         renderSortedComments,
+        syncChatReplayForCurrentTime,
       }) {
         const seekSync = createPlayerSeekSyncController(
           videoPlayer,
@@ -703,10 +748,28 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
         );
         const actions = createPlayerPlaybackActions(videoPlayer);
 
+        function releasePlayerResources() {
+          try {
+            videoPlayer.pause();
+          } catch (_error) {
+            // noop
+          }
+          try {
+            videoPlayer.removeAttribute("src");
+            videoPlayer.load();
+          } catch (_error) {
+            // noop
+          }
+        }
+
         function initializePlayerUiBindings() {
+          bindChatManualScrollPause();
           seekSync.initializeSeekBarState();
-          seekSync.bindTimeUpdateEvents(() => {
-            syncLiveChatScrollForCurrentTime(videoPlayer);
+          seekSync.bindTimeUpdateEvents(({ force }) => {
+            syncLiveChatScrollForCurrentTime(videoPlayer, {
+              force,
+              syncChatReplayForCurrentTime,
+            });
           });
           seekSync.bindSeekBarInput();
           bindPlayButton(videoPlayer, btnPlay);
@@ -731,6 +794,8 @@ function syncLiveChatScrollForCurrentTime(videoPlayer) {
             "visibilitychange",
             seekSync.updateSmoothSeekLoopState,
           );
+          window.addEventListener("pagehide", releasePlayerResources);
+          window.addEventListener("beforeunload", releasePlayerResources);
         }
 
         return {

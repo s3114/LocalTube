@@ -29,14 +29,36 @@ function normalizeLiveChatBaseName(videoBaseName) {
     .replace(/\.(mp4|mkv|webm|mov)$/i, "");
 }
 
-function parseNdjsonMessages(text) {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+function extractNonEmptyNdjsonLines(text) {
+  const value = String(text || "");
+  const lines = [];
+  let start = 0;
 
+  for (let index = 0; index <= value.length; index += 1) {
+    const charCode = value.charCodeAt(index);
+    const isLineBreak =
+      index === value.length || charCode === 10 || charCode === 13;
+    if (!isLineBreak) continue;
+
+    let end = index;
+    while (start < end && /\s/.test(value[start])) start += 1;
+    while (end > start && /\s/.test(value[end - 1])) end -= 1;
+    if (end > start) {
+      lines.push(value.slice(start, end));
+    }
+
+    if (charCode === 13 && value.charCodeAt(index + 1) === 10) {
+      index += 1;
+    }
+    start = index + 1;
+  }
+
+  return lines;
+}
+
+function parseNdjsonMessages(text) {
   const messages = [];
-  for (const line of lines) {
+  for (const line of extractNonEmptyNdjsonLines(text)) {
     try {
       messages.push(JSON.parse(line));
     } catch (e) {
