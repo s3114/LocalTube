@@ -4,12 +4,21 @@ const DISCONNECT_RELOAD_DELAY_KEY = "localtube.disconnectReloadDelayMs";
 const COOKIE_MODE_STORAGE_KEY = "localtube.cookieSelectionMode";
 const COOKIE_UPDATED_AT_STORAGE_KEY = "localtube.cookieUpdatedAt";
 const UPDATE_HISTORY_FILTER_STORAGE_KEY = "localtube.updateHistoryFilter";
+const FEEDBACK_FORM_ACTION =
+  "https://docs.google.com/forms/u/0/d/e/1FAIpQLSclkUPg2xtalK8G2N6g7e2iSrXuZy7rz1QQnLnxvsLh8sByNw/formResponse";
+const FEEDBACK_CATEGORY_ENTRY_NAME = "entry.430026484";
+const FEEDBACK_MESSAGE_ENTRY_NAME = "entry.1820568644";
+const FEEDBACK_DISCORD_QUESTION_URL =
+  "https://discord.com/channels/1332943491688300566/1470084207937196143";
+const FEEDBACK_DISCORD_DESKTOP_URL =
+  "discord://discord.com/channels/1332943491688300566/1470084207937196143";
+const FEEDBACK_QUESTION_MESSAGE =
+  "ここでの質問に返答することはできません。\n質問はdiscordフォームにてお願いします。";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
-  notifyInfoImpl: (message) => global.alert?.(message),
-  notifyErrorImpl: (message) => global.alert?.(message),
-  confirmImpl: (message) => global.confirm?.(message) ?? true,
+  notifyInfoImpl: () => {},
+  notifyErrorImpl: () => {},
   writeClipboardTextImpl: async (text) => {
     const clipboardText = String(text ?? "");
 
@@ -329,9 +338,63 @@ function clampNumberInRange(value, min, max, fallback) {
         );
       }
 
+      function showSettingsConfirmModal(elements, message) {
+        if (
+          !elements.settingsConfirmModalBackdrop ||
+          !elements.settingsConfirmModalMessage ||
+          !elements.settingsConfirmModalCancelBtn ||
+          !elements.settingsConfirmModalConfirmBtn
+        ) {
+          return Promise.resolve(true);
+        }
+
+        return new Promise((resolve) => {
+          const backdrop = elements.settingsConfirmModalBackdrop;
+          const messageEl = elements.settingsConfirmModalMessage;
+          const cancelBtn = elements.settingsConfirmModalCancelBtn;
+          const confirmBtn = elements.settingsConfirmModalConfirmBtn;
+
+          const cleanup = () => {
+            backdrop.classList.add("hidden");
+            cancelBtn.removeEventListener("click", onCancel);
+            confirmBtn.removeEventListener("click", onConfirm);
+            backdrop.removeEventListener("click", onBackdropClick);
+          };
+
+          const onCancel = () => {
+            cleanup();
+            resolve(false);
+          };
+
+          const onConfirm = () => {
+            cleanup();
+            resolve(true);
+          };
+
+          const onBackdropClick = (event) => {
+            if (event.target !== backdrop) return;
+            cleanup();
+            resolve(false);
+          };
+
+          messageEl.textContent = String(message || "").trim();
+          backdrop.classList.remove("hidden");
+          cancelBtn.addEventListener("click", onCancel);
+          confirmBtn.addEventListener("click", onConfirm);
+          backdrop.addEventListener("click", onBackdropClick);
+          global.requestAnimationFrame?.(() => {
+            confirmBtn.focus?.();
+          });
+        });
+      }
+
       function initializeHistoryClearButton(elements) {
         elements.clearHistoryBtn.addEventListener("click", async () => {
-          if (!settingsUiDeps.confirmImpl("ダウンロード履歴を削除しますか？")) return;
+          const confirmed = await showSettingsConfirmModal(
+            elements,
+            "ダウンロード履歴を削除しますか？",
+          );
+          if (!confirmed) return;
           try {
             const response = await settingsUiDeps.fetchImpl("/api/clear-history", {
               method: "POST",
@@ -346,7 +409,7 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
-      function initializeAutostartTaskButtons() {
+      function initializeAutostartTaskButtons(elements) {
         const autostartToggle = document.getElementById("opt-autostart-task");
         const autostartStatus = document.getElementById("autostart-status");
 
@@ -397,13 +460,14 @@ function clampNumberInRange(value, min, max, fallback) {
           }
         }
 
-        autostartToggle.addEventListener("change", () => {
+        autostartToggle.addEventListener("change", async () => {
           const nextCheckedState = autostartToggle.checked;
-          const confirmed = nextCheckedState
-            ? settingsUiDeps.confirmImpl(
-              "PC起動時にこのアプリケーションを自動で起動するように設定しますか？",
-            )
-            : settingsUiDeps.confirmImpl("PC起動時の自動実行を解除しますか？");
+          const confirmed = await showSettingsConfirmModal(
+            elements,
+            nextCheckedState
+              ? "PC起動時にこのアプリケーションを自動で起動するように設定しますか？"
+              : "PC起動時の自動実行を解除しますか？",
+          );
 
           if (!confirmed) {
             autostartToggle.checked = !nextCheckedState;
@@ -419,7 +483,7 @@ function clampNumberInRange(value, min, max, fallback) {
         syncAutostartStatus();
       }
 
-      function initializeServerRestartButton() {
+      function initializeServerRestartButton(elements) {
         const restartButton = document.getElementById("btn-restart-server");
         const restartNodeButton = document.getElementById("btn-restart-server-node");
         const shutdownButton = document.getElementById("btn-shutdown-server");
@@ -427,7 +491,11 @@ function clampNumberInRange(value, min, max, fallback) {
         if (!restartButton || !restartNodeButton || !shutdownButton || !restartStatus) return;
 
         restartButton.addEventListener("click", async () => {
-          if (!settingsUiDeps.confirmImpl("更新して localhost:3000 を再起動しますか？")) return;
+          const confirmed = await showSettingsConfirmModal(
+            elements,
+            "更新して localhost:3000 を再起動しますか？",
+          );
+          if (!confirmed) return;
           restartStatus.textContent = "再起動リクエストを送信中...";
           restartStatus.style.color = "var(--blue)";
           try {
@@ -457,7 +525,8 @@ function clampNumberInRange(value, min, max, fallback) {
         });
 
         restartNodeButton.addEventListener("click", async () => {
-          const confirmed = settingsUiDeps.confirmImpl(
+          const confirmed = await showSettingsConfirmModal(
+            elements,
             "server.js を直接再起動しますか？（起動.bat は使用しません）",
           );
           if (!confirmed) return;
@@ -490,7 +559,8 @@ function clampNumberInRange(value, min, max, fallback) {
         });
 
         shutdownButton.addEventListener("click", async () => {
-          const confirmed = settingsUiDeps.confirmImpl(
+          const confirmed = await showSettingsConfirmModal(
+            elements,
             "localhost:3000 を強制終了しますか？（再起動はされません）",
           );
           if (!confirmed) return;
@@ -1469,13 +1539,79 @@ function clampNumberInRange(value, min, max, fallback) {
           !elements.feedbackModalBackdrop ||
           !elements.feedbackModalCancelBtn ||
           !elements.feedbackModalConfirmBtn ||
+          !elements.feedbackModalSubmitStatus ||
           !elements.feedbackCategorySelect ||
-          !elements.feedbackMessageInput
+          !elements.feedbackMessageInput ||
+          !elements.feedbackConfirmModalBackdrop ||
+          !elements.feedbackConfirmModalCancelBtn ||
+          !elements.feedbackConfirmModalConfirmBtn
         ) {
           return;
         }
 
+        let isSubmitting = false;
+        let lastEditableFeedbackMessage = "";
+
+        const isQuestionCategory = () =>
+          String(elements.feedbackCategorySelect.value || "").trim() === "質問";
+
+        const setSubmitState = (message = "", tone = "muted") => {
+          const text = String(message || "").trim();
+          if (!text) {
+            elements.feedbackModalSubmitStatus.textContent = "";
+            elements.feedbackModalSubmitStatus.classList.add("hidden");
+            elements.feedbackModalSubmitStatus.style.color = "";
+            return;
+          }
+          elements.feedbackModalSubmitStatus.textContent = text;
+          elements.feedbackModalSubmitStatus.classList.remove("hidden");
+          if (tone === "success") {
+            elements.feedbackModalSubmitStatus.style.color = "var(--ok)";
+          } else if (tone === "error") {
+            elements.feedbackModalSubmitStatus.style.color = "var(--danger)";
+          } else {
+            elements.feedbackModalSubmitStatus.style.color = "var(--subtext)";
+          }
+        };
+
+        const setSubmitting = (submitting) => {
+          isSubmitting = Boolean(submitting);
+          elements.feedbackModalConfirmBtn.disabled = isSubmitting;
+          elements.feedbackModalCancelBtn.disabled = isSubmitting;
+          elements.feedbackCategorySelect.disabled = isSubmitting;
+          elements.feedbackMessageInput.disabled = isSubmitting;
+          if (isSubmitting) {
+            elements.feedbackModalConfirmBtn.textContent = "送信中...";
+            return;
+          }
+          elements.feedbackModalConfirmBtn.textContent = isQuestionCategory()
+            ? "開く"
+            : "送信";
+        };
+
+        const syncFeedbackCategoryMode = () => {
+          if (isQuestionCategory()) {
+            const currentMessage = String(elements.feedbackMessageInput.value || "");
+            if (currentMessage.trim() && currentMessage !== FEEDBACK_QUESTION_MESSAGE) {
+              lastEditableFeedbackMessage = currentMessage;
+            }
+            elements.feedbackMessageInput.value = FEEDBACK_QUESTION_MESSAGE;
+            elements.feedbackMessageInput.readOnly = true;
+            elements.feedbackModalConfirmBtn.textContent = isSubmitting ? "送信中..." : "開く";
+            return;
+          }
+
+          const currentMessage = String(elements.feedbackMessageInput.value || "");
+          if (currentMessage === FEEDBACK_QUESTION_MESSAGE) {
+            elements.feedbackMessageInput.value = lastEditableFeedbackMessage;
+          }
+          elements.feedbackMessageInput.readOnly = false;
+          elements.feedbackModalConfirmBtn.textContent = isSubmitting ? "送信中..." : "送信";
+        };
+
         const openModal = () => {
+          setSubmitState("");
+          syncFeedbackCategoryMode();
           elements.feedbackModalBackdrop.classList.remove("hidden");
           global.requestAnimationFrame?.(() => {
             elements.feedbackMessageInput.focus?.();
@@ -1483,19 +1619,148 @@ function clampNumberInRange(value, min, max, fallback) {
         };
 
         const closeModal = () => {
+          if (isSubmitting) return;
           elements.feedbackModalBackdrop.classList.add("hidden");
         };
 
+        const confirmFeedbackSend = () =>
+          new Promise((resolve) => {
+            const backdrop = elements.feedbackConfirmModalBackdrop;
+            const cancelBtn = elements.feedbackConfirmModalCancelBtn;
+            const confirmBtn = elements.feedbackConfirmModalConfirmBtn;
+
+            const cleanup = () => {
+              backdrop.classList.add("hidden");
+              cancelBtn.removeEventListener("click", onCancel);
+              confirmBtn.removeEventListener("click", onConfirm);
+              backdrop.removeEventListener("click", onBackdropClick);
+            };
+
+            const onCancel = () => {
+              cleanup();
+              resolve(false);
+            };
+
+            const onConfirm = () => {
+              cleanup();
+              resolve(true);
+            };
+
+            const onBackdropClick = (event) => {
+              if (event.target !== backdrop) return;
+              cleanup();
+              resolve(false);
+            };
+
+            backdrop.classList.remove("hidden");
+            cancelBtn.addEventListener("click", onCancel);
+            confirmBtn.addEventListener("click", onConfirm);
+            backdrop.addEventListener("click", onBackdropClick);
+            global.requestAnimationFrame?.(() => {
+              confirmBtn.focus?.();
+            });
+          });
+
         const updateStatus = () => {
           const message = String(elements.feedbackMessageInput.value || "").trim();
-          const hasContent = message;
-          setSettingStatus(
-            elements.feedbackModalStatus,
-            hasContent
-              ? `入力中: ${elements.feedbackCategorySelect.options[elements.feedbackCategorySelect.selectedIndex]?.textContent || "フィードバック"}`
-              : "未入力です",
-            hasContent ? "success" : "muted",
-          );
+          if (message) {
+            elements.feedbackModalStatus.textContent = "";
+          } else {
+            elements.feedbackModalStatus.textContent = "";
+          }
+        };
+
+        const submitFeedbackToGoogleForm = async () => {
+          if (isQuestionCategory()) {
+            const openDiscordQuestionChannel = () => {
+              let fallbackTriggered = false;
+              const fallbackToWeb = () => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                global.open?.(
+                  FEEDBACK_DISCORD_QUESTION_URL,
+                  "_blank",
+                  "noopener,noreferrer",
+                );
+              };
+
+              const onVisibilityChange = () => {
+                if (global.document?.hidden) {
+                  fallbackTriggered = true;
+                }
+              };
+
+              global.document?.addEventListener("visibilitychange", onVisibilityChange, {
+                once: true,
+              });
+
+              try {
+                global.location.href = FEEDBACK_DISCORD_DESKTOP_URL;
+              } catch {
+                fallbackToWeb();
+                return;
+              }
+
+              global.setTimeout(() => {
+                fallbackToWeb();
+              }, 900);
+            };
+
+            openDiscordQuestionChannel();
+            setSubmitState("Discord の質問フォームを開きました。", "success");
+            settingsUiDeps.notifyInfoImpl("Discord の質問フォームを開きました。");
+            closeModal();
+            return;
+          }
+
+          const category = String(elements.feedbackCategorySelect.value || "").trim();
+          const message = String(elements.feedbackMessageInput.value || "").trim();
+          if (!message) {
+            setSubmitState("内容を入力してください。", "error");
+            settingsUiDeps.notifyErrorImpl("フィードバック内容を入力してください。");
+            elements.feedbackMessageInput.focus?.();
+            return;
+          }
+
+          const confirmed = await confirmFeedbackSend();
+          if (!confirmed) return;
+
+          setSubmitting(true);
+          setSubmitState("Googleフォームへ送信しています...", "muted");
+          try {
+            const body = new URLSearchParams();
+            body.set(FEEDBACK_CATEGORY_ENTRY_NAME, category);
+            body.set(FEEDBACK_MESSAGE_ENTRY_NAME, message);
+
+            await settingsUiDeps.fetchImpl(FEEDBACK_FORM_ACTION, {
+              method: "POST",
+              mode: "no-cors",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              },
+              body: body.toString(),
+            });
+
+            elements.feedbackMessageInput.value = "";
+            elements.feedbackCategorySelect.value = "不具合報告";
+            lastEditableFeedbackMessage = "";
+            syncFeedbackCategoryMode();
+            setSubmitState(
+              "送信リクエストを受け付けました。ありがとうございます。",
+              "success",
+            );
+            settingsUiDeps.notifyInfoImpl("フィードバックを送信しました。");
+            updateStatus();
+            global.setTimeout(() => {
+              closeModal();
+            }, 700);
+          } catch (error) {
+            console.error("feedback submit error:", error);
+            setSubmitState("送信に失敗しました。時間を置いて再度お試しください。", "error");
+            settingsUiDeps.notifyErrorImpl("フィードバックの送信に失敗しました。");
+          } finally {
+            setSubmitting(false);
+          }
         };
 
         elements.openFeedbackModalBtn.addEventListener("click", () => {
@@ -1508,9 +1773,8 @@ function clampNumberInRange(value, min, max, fallback) {
           updateStatus();
         });
 
-        elements.feedbackModalConfirmBtn.addEventListener("click", () => {
-          closeModal();
-          updateStatus();
+        elements.feedbackModalConfirmBtn.addEventListener("click", async () => {
+          await submitFeedbackToGoogleForm();
         });
 
         elements.feedbackModalBackdrop.addEventListener("click", (event) => {
@@ -1528,6 +1792,12 @@ function clampNumberInRange(value, min, max, fallback) {
           element?.addEventListener("change", updateStatus);
         });
 
+        elements.feedbackCategorySelect.addEventListener("change", () => {
+          syncFeedbackCategoryMode();
+          updateStatus();
+        });
+
+        syncFeedbackCategoryMode();
         updateStatus();
       }
 
@@ -1540,8 +1810,8 @@ function initializeSettingsUiController({
         setSettingsUiDependencies(dependencies);
         initializeGeneralSettingStorageBindings(elements);
         initializeHistoryClearButton(elements);
-        initializeAutostartTaskButtons();
-        initializeServerRestartButton();
+        initializeAutostartTaskButtons(elements);
+        initializeServerRestartButton(elements);
         initializeConsoleLogViewer();
         initializeYoutubePlaylistConverterUI();
         initializeLocalLanIpToolUI();
