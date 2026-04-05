@@ -2184,6 +2184,66 @@
         gap: 8px;
       }
 
+      .feedback-modal {
+        width: min(760px, calc(100vw - 32px));
+        max-height: min(84vh, 920px);
+        overflow: auto;
+      }
+
+      .feedback-modal-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .feedback-modal-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+        gap: 12px 16px;
+        align-items: start;
+      }
+
+      .feedback-modal-label {
+        padding-top: 10px;
+        color: var(--subtext);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .feedback-modal-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .feedback-modal-field input,
+      .feedback-modal-field select,
+      .feedback-modal-field textarea {
+        width: 100%;
+        background: #1b1b1b;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+      }
+
+      .feedback-modal-field textarea {
+        min-height: 160px;
+        resize: vertical;
+      }
+
+      @media (max-width: 700px) {
+        .feedback-modal-grid {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .feedback-modal-label {
+          padding-top: 0;
+        }
+      }
+
       .playlist-controls {
         display: flex;
         gap: 6px;
@@ -4362,18 +4422,30 @@
 
         <div class="card card-layout card-margin-top-20">
           <div class="card-main">
-            <h2>インフォーメーション</h2>
+            <h2>info</h2>
             <div class="options">
               <div class="toggle">
                 <div>
                   サポートサーバーはこちら
-                  <small>困ったときの案内先として使用してください。</small>
+                  <small>即抜けや、入ったり抜けたりして大丈夫です。</small>
                 </div>
                 <div
                   class="settings-stack settings-stack-8 settings-stack-wide">
                   <a href="https://discord.gg/hzvfKJ8TMw"
                     target="_blank"
                     rel="noopener noreferrer">https://discord.gg/hzvfKJ8TMw</a>
+                </div>
+              </div>
+              <div class="toggle">
+                <div>
+                  支援箱
+                  <small>ご支援いただける場合はこちらからお願いします。</small>
+                </div>
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-wide">
+                  <a href="https://soari3114.booth.pm/items/7995288"
+                    target="_blank"
+                    rel="noopener noreferrer">https://soari3114.booth.pm/items/7995288</a>
                 </div>
               </div>
               <div class="toggle settings-toggle-top">
@@ -4573,6 +4645,18 @@
                   </details>
                 </div>
               </div>
+              <div class="toggle">
+                <div>
+                  フィードバック
+                  <small>フィードバックはこちらからお願いします。</small>
+                </div>
+                <div class="settings-inline-row settings-gap-8">
+                  <button id="open-feedback-modal-btn"
+                    class="btn-ui btn-blue">フィードバックを開く</button>
+                  <small id="feedback-modal-status"
+                    class="settings-hint-blue"></small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4637,6 +4721,87 @@
             <button id="report-modal-cancel-btn"
               class="btn-ui btn-gray">いいえ</button>
             <button id="report-modal-confirm-btn"
+              class="btn-ui btn-blue">はい</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="feedback-modal-backdrop"
+        class="report-modal-backdrop hidden">
+        <div class="report-modal feedback-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-modal-title">
+          <h3 id="feedback-modal-title"
+            class="report-modal-title">フィードバック</h3>
+          <div class="report-modal-copy">
+            匿名です。つよい言葉や個人情報は避けてください。
+          </div>
+          <div id="feedback-modal-submit-status"
+            class="report-modal-copy hidden"></div>
+          <div class="feedback-modal-form">
+            <div class="feedback-modal-grid">
+              <div class="feedback-modal-label">カテゴリ</div>
+              <div class="feedback-modal-field">
+                <select id="feedback-category-select">
+                  <option value="不具合報告">不具合報告</option>
+                  <option value="改善要望">改善要望</option>
+                  <option value="感想">感想</option>
+                  <option value="質問">質問</option>
+                  <option value="その他">その他</option>
+                </select>
+              </div>
+
+              <div class="feedback-modal-label">内容</div>
+              <div class="feedback-modal-field">
+                <textarea id="feedback-message-input"
+                  placeholder="フィードバックの内容をここに入力してください。"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="report-modal-actions">
+            <button id="feedback-modal-cancel-btn"
+              class="btn-ui btn-gray">閉じる</button>
+            <button id="feedback-modal-confirm-btn"
+              class="btn-ui btn-blue">送信</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="feedback-confirm-modal-backdrop"
+        class="report-modal-backdrop hidden">
+        <div class="report-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-confirm-modal-title">
+          <h3 id="feedback-confirm-modal-title"
+            class="report-modal-title">フィードバック送信の確認</h3>
+          <div class="report-modal-copy">
+            フィードバックを送信してもよろしいですか？
+          </div>
+          <div class="report-modal-actions">
+            <button id="feedback-confirm-modal-cancel-btn"
+              class="btn-ui btn-gray">いいえ</button>
+            <button id="feedback-confirm-modal-confirm-btn"
+              class="btn-ui btn-blue">はい</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="settings-confirm-modal-backdrop"
+        class="report-modal-backdrop hidden">
+        <div class="report-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-confirm-modal-title">
+          <h3 id="settings-confirm-modal-title"
+            class="report-modal-title">確認</h3>
+          <div id="settings-confirm-modal-message"
+            class="report-modal-copy"></div>
+          <div class="report-modal-actions">
+            <button id="settings-confirm-modal-cancel-btn"
+              class="btn-ui btn-gray">いいえ</button>
+            <button id="settings-confirm-modal-confirm-btn"
               class="btn-ui btn-blue">はい</button>
           </div>
         </div>
