@@ -4648,7 +4648,7 @@
               <div class="toggle">
                 <div>
                   フィードバック
-                  <small>専用GUIを開いて、内容を整理しながら送信用の下書きを作成できます。</small>
+                  <small>Googleフォームへ送る内容を、LocalTube上で整理しながら入力できます。</small>
                 </div>
                 <div class="settings-inline-row settings-gap-8">
                   <button id="open-feedback-modal-btn"
@@ -4735,39 +4735,32 @@
           <h3 id="feedback-modal-title"
             class="report-modal-title">フィードバック</h3>
           <div class="report-modal-copy">
-            ここでは LocalTube 内で使うフィードバック内容を整理できます。送信方法は次の段階で接続します。
+            Googleフォームの項目に合わせて、カテゴリと内容を入力できます。
           </div>
           <div class="feedback-modal-form">
             <div class="feedback-modal-grid">
               <div class="feedback-modal-label">種別</div>
               <div class="feedback-modal-field">
                 <select id="feedback-category-select">
-                  <option value="bug">不具合報告</option>
-                  <option value="feature">改善要望</option>
-                  <option value="question">質問</option>
-                  <option value="other">その他</option>
+                  <option value="不具合報告">不具合報告</option>
+                  <option value="改善要望">改善要望</option>
+                  <option value="感想">感想</option>
+                  <option value="質問">質問</option>
+                  <option value="その他">その他</option>
                 </select>
-              </div>
-
-              <div class="feedback-modal-label">タイトル</div>
-              <div class="feedback-modal-field">
-                <input id="feedback-title-input"
-                  type="text"
-                  maxlength="120"
-                  placeholder="例: ライブチャットが表示されない" />
               </div>
 
               <div class="feedback-modal-label">内容</div>
               <div class="feedback-modal-field">
                 <textarea id="feedback-message-input"
-                  placeholder="再現手順、期待した動作、実際の動作などを書けるようにしておきます。"></textarea>
+                  placeholder="Googleフォームの「内容」に送る本文をここに入力します。必要なら再現手順や期待した動作、実際の動作も含めてください。"></textarea>
               </div>
 
               <div class="feedback-modal-label">補足</div>
               <div class="feedback-modal-field">
                 <div class="feedback-modal-box feedback-modal-help">
-                  今後ここに、レポート添付や Googleフォーム連携などを追加できるようにする想定です。<br />
-                  今回はまず、設定ページの上に重なる専用GUIとして使える状態まで整えています。
+                  現在のGoogleフォーム項目は「カテゴリ」と「内容」です。<br />
+                  そのため、この画面でも同じ2項目に絞って入力できるようにしています。
                 </div>
               </div>
             </div>

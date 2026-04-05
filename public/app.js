@@ -156,7 +156,6 @@ const appState = window.AppState || {
           feedbackModalCancelBtn: document.getElementById("feedback-modal-cancel-btn"),
           feedbackModalConfirmBtn: document.getElementById("feedback-modal-confirm-btn"),
           feedbackCategorySelect: document.getElementById("feedback-category-select"),
-          feedbackTitleInput: document.getElementById("feedback-title-input"),
           feedbackMessageInput: document.getElementById("feedback-message-input"),
           clearHistoryBtn: document.getElementById("clearHistoryBtn"),
           localVideoDirsInput: document.getElementById("local-video-dirs-input"),

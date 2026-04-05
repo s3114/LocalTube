@@ -1470,7 +1470,6 @@ function clampNumberInRange(value, min, max, fallback) {
           !elements.feedbackModalCancelBtn ||
           !elements.feedbackModalConfirmBtn ||
           !elements.feedbackCategorySelect ||
-          !elements.feedbackTitleInput ||
           !elements.feedbackMessageInput
         ) {
           return;
@@ -1479,7 +1478,7 @@ function clampNumberInRange(value, min, max, fallback) {
         const openModal = () => {
           elements.feedbackModalBackdrop.classList.remove("hidden");
           global.requestAnimationFrame?.(() => {
-            elements.feedbackTitleInput.focus?.();
+            elements.feedbackMessageInput.focus?.();
           });
         };
 
@@ -1488,9 +1487,8 @@ function clampNumberInRange(value, min, max, fallback) {
         };
 
         const updateStatus = () => {
-          const title = String(elements.feedbackTitleInput.value || "").trim();
           const message = String(elements.feedbackMessageInput.value || "").trim();
-          const hasContent = title || message;
+          const hasContent = message;
           setSettingStatus(
             elements.feedbackModalStatus,
             hasContent
@@ -1524,7 +1522,6 @@ function clampNumberInRange(value, min, max, fallback) {
 
         [
           elements.feedbackCategorySelect,
-          elements.feedbackTitleInput,
           elements.feedbackMessageInput,
         ].forEach((element) => {
           element?.addEventListener("input", updateStatus);
