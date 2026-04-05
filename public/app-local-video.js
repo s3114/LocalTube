@@ -457,6 +457,44 @@
       chatContainer.__chatRenderCompleted = true;
     }
 
+    async function primeFutureChatReplayWindow(chatContainer, currentSec, maxWindows = 8) {
+      const replayState = chatContainer?.__chatReplayState;
+      if (!chatContainer || !replayState) return 0;
+      if ((replayState.queue?.length || 0) > 0) return replayState.queue.length;
+
+      let probeStartSec = replayState.currentRangeEndSec + 1;
+      for (let attempt = 0; attempt < maxWindows; attempt += 1) {
+        if (!replayState.hasMoreAfter) break;
+        const probeEndSec = probeStartSec + replayState.windowAfterSec;
+        const payload = await fetchChatReplayWindow(
+          replayState.videoBaseName,
+          probeStartSec,
+          probeEndSec,
+          replayState.limit,
+          undefined,
+        );
+
+        replayState.currentRangeStartSec = payload.startSec ?? probeStartSec;
+        replayState.currentRangeEndSec = payload.endSec ?? probeEndSec;
+        replayState.hasMoreAfter = payload.hasMoreAfter !== false;
+        replayState.hasMoreBefore = true;
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const future = items.filter((msg) => {
+          const timeSec = getReplayTimeSecFromMessage(msg);
+          return Number.isFinite(timeSec) && timeSec > currentSec;
+        });
+        if (future.length > 0) {
+          replayState.queue = future;
+          return future.length;
+        }
+
+        probeStartSec = replayState.currentRangeEndSec + 1;
+      }
+
+      return 0;
+    }
+
     async function fetchNextChatReplayWindow(chatContainer, currentSec) {
       const replayState = chatContainer?.__chatReplayState;
       if (!chatContainer || !replayState || replayState.isFetching || !replayState.hasMoreAfter) {
@@ -795,6 +833,18 @@
           const initialCount =
             ui.chatContainer.childElementCount + (replayState?.queue?.length || 0);
           if (initialCount === 0) {
+            const futureCount = replayState?.hasMoreAfter
+              ? await primeFutureChatReplayWindow(ui.chatContainer, currentSec)
+              : 0;
+            if (currentChatToken !== chatRequestToken) return;
+            if (futureCount > 0) {
+              if (ui.chatEmpty) ui.chatEmpty.textContent = "この時間帯のチャットを待機中…";
+              onMetric("chat_load_ms", performance.now() - startedAt, {
+                count: futureCount,
+                deferred: true,
+              });
+              return;
+            }
             if (ui.chatEmpty) ui.chatEmpty.textContent = "チャットがありません";
             onMetric("chat_load_ms", performance.now() - startedAt, { count: 0 });
             return;
