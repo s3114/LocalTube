@@ -271,7 +271,8 @@ function registerLiveChatRoutes(app, deps) {
   }
 
   function getChatTimeSecFromMessage(msg) {
-    const timeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
+    const rawTimeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
+    const timeMs = Number(rawTimeMs);
     if (!Number.isFinite(timeMs)) return null;
     return Math.floor(timeMs / 1000);
   }
