@@ -23,7 +23,7 @@
     }
     if (text.includes("Requested format is not available")) {
       hints.push(
-        "フォーマットが利用できません。最大の原因はショート動画のDLです。詳しくはサポートサーバーにて質問して下さい。",
+        "フォーマットが利用できません。ダウンロード通信をID固定を有効にしてみてください。うまくいかない場合はサポートサーバーにて質問して下さい。",
       );
     }
     if (text.includes("HTTP Error 403: Forbidden")) {
