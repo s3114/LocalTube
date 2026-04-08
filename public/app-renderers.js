@@ -130,9 +130,30 @@ function renderChatMessageHtml(message) {
         run.emoji.image?.accessibility?.accessibilityData?.label ||
         run.emoji.emojiId ||
         "emoji";
-      return `<img src="${thumb.url}" alt="${escapeHtml(alt)}" class="chat-emoji">`;
+      return `<img src="${thumb.url}" alt="${escapeHtml(alt)}" class="chat-emoji" data-chat-image-kind="emoji" data-original-src="${escapeHtml(thumb.url)}">`;
     })
     .join("");
+}
+
+function buildChatImageFallbackUrl(originalUrl, kind) {
+  const params = new URLSearchParams({
+    url: String(originalUrl || ""),
+    kind: String(kind || ""),
+  });
+  return `/api/chat-image-fallback?${params.toString()}`;
+}
+
+function attachChatImageFallback(img, kind) {
+  if (!img || img.dataset.chatImageFallbackAttached === "1") return;
+  img.dataset.chatImageFallbackAttached = "1";
+  const originalSrc = img.dataset.originalSrc || img.getAttribute("src") || "";
+  if (!originalSrc) return;
+
+  img.addEventListener("error", () => {
+    if (img.dataset.chatImageFallbackTried === "1") return;
+    img.dataset.chatImageFallbackTried = "1";
+    img.src = buildChatImageFallbackUrl(originalSrc, kind);
+  });
 }
 
 function createChatAvatarElementForRenderer(renderer, author) {
@@ -164,8 +185,10 @@ function createChatBadgeElementFromImages(badgeImages) {
   badgeImages.forEach((thumb) => {
     const img = document.createElement("img");
     img.src = thumb.url;
+    img.dataset.originalSrc = thumb.url;
     img.style.width = "16px";
     img.style.height = "16px";
+    attachChatImageFallback(img, "badge");
     badgeContainer.appendChild(img);
   });
 
@@ -202,6 +225,9 @@ function createChatLineElementFromMessage(msg) {
   const msgEl = document.createElement("span");
   msgEl.className = "chat-message";
   msgEl.innerHTML = msgHtml;
+  msgEl.querySelectorAll('img[data-chat-image-kind="emoji"]').forEach((img) => {
+    attachChatImageFallback(img, "emoji");
+  });
 
   line.appendChild(createChatAvatarElementForRenderer(renderer, author));
   line.appendChild(nameEl);
