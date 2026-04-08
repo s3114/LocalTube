@@ -11,6 +11,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
     loadConfig,
     saveConfig,
     normalizeDirList,
+    normalizeEmojiDictionary,
     normalizePlaylistsState,
     getWallpaperPublicUrl,
     apiOk,
@@ -145,6 +146,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         wallpaperBlur,
         wallpaperBrightness,
         ytDlpCustomCommand,
+        emojiDictionary,
         playlistsState,
       } = req.body || {};
       if (
@@ -154,6 +156,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         typeof wallpaperBlur === "undefined" &&
         typeof wallpaperBrightness === "undefined" &&
         typeof ytDlpCustomCommand === "undefined" &&
+        typeof emojiDictionary === "undefined" &&
         typeof playlistsState === "undefined"
       ) {
         return apiError(res, 400, "無効なリクエストです。");
@@ -182,6 +185,10 @@ function registerSettingsWallpaperRoutes(app, deps) {
 
       if (typeof ytDlpCustomCommand !== "undefined") {
         currentConfig.ytDlpCustomCommand = String(ytDlpCustomCommand || "").trim();
+      }
+
+      if (typeof emojiDictionary !== "undefined") {
+        currentConfig.emojiDictionary = normalizeEmojiDictionary(emojiDictionary);
       }
 
       if (typeof playlistsState !== "undefined") {

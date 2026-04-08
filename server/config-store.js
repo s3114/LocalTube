@@ -11,6 +11,7 @@ const CONFIG_DEFAULTS = {
   wallpaperBlur: 2,
   wallpaperBrightness: 50,
   ytDlpCustomCommand: "",
+  emojiDictionary: {},
   playlistsState: {
     playlists: [],
     selectedId: "",
@@ -58,6 +59,35 @@ function normalizePlaylistsState(rawState) {
   };
 }
 
+function normalizeEmojiDictionary(rawDictionary) {
+  if (!rawDictionary || typeof rawDictionary !== "object" || Array.isArray(rawDictionary)) {
+    return {};
+  }
+
+  const normalized = {};
+  for (const [key, value] of Object.entries(rawDictionary)) {
+    const shortcut = String(key || "").trim();
+    if (!shortcut) continue;
+
+    if (typeof value === "string") {
+      const url = value.trim();
+      if (!url) continue;
+      normalized[shortcut] = url;
+      continue;
+    }
+
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const url = String(value.url || "").trim();
+    if (!url) continue;
+    normalized[shortcut] = {
+      url,
+      label: String(value.label || shortcut).trim() || shortcut,
+    };
+  }
+
+  return normalized;
+}
+
 function normalizeConfig(config) {
   const raw = config || {};
   return {
@@ -80,6 +110,7 @@ function normalizeConfig(config) {
       CONFIG_DEFAULTS.wallpaperBrightness,
     ),
     ytDlpCustomCommand: String(raw.ytDlpCustomCommand || "").trim(),
+    emojiDictionary: normalizeEmojiDictionary(raw.emojiDictionary),
     playlistsState: normalizePlaylistsState(raw.playlistsState),
   };
 }
@@ -110,6 +141,7 @@ async function saveConfig(configPath, config) {
 module.exports = {
   CONFIG_DEFAULTS,
   normalizeDirList,
+  normalizeEmojiDictionary,
   normalizePlaylistsState,
   normalizeConfig,
   loadConfig,

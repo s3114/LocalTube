@@ -6,6 +6,7 @@ const os = require("node:os");
 
 const {
   normalizeDirList,
+  normalizeEmojiDictionary,
   normalizeConfig,
   loadConfig,
   saveConfig,
@@ -31,6 +32,27 @@ test("normalizeConfig applies defaults and clamps numeric settings", () => {
   assert.equal(normalized.enableFallbackThumbnails, true);
   assert.equal(normalized.wallpaperBlur, 30);
   assert.equal(normalized.wallpaperBrightness, 30);
+  assert.deepEqual(normalized.emojiDictionary, {});
+});
+
+test("normalizeEmojiDictionary keeps valid entries and drops invalid ones", () => {
+  const normalized = normalizeEmojiDictionary({
+    ":_kanataTen:": {
+      url: "/api/chat-image-fallback?url=x&kind=emoji",
+      label: "kanataTen",
+    },
+    ":_kanataShi:": "/api/chat-image-fallback?url=y&kind=emoji",
+    "": { url: "/api/chat-image-fallback?url=z&kind=emoji" },
+    invalid: {},
+  });
+
+  assert.deepEqual(normalized, {
+    ":_kanataTen:": {
+      url: "/api/chat-image-fallback?url=x&kind=emoji",
+      label: "kanataTen",
+    },
+    ":_kanataShi:": "/api/chat-image-fallback?url=y&kind=emoji",
+  });
 });
 
 test("saveConfig and loadConfig round-trip normalized values", async () => {
@@ -52,6 +74,7 @@ test("saveConfig and loadConfig round-trip normalized values", async () => {
   assert.equal(saved.enableFallbackThumbnails, false);
   assert.equal(saved.wallpaperBlur, 5);
   assert.equal(saved.wallpaperBrightness, 80);
+  assert.deepEqual(saved.emojiDictionary, {});
 
   const loaded = await loadConfig(configPath);
   assert.deepEqual(loaded, saved);

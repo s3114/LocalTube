@@ -19,6 +19,7 @@ test("GET /api/settings returns expected shape", async () => {
   assert.equal(typeof body.data, "object");
   assert.equal(Array.isArray(body.data.localVideoDirs), true);
   assert.equal(typeof body.data.enableFallbackThumbnails, "boolean");
+  assert.equal(typeof body.data.emojiDictionary, "object");
 });
 
 test("POST /api/settings persists localVideoDirs", async () => {
@@ -155,6 +156,27 @@ test("POST /api/settings persists yt-dlp custom command", async () => {
 
   const loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
   assert.equal(loaded.body.data.ytDlpCustomCommand, payload.ytDlpCustomCommand);
+});
+
+test("POST /api/settings persists emoji dictionary", async () => {
+  const payload = {
+    emojiDictionary: {
+      ":_kanataTen:": {
+        url: "/api/chat-image-fallback?url=abc&kind=emoji",
+        label: "kanataTen",
+      },
+    },
+  };
+  const save = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(save.status, 200);
+  assert.equal(save.body.ok, true);
+
+  const loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
+  assert.deepEqual(loaded.body.data.emojiDictionary, payload.emojiDictionary);
 });
 
 test("POST /api/settings normalizes invalid localVideoDirs type to empty array", async () => {
