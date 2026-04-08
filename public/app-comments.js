@@ -2,6 +2,28 @@
   const DEFAULT_COMMENT_AVATAR =
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='12' fill='%23999'/%3E%3Cpath d='M12 56c2-14 38-14 40 0' fill='%23ccc'/%3E%3C/svg%3E";
 
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function renderCommentTextHtml(text, linkify, emojiMap) {
+    const source = String(text || "");
+    const map = emojiMap instanceof Map ? emojiMap : new Map();
+    if (!source) return "";
+    let html = linkify(source);
+    if (map.size === 0) return html;
+
+    const shortcuts = Array.from(map.keys()).sort((a, b) => b.length - a.length);
+    for (const shortcut of shortcuts) {
+      const emoji = map.get(shortcut);
+      if (!emoji?.url) continue;
+      const regex = new RegExp(escapeRegExp(shortcut), "g");
+      const imgHtml = `<img src="${emoji.url}" alt="${shortcut}" class="chat-emoji comment-emoji" title="${shortcut}">`;
+      html = html.replace(regex, imgHtml);
+    }
+    return html;
+  }
+
   function normalizeCommentItemForRenderer(comment) {
     if (comment.id && comment.text) {
       if (comment.parent === "root") comment.parent = null;
@@ -124,7 +146,13 @@
     });
   }
 
-  function createCommentElementNode(comment, isReply, linkify, defaultCommentAvatar) {
+  function createCommentElementNode(
+    comment,
+    isReply,
+    linkify,
+    defaultCommentAvatar,
+    emojiMap,
+  ) {
     const item = document.createElement("div");
     item.className = isReply ? "comment-reply" : "comment-item";
 
@@ -133,7 +161,7 @@
 
     const text = document.createElement("div");
     text.className = "comment-text";
-    text.innerHTML = comment.text ? linkify(comment.text) : "";
+    text.innerHTML = renderCommentTextHtml(comment.text, linkify, emojiMap);
 
     const moreBtn = document.createElement("button");
     moreBtn.className = "comment-more";
@@ -152,21 +180,45 @@
     return item;
   }
 
-  function renderNestedReplyTreeNodes(nodes, container, linkify, defaultCommentAvatar) {
+  function renderNestedReplyTreeNodes(
+    nodes,
+    container,
+    linkify,
+    defaultCommentAvatar,
+    emojiMap,
+  ) {
     nodes.forEach((node) => {
-      const replyEl = createCommentElementNode(node, true, linkify, defaultCommentAvatar);
+      const replyEl = createCommentElementNode(
+        node,
+        true,
+        linkify,
+        defaultCommentAvatar,
+        emojiMap,
+      );
       container.appendChild(replyEl);
 
       if (node.children.length > 0) {
         const nested = document.createElement("div");
         nested.className = "comment-replies";
-        renderNestedReplyTreeNodes(node.children, nested, linkify, defaultCommentAvatar);
+        renderNestedReplyTreeNodes(
+          node.children,
+          nested,
+          linkify,
+          defaultCommentAvatar,
+          emojiMap,
+        );
         replyEl.querySelector(".comment-body").appendChild(nested);
       }
     });
   }
 
-  function createReplyControlsForComment(parentNode, parentEl, linkify, defaultCommentAvatar) {
+  function createReplyControlsForComment(
+    parentNode,
+    parentEl,
+    linkify,
+    defaultCommentAvatar,
+    emojiMap,
+  ) {
     const replyContainer = document.createElement("div");
     replyContainer.className = "comment-replies";
     replyContainer.id = `replies-${parentNode.id}`;
@@ -196,6 +248,7 @@
         replyContainer,
         linkify,
         defaultCommentAvatar,
+        emojiMap,
       );
       renderedReplies = true;
     };
@@ -238,6 +291,7 @@
     roots,
     linkify,
     defaultCommentAvatar,
+    emojiMap,
     shouldContinue = () => true,
     chunkSize = 24,
   }) {
@@ -253,6 +307,7 @@
           false,
           linkify,
           defaultCommentAvatar,
+          emojiMap,
         );
         parentEl.querySelector(".comment-text")?.classList.add("clamped");
         fragment.appendChild(parentEl);
@@ -263,6 +318,7 @@
             parentEl,
             linkify,
             defaultCommentAvatar,
+            emojiMap,
           );
         }
       }
@@ -278,6 +334,23 @@
 
   function createCommentRenderer(linkify) {
     let renderToken = 0;
+    let currentEmojiMap = new Map();
+
+    function setEmojiMap(items) {
+      const map = new Map();
+      if (Array.isArray(items)) {
+        items.forEach((item) => {
+          const shortcut = String(item?.shortcut || "").trim();
+          const url = String(item?.url || "").trim();
+          if (!shortcut || !url) return;
+          map.set(shortcut, {
+            shortcut,
+            url,
+          });
+        });
+      }
+      currentEmojiMap = map;
+    }
 
     function renderComments(comments) {
       const list = document.getElementById("comment-list");
@@ -306,6 +379,7 @@
           roots,
           linkify,
           defaultCommentAvatar: DEFAULT_COMMENT_AVATAR,
+          emojiMap: currentEmojiMap,
           shouldContinue: () => currentToken === renderToken,
         });
       });
@@ -313,6 +387,7 @@
 
     return {
       extractRenderableComments: extractRenderableCommentsFromInfo,
+      setEmojiMap,
       renderComments,
     };
   }

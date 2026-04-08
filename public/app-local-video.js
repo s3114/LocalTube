@@ -795,6 +795,22 @@
       const ui = getVideoDataUiElements();
       const commentRenderer = createCommentRenderer(linkify);
 
+      async function loadCommentEmojiMap(videoBaseName) {
+        try {
+          const response = await fetch(
+            `/api/live-chat-emoji-map/${encodeURIComponent(videoBaseName)}`,
+          );
+          if (!response.ok) {
+            commentRenderer.setEmojiMap([]);
+            return;
+          }
+          const payload = await response.json();
+          commentRenderer.setEmojiMap(Array.isArray(payload?.items) ? payload.items : []);
+        } catch (_error) {
+          commentRenderer.setEmojiMap([]);
+        }
+      }
+
       function applyVideoInfo(info) {
         updateVideoDataPlayerHeader(ui, info);
         updateVideoDataChannelInfo(ui, info);
@@ -885,7 +901,8 @@
           signal: infoAbortController.signal,
         })
           .then((r) => r.json())
-          .then((info) => {
+          .then(async (info) => {
+            await loadCommentEmojiMap(videoId);
             if (currentInfoToken !== infoRequestToken) return;
             applyVideoInfo(info);
             onMetric("info_load_ms", performance.now() - startedAt, { videoId });

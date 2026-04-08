@@ -334,6 +334,72 @@ function registerLiveChatRoutes(app, deps) {
     };
   }
 
+  async function buildEmojiShortcutMap(chatFile) {
+    const shortcutMap = new Map();
+    const stream = fs.createReadStream(chatFile, { encoding: "utf8" });
+    const rl = readline.createInterface({
+      input: stream,
+      crlfDelay: Infinity,
+    });
+
+    function collectEmojiRuns(value) {
+      if (!value || typeof value !== "object") return;
+      if (Array.isArray(value)) {
+        value.forEach(collectEmojiRuns);
+        return;
+      }
+
+      if (Array.isArray(value.runs)) {
+        for (const run of value.runs) {
+          const emoji = run?.emoji;
+          if (!emoji) continue;
+          const thumb = emoji.image?.thumbnails?.slice(-1)[0];
+          const thumbUrl = thumb?.url || "";
+          if (!thumbUrl) continue;
+          const shortcuts = Array.isArray(emoji.shortcuts) ? emoji.shortcuts : [];
+          const label =
+            emoji.image?.accessibility?.accessibilityData?.label ||
+            emoji.emojiId ||
+            "emoji";
+          for (const shortcut of shortcuts) {
+            const key = String(shortcut || "").trim();
+            if (!key || shortcutMap.has(key)) continue;
+            shortcutMap.set(key, {
+              shortcut: key,
+              label,
+              url: `/api/chat-image-fallback?url=${encodeURIComponent(thumbUrl)}&kind=emoji`,
+            });
+          }
+        }
+      }
+
+      for (const child of Object.values(value)) {
+        if (child && typeof child === "object") {
+          collectEmojiRuns(child);
+        }
+      }
+    }
+
+    try {
+      for await (const rawLine of rl) {
+        const line = String(rawLine || "").trim();
+        if (!line) continue;
+        let parsed = null;
+        try {
+          parsed = JSON.parse(line);
+        } catch (_error) {
+          continue;
+        }
+        collectEmojiRuns(parsed);
+      }
+    } finally {
+      rl.close();
+      stream.destroy();
+    }
+
+    return Array.from(shortcutMap.values());
+  }
+
   app.get("/api/live-chat/:videoFile", async (req, res) => {
     try {
       const videoFile = decodeURIComponent(req.params.videoFile);
@@ -364,6 +430,22 @@ function registerLiveChatRoutes(app, deps) {
     } catch (e) {
       logger.error("failed to serve live chat", { error: e.message });
       apiError(res, 500, "ライブチャットの取得に失敗しました");
+    }
+  });
+
+  app.get("/api/live-chat-emoji-map/:videoFile", async (req, res) => {
+    try {
+      const videoFile = decodeURIComponent(req.params.videoFile);
+      const chatFile = await findLiveChatFile(videoFile);
+      if (!chatFile || !fs.existsSync(chatFile)) {
+        return res.json({ items: [] });
+      }
+
+      const items = await buildEmojiShortcutMap(chatFile);
+      return res.json({ items });
+    } catch (e) {
+      logger.error("failed to build live chat emoji map", { error: e.message });
+      return apiError(res, 500, "ライブチャット絵文字マップの取得に失敗しました");
     }
   });
 }
