@@ -3,7 +3,7 @@ const fsp = require("node:fs/promises");
 const readline = require("node:readline");
 
 function registerLiveChatRoutes(app, deps) {
-  const { fs, path, baseDir, apiError, getLocalVideoDirs } = deps;
+  const { fs, path, baseDir, apiError, getLocalVideoDirs, loadConfig, saveConfig } = deps;
   const logger = deps.logger || createLogger("route-live-chat");
   const LIVE_CHAT_DIR_INDEX_PATH = path.join(baseDir, "cache", "live-chat-dir-index.json");
   const LIVE_CHAT_FILE_INDEX_PATH = path.join(baseDir, "cache", "live-chat-file-index.json");
@@ -400,6 +400,73 @@ function registerLiveChatRoutes(app, deps) {
     return Array.from(shortcutMap.values());
   }
 
+  function buildEmojiItemsFromDictionary(dictionary) {
+    if (!dictionary || typeof dictionary !== "object") return [];
+    const items = [];
+    const seenShortcuts = new Set();
+    for (const [shortcut, value] of Object.entries(dictionary)) {
+      const key = String(shortcut || "").trim();
+      if (!key || seenShortcuts.has(key)) continue;
+      if (typeof value === "string") {
+        const url = value.trim();
+        if (!url) continue;
+        seenShortcuts.add(key);
+        items.push({ shortcut: key, url, label: key });
+        continue;
+      }
+      if (!value || typeof value !== "object") continue;
+      const url = String(value.url || "").trim();
+      if (!url) continue;
+      seenShortcuts.add(key);
+      items.push({
+        shortcut: key,
+        url,
+        label: String(value.label || key).trim() || key,
+      });
+    }
+    return items;
+  }
+
+  async function persistEmojiShortcutMap(items) {
+    if (typeof loadConfig !== "function" || typeof saveConfig !== "function") return;
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    const currentConfig = await loadConfig();
+    const nextDictionary = {
+      ...(currentConfig.emojiDictionary && typeof currentConfig.emojiDictionary === "object"
+        ? currentConfig.emojiDictionary
+        : {}),
+    };
+
+    let changed = false;
+    const seenShortcuts = new Set();
+    for (const item of items) {
+      const shortcut = String(item?.shortcut || "").trim();
+      const url = String(item?.url || "").trim();
+      if (!shortcut || !url || seenShortcuts.has(shortcut)) continue;
+      seenShortcuts.add(shortcut);
+      const nextValue = {
+        url,
+        label: String(item?.label || shortcut).trim() || shortcut,
+      };
+      const prev = nextDictionary[shortcut];
+      if (
+        prev &&
+        typeof prev === "object" &&
+        prev.url === nextValue.url &&
+        String(prev.label || "").trim() === nextValue.label
+      ) {
+        continue;
+      }
+      nextDictionary[shortcut] = nextValue;
+      changed = true;
+    }
+
+    if (!changed) return;
+    currentConfig.emojiDictionary = nextDictionary;
+    await saveConfig(currentConfig);
+  }
+
   app.get("/api/live-chat/:videoFile", async (req, res) => {
     try {
       const videoFile = decodeURIComponent(req.params.videoFile);
@@ -438,11 +505,16 @@ function registerLiveChatRoutes(app, deps) {
       const videoFile = decodeURIComponent(req.params.videoFile);
       const chatFile = await findLiveChatFile(videoFile);
       if (!chatFile || !fs.existsSync(chatFile)) {
-        return res.json({ items: [] });
+        const settings = typeof loadConfig === "function" ? await loadConfig() : {};
+        return res.json({
+          items: buildEmojiItemsFromDictionary(settings?.emojiDictionary),
+          source: "config",
+        });
       }
 
       const items = await buildEmojiShortcutMap(chatFile);
-      return res.json({ items });
+      await persistEmojiShortcutMap(items);
+      return res.json({ items, source: "live-chat" });
     } catch (e) {
       logger.error("failed to build live chat emoji map", { error: e.message });
       return apiError(res, 500, "ライブチャット絵文字マップの取得に失敗しました");

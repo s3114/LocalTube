@@ -61,6 +61,7 @@ function createTestServerContext() {
   let serverProcess = null;
   let baseUrl = "";
   let testConfigPath = "";
+  let testEmojiDictionaryPath = "";
   let testPublicDir = "";
   let started = false;
 
@@ -74,6 +75,10 @@ function createTestServerContext() {
     testConfigPath = path.join(
       os.tmpdir(),
       `youtubedl-config-test-${Date.now()}-${Math.random().toString(16).slice(2)}.json`,
+    );
+    testEmojiDictionaryPath = path.join(
+      os.tmpdir(),
+      `${path.basename(testConfigPath, ".json")}.emoji-dictionary.json`,
     );
     testPublicDir = path.join(
       os.tmpdir(),
@@ -109,6 +114,13 @@ function createTestServerContext() {
     if (testConfigPath) {
       try {
         await fs.unlink(testConfigPath);
+      } catch {
+        // noop
+      }
+    }
+    if (testEmojiDictionaryPath) {
+      try {
+        await fs.unlink(testEmojiDictionaryPath);
       } catch {
         // noop
       }

@@ -65,6 +65,7 @@ function normalizeEmojiDictionary(rawDictionary) {
   }
 
   const normalized = {};
+  const seenSignatures = new Set();
   for (const [key, value] of Object.entries(rawDictionary)) {
     const shortcut = String(key || "").trim();
     if (!shortcut) continue;
@@ -72,6 +73,9 @@ function normalizeEmojiDictionary(rawDictionary) {
     if (typeof value === "string") {
       const url = value.trim();
       if (!url) continue;
+      const signature = `${shortcut}::${url}::${shortcut}`;
+      if (seenSignatures.has(signature)) continue;
+      seenSignatures.add(signature);
       normalized[shortcut] = url;
       continue;
     }
@@ -79,9 +83,13 @@ function normalizeEmojiDictionary(rawDictionary) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     const url = String(value.url || "").trim();
     if (!url) continue;
+    const label = String(value.label || shortcut).trim() || shortcut;
+    const signature = `${shortcut}::${url}::${label}`;
+    if (seenSignatures.has(signature)) continue;
+    seenSignatures.add(signature);
     normalized[shortcut] = {
       url,
-      label: String(value.label || shortcut).trim() || shortcut,
+      label,
     };
   }
 
@@ -132,9 +140,10 @@ async function loadConfig(configPath) {
 
 async function saveConfig(configPath, config) {
   const normalized = normalizeConfig(config);
+  const { emojiDictionary: _emojiDictionary, ...configForFile } = normalized;
 
   await fs.promises.mkdir(path.dirname(configPath), { recursive: true });
-  await fs.promises.writeFile(configPath, JSON.stringify(normalized, null, 2));
+  await fs.promises.writeFile(configPath, JSON.stringify(configForFile, null, 2));
   return normalized;
 }
 

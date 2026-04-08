@@ -16,4 +16,5 @@ cache/
 ffmpeg.exe
 .git-rewrite/
 libopenh264.dll
-
+emoji-dictionary.json
+config.emoji-dictionary.json
