@@ -40,6 +40,16 @@ test("GET /api/local-videos returns list payload", async () => {
   assert.equal(Array.isArray(res.body.data), true);
 });
 
+test("GET /api/chat-image-fallback redirects to remote ggpht url when local cache is missing", async () => {
+  const targetUrl = "https://yt3.ggpht.com/example-emoji=s32-c-k";
+  const res = await fetch(
+    `${ctx.baseUrl}/api/chat-image-fallback?url=${encodeURIComponent(targetUrl)}&kind=emoji`,
+    { redirect: "manual" },
+  );
+  assert.ok([302, 303, 307, 308].includes(res.status));
+  assert.equal(res.headers.get("location"), targetUrl);
+});
+
 test("GET /api/info-lite/:videoId returns API envelope", async () => {
   const res = await ctx.fetchJson(`${ctx.baseUrl}/api/info-lite/non-existent-video-id-for-test`);
   assert.ok([200, 404].includes(res.status));

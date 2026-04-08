@@ -401,6 +401,16 @@ function registerLocalMediaRoutes(app, deps) {
     return fs.existsSync(filePath) ? filePath : null;
   }
 
+  function isAllowedRemoteChatAssetUrl(assetUrl) {
+    try {
+      const parsed = new URL(String(assetUrl || ""));
+      if (parsed.protocol !== "https:") return false;
+      return /(^|\.)ggpht\.com$/i.test(parsed.hostname);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   app.get("/api/local-media", async (req, res) => {
     try {
       const type = req.query.type;
@@ -521,6 +531,9 @@ function registerLocalMediaRoutes(app, deps) {
 
       const fallbackPath = getChatAssetFallbackPath(assetUrl, kind);
       if (!fallbackPath) {
+        if (isAllowedRemoteChatAssetUrl(assetUrl)) {
+          return res.redirect(assetUrl);
+        }
         return apiError(res, 404, "対応するローカル画像が見つかりません。");
       }
 

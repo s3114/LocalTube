@@ -130,7 +130,8 @@ function renderChatMessageHtml(message) {
         run.emoji.image?.accessibility?.accessibilityData?.label ||
         run.emoji.emojiId ||
         "emoji";
-      return `<img src="${thumb.url}" alt="${escapeHtml(alt)}" class="chat-emoji" data-chat-image-kind="emoji" data-original-src="${escapeHtml(thumb.url)}">`;
+      const localFirstUrl = buildChatImageFallbackUrl(thumb.url, "emoji");
+      return `<img src="${localFirstUrl}" alt="${escapeHtml(alt)}" class="chat-emoji" data-chat-image-kind="emoji" data-original-src="${escapeHtml(thumb.url)}">`;
     })
     .join("");
 }
@@ -184,7 +185,7 @@ function createChatBadgeElementFromImages(badgeImages) {
 
   badgeImages.forEach((thumb) => {
     const img = document.createElement("img");
-    img.src = thumb.url;
+    img.src = buildChatImageFallbackUrl(thumb.url, "badge");
     img.dataset.originalSrc = thumb.url;
     img.style.width = "16px";
     img.style.height = "16px";
