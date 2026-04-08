@@ -23,7 +23,7 @@
     }
     if (text.includes("Requested format is not available")) {
       hints.push(
-        "フォーマットが利用できません。ダウンロード通信をID固定を有効にしてみてください。うまくいかない場合はサポートサーバーにて質問して下さい。",
+        "フォーマットが利用できません。ダウンロード通信をID固定を有効にしてみてください。うまくいかない場合は設定ページのinfoのサポートサーバーから質問してください。",
       );
     }
     if (text.includes("HTTP Error 403: Forbidden")) {
