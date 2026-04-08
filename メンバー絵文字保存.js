@@ -6,27 +6,40 @@ const crypto = require("crypto");
 // Node 18+ の標準 fetch を使う
 const fetch = global.fetch;
 
-// ======== ★ 入力：ジョブフォルダそのもの ★ ========
-const jobDir = process.argv[2];
+// ======== ★ 入力：ジョブフォルダ or live_chat.json そのもの ★ ========
+const inputPath = process.argv[2];
 
-if (!jobDir) {
+if (!inputPath) {
   console.error(
-    "使用方法: node メンバー絵文字保存.js <syorimachi_folder/job_xxx>",
+    "使用方法: node メンバー絵文字保存.js <syorimachi_folder/job_xxx | *.live_chat.json>",
   );
   process.exit(1);
 }
-
-// job_xxx の中から *.live_chat.json を探す
-const files = fs.readdirSync(jobDir);
+const resolvedInputPath = path.resolve(inputPath);
 const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
-const chatFile = files.find((f) => LIVE_CHAT_JSON_PATTERN.test(f));
+let chatJsonPath = null;
 
-if (!chatFile) {
-  console.error("live_chat.json が見つかりません:", jobDir);
-  process.exit(0);
+if (fs.existsSync(resolvedInputPath) && fs.statSync(resolvedInputPath).isFile()) {
+  if (!LIVE_CHAT_JSON_PATTERN.test(path.basename(resolvedInputPath))) {
+    console.error("live_chat.json ではありません:", resolvedInputPath);
+    process.exit(1);
+  }
+  chatJsonPath = resolvedInputPath;
+} else if (
+  fs.existsSync(resolvedInputPath) &&
+  fs.statSync(resolvedInputPath).isDirectory()
+) {
+  const files = fs.readdirSync(resolvedInputPath);
+  const chatFile = files.find((f) => LIVE_CHAT_JSON_PATTERN.test(f));
+  if (!chatFile) {
+    console.error("live_chat.json が見つかりません:", resolvedInputPath);
+    process.exit(0);
+  }
+  chatJsonPath = path.join(resolvedInputPath, chatFile);
+} else {
+  console.error("入力が見つかりません:", resolvedInputPath);
+  process.exit(1);
 }
-
-const chatJsonPath = path.join(jobDir, chatFile);
 
 // ======== ★ 出力フォルダ ★ ========
 const OUTPUT_DIR = path.join(process.cwd(), "downloads", "メンバー絵文字");
@@ -46,10 +59,14 @@ function urlToFilename(url) {
   return `${hash}.png`;
 }
 
+const attemptedDownloads = new Map();
+
 async function downloadIfNotExists(url) {
   const normalizedUrl = normalizeEmojiUrl(url);
   const filename = urlToFilename(normalizedUrl);
   const filepath = path.join(OUTPUT_DIR, filename);
+  const candidateUrls =
+    normalizedUrl && normalizedUrl !== url ? [url, normalizedUrl] : [url];
 
   if (url.includes("fonts.gstatic.com")) {
     console.log("Skip (Unicode emoji):", url);
@@ -60,22 +77,32 @@ async function downloadIfNotExists(url) {
     return filepath;
   }
 
-  console.log("Downloading:", normalizedUrl);
-
-  try {
-    const res = await fetch(normalizedUrl);
-    if (!res.ok) {
-      console.error(`Failed (${res.status}):`, normalizedUrl);
-      return null;
-    }
-
-    const buffer = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(filepath, buffer);
-    return filepath;
-  } catch (e) {
-    console.error("Error downloading:", normalizedUrl, e.message);
-    return null;
+  if (attemptedDownloads.has(filename)) {
+    return attemptedDownloads.get(filename);
   }
+
+  attemptedDownloads.set(filename, null);
+
+  for (const candidateUrl of candidateUrls) {
+    console.log("Downloading:", candidateUrl);
+
+    try {
+      const res = await fetch(candidateUrl);
+      if (!res.ok) {
+        console.error(`Failed (${res.status}):`, candidateUrl);
+        continue;
+      }
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(filepath, buffer);
+      attemptedDownloads.set(filename, filepath);
+      return filepath;
+    } catch (e) {
+      console.error("Error downloading:", candidateUrl, e.message);
+    }
+  }
+
+  return null;
 }
 
 // ===== 絵文字URLを再帰的に抽出 =====
