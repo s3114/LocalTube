@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { createLogger } = require("../services/logger-service");
 
 function registerLocalMediaRoutes(app, deps) {
@@ -24,6 +25,8 @@ function registerLocalMediaRoutes(app, deps) {
   const VIDEO_DIR_INDEX_PATH = path.join(baseDir, "cache", "video-dir-index.json");
   const THUMB_DIR_INDEX_PATH = path.join(baseDir, "cache", "thumb-dir-index.json");
   const LOCAL_VIDEOS_INDEX_PATH = path.join(baseDir, "cache", "local-videos-index.json");
+  const MEMBER_EMOJI_DIR = path.join(baseDir, "downloads", "メンバー絵文字");
+  const MEMBER_BADGE_DIR = path.join(baseDir, "downloads", "メンバーバッチ");
   const SKIP_SCAN_DIR_NAMES = new Set([
     "コメント",
     "ライブチャット",
@@ -375,6 +378,29 @@ function registerLocalMediaRoutes(app, deps) {
     return videos.map((video) => appendVideoPathToThumbUrl(video));
   }
 
+  function normalizeChatEmojiUrl(url) {
+    return String(url || "").replace(/=w\d+-h\d+[-a-z0-9]*/i, "");
+  }
+
+  function normalizeChatBadgeUrl(url) {
+    return String(url || "").replace(/=s\d+[-a-z0-9]*/i, "");
+  }
+
+  function getChatAssetFallbackPath(assetUrl, kind) {
+    const normalizedUrl =
+      kind === "badge"
+        ? normalizeChatBadgeUrl(assetUrl)
+        : normalizeChatEmojiUrl(assetUrl);
+    if (!normalizedUrl) return null;
+    const hash = crypto
+      .createHash("sha256")
+      .update(normalizedUrl)
+      .digest("hex");
+    const dir = kind === "badge" ? MEMBER_BADGE_DIR : MEMBER_EMOJI_DIR;
+    const filePath = path.join(dir, `${hash}.png`);
+    return fs.existsSync(filePath) ? filePath : null;
+  }
+
   app.get("/api/local-media", async (req, res) => {
     try {
       const type = req.query.type;
@@ -482,6 +508,28 @@ function registerLocalMediaRoutes(app, deps) {
         error: error.message,
       });
       res.redirect("/none_icon.jpg");
+    }
+  });
+
+  app.get("/api/chat-image-fallback", async (req, res) => {
+    try {
+      const assetUrl = String(req.query.url || "");
+      const kind = String(req.query.kind || "").toLowerCase();
+      if (!assetUrl || !["emoji", "badge"].includes(kind)) {
+        return apiError(res, 400, "無効なリクエストです。");
+      }
+
+      const fallbackPath = getChatAssetFallbackPath(assetUrl, kind);
+      if (!fallbackPath) {
+        return apiError(res, 404, "対応するローカル画像が見つかりません。");
+      }
+
+      res.sendFile(path.resolve(fallbackPath));
+    } catch (error) {
+      logger.warn("チャット画像フォールバックの取得に失敗", {
+        error: error.message,
+      });
+      apiError(res, 500, "チャット画像フォールバックの取得に失敗しました。");
     }
   });
 
