@@ -124,6 +124,7 @@ function createDownloadJobService({
       options.downloadThumb === true || options.downloadThumb === "true";
     const downloadVideoEnabled =
       options.downloadVideo === true || options.downloadVideo === "true";
+    const hasCookieOption = Boolean(job.cookieFile?.path || settings?.selectedBrowser);
 
     const args = [
       url,
@@ -133,12 +134,6 @@ function createDownloadJobService({
       `home:${targetMovieDir}`,
       "-P",
       `temp:${tempDir}`,
-      "--sleep-requests",
-      "3",
-      "--sleep-interval",
-      "10",
-      "--max-sleep-interval",
-      "60",
       "--ignore-errors",
       "--retries",
       "infinite",
@@ -171,6 +166,16 @@ function createDownloadJobService({
       args.push("--cookies", job.cookieFile.path);
     } else if (settings && settings.selectedBrowser) {
       args.push("--cookies-from-browser", settings.selectedBrowser);
+    }
+    if (hasCookieOption) {
+      args.push(
+        "--sleep-requests",
+        "3",
+        "--sleep-interval",
+        "10",
+        "--max-sleep-interval",
+        "60",
+      );
     }
     if (options.concurrentFragments && parseInt(options.concurrentFragments, 10) > 0) {
       args.push("--concurrent-fragments", options.concurrentFragments);
