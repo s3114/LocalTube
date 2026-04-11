@@ -14,6 +14,7 @@ const FEEDBACK_DISCORD_DESKTOP_URL =
   "discord://discord.com/channels/1332943491688300566/1470084207937196143";
 const FEEDBACK_QUESTION_MESSAGE =
   "ここでの質問に返答することはできません。\n質問はdiscordフォームにてお願いします。";
+const SETTINGS_SEARCH_PLACEHOLDER = "設定を検索";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
@@ -595,20 +596,59 @@ function clampNumberInRange(value, min, max, fallback) {
         const logStatus = document.getElementById("console-log-status");
         const clearButton = document.getElementById("console-log-clear-btn");
         const pauseToggle = document.getElementById("console-log-pause");
-        if (!logOutput || !logStatus || !clearButton || !pauseToggle) return;
+        const searchInput = document.getElementById("console-log-search");
+        if (!logOutput || !logStatus || !clearButton || !pauseToggle || !searchInput) return;
 
         let sinceId = 0;
         let pollTimer = null;
         const MAX_LINES = 800;
         const LOG_POLL_INTERVAL_MS = 1000;
+        const logEntries = [];
         pauseToggle.checked = false;
+
+        function parseLogSearchQuery(query) {
+          const includeTerms = [];
+          const excludeTerms = [];
+          String(query || "")
+            .split(/\s+/)
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .forEach((part) => {
+              if (part.startsWith("-") && part.length > 1) {
+                excludeTerms.push(part.slice(1).toLowerCase());
+                return;
+              }
+              includeTerms.push(part.toLowerCase());
+            });
+          return { includeTerms, excludeTerms };
+        }
+
+        function buildLogEntryText(entry) {
+          return [
+            String(entry.timestamp || ""),
+            String(entry.level || ""),
+            String(entry.scope || ""),
+            String(entry.message || ""),
+          ]
+            .join(" ")
+            .toLowerCase();
+        }
+
+        function doesLogEntryMatch(entry, query) {
+          const haystack = buildLogEntryText(entry);
+          const { includeTerms, excludeTerms } = parseLogSearchQuery(query);
+          if (excludeTerms.some((term) => haystack.includes(term))) {
+            return false;
+          }
+          return includeTerms.every((term) => haystack.includes(term));
+        }
 
         function isSettingsPageActive() {
           const settingsPage = document.getElementById("page-settings");
           return Boolean(settingsPage?.classList.contains("active-page"));
         }
 
-        function appendLogLine(entry) {
+        function createLogLineElement(entry) {
           const line = document.createElement("div");
           const level = String(entry.level || "info").toLowerCase();
           line.className = `console-log-line level-${level}`;
@@ -636,13 +676,25 @@ function clampNumberInRange(value, min, max, fallback) {
           line.appendChild(scope);
           line.appendChild(document.createTextNode(" "));
           line.appendChild(message);
-          logOutput.appendChild(line);
+          return line;
         }
 
-        function trimLogLines() {
-          while (logOutput.children.length > MAX_LINES) {
-            logOutput.removeChild(logOutput.firstChild);
+        function trimLogEntries() {
+          while (logEntries.length > MAX_LINES) {
+            logEntries.shift();
           }
+        }
+
+        function renderFilteredLogs() {
+          const query = searchInput.value || "";
+          const fragment = document.createDocumentFragment();
+          logEntries
+            .filter((entry) => doesLogEntryMatch(entry, query))
+            .forEach((entry) => {
+              fragment.appendChild(createLogLineElement(entry));
+            });
+          logOutput.innerHTML = "";
+          logOutput.appendChild(fragment);
         }
 
         function scrollLogToBottom() {
@@ -671,15 +723,17 @@ function clampNumberInRange(value, min, max, fallback) {
               throw new Error(result.error || "ログ取得に失敗しました。");
             }
             const logs = Array.isArray(result.data?.logs) ? result.data.logs : [];
-            logs.forEach((entry) => appendLogLine(entry));
-            trimLogLines();
+            logEntries.push(...logs);
+            trimLogEntries();
+            renderFilteredLogs();
             if (logs.length > 0) {
               sinceId = Number(result.data?.lastId || sinceId);
             }
             scrollLogToBottom();
+            const visibleCount = logOutput.children.length;
             logStatus.textContent = logs.length > 0
-              ? `更新: ${logs.length}件`
-              : "接続中（更新待ち）";
+              ? `更新: ${logs.length}件 / 表示: ${visibleCount}件`
+              : `接続中（更新待ち） / 表示: ${visibleCount}件`;
             logStatus.style.color = "var(--green)";
           } catch (error) {
             console.error("ログ取得エラー:", error);
@@ -689,8 +743,16 @@ function clampNumberInRange(value, min, max, fallback) {
         }
 
         clearButton.addEventListener("click", () => {
-          logOutput.innerHTML = "";
+          logEntries.length = 0;
+          renderFilteredLogs();
           logStatus.textContent = "表示をクリアしました";
+          logStatus.style.color = "var(--subtext)";
+        });
+
+        searchInput.addEventListener("input", () => {
+          renderFilteredLogs();
+          const visibleCount = logOutput.children.length;
+          logStatus.textContent = `検索結果: ${visibleCount}件`;
           logStatus.style.color = "var(--subtext)";
         });
 
@@ -732,6 +794,117 @@ function clampNumberInRange(value, min, max, fallback) {
             pollTimer = null;
           }
         });
+      }
+
+      function initializeSettingsHeaderSearchUi() {
+        const headerSearchInput = document.getElementById("home-search-input");
+        const settingsPage = document.getElementById("page-settings");
+        if (!headerSearchInput || !settingsPage) return;
+
+        let settingsSearchValue = "";
+        let homeSearchValue = headerSearchInput.value || "";
+        let currentMode = settingsPage.classList.contains("active-page") ? "settings" : "other";
+
+        function parseSearchTerms(query) {
+          const includeTerms = [];
+          const excludeTerms = [];
+          String(query || "")
+            .split(/\s+/)
+            .map((part) => part.trim().toLowerCase())
+            .filter(Boolean)
+            .forEach((part) => {
+              if (part.startsWith("-") && part.length > 1) {
+                excludeTerms.push(part.slice(1));
+                return;
+              }
+              includeTerms.push(part);
+            });
+          return { includeTerms, excludeTerms };
+        }
+
+        function matchesSearchText(text, query) {
+          const haystack = String(text || "").toLowerCase();
+          const { includeTerms, excludeTerms } = parseSearchTerms(query);
+          if (excludeTerms.some((term) => haystack.includes(term))) return false;
+          return includeTerms.every((term) => haystack.includes(term));
+        }
+
+        function resetSettingsSearchResults() {
+          settingsPage
+            .querySelectorAll(".card.card-layout, .toggle")
+            .forEach((element) => {
+              element.style.display = "";
+            });
+        }
+
+        function applySettingsSearch(query) {
+          const normalizedQuery = String(query || "").trim();
+          if (!normalizedQuery) {
+            resetSettingsSearchResults();
+            return;
+          }
+
+          const cards = Array.from(settingsPage.querySelectorAll(".card.card-layout"));
+          cards.forEach((card) => {
+            const cardMain = card.querySelector(".card-main");
+            const toggles = Array.from(card.querySelectorAll(".options > .toggle"));
+            const cardTitle = String(cardMain?.querySelector("h2")?.textContent || "").trim();
+            const cardMatches = matchesSearchText(card.textContent, normalizedQuery);
+            const titleMatches = matchesSearchText(cardTitle, normalizedQuery);
+
+            let visibleToggleCount = 0;
+            toggles.forEach((toggle) => {
+              const toggleMatches =
+                titleMatches || matchesSearchText(toggle.textContent, normalizedQuery);
+              toggle.style.display = toggleMatches ? "" : "none";
+              if (toggleMatches) visibleToggleCount += 1;
+            });
+
+            const shouldShowCard =
+              titleMatches || cardMatches || toggles.length === 0 || visibleToggleCount > 0;
+            card.style.display = shouldShowCard ? "" : "none";
+          });
+        }
+
+        function syncHeaderSearchMode() {
+          const isSettingsActive = settingsPage.classList.contains("active-page");
+          const homePage = document.getElementById("page-home");
+          const isHomeActive = Boolean(homePage?.classList.contains("active-page"));
+
+          if (isSettingsActive) {
+            if (currentMode !== "settings") {
+              if (currentMode === "home") {
+                homeSearchValue = headerSearchInput.value || "";
+              }
+              headerSearchInput.value = settingsSearchValue;
+              headerSearchInput.placeholder = SETTINGS_SEARCH_PLACEHOLDER;
+              currentMode = "settings";
+            }
+            applySettingsSearch(headerSearchInput.value);
+            return;
+          }
+
+          resetSettingsSearchResults();
+          if (currentMode === "settings") {
+            settingsSearchValue = headerSearchInput.value || "";
+            if (isHomeActive) {
+              headerSearchInput.value = homeSearchValue;
+            } else {
+              headerSearchInput.value = "";
+            }
+          }
+          currentMode = isHomeActive ? "home" : "other";
+        }
+
+        headerSearchInput.addEventListener("input", () => {
+          if (!settingsPage.classList.contains("active-page")) return;
+          settingsSearchValue = headerSearchInput.value || "";
+          applySettingsSearch(settingsSearchValue);
+        });
+
+        global.addEventListener("app:page-changed", syncHeaderSearchMode);
+        global.addEventListener("hashchange", syncHeaderSearchMode);
+        syncHeaderSearchMode();
       }
 
       function initializeYoutubePlaylistConverterUI() {
@@ -1813,6 +1986,7 @@ function initializeSettingsUiController({
         initializeAutostartTaskButtons(elements);
         initializeServerRestartButton(elements);
         initializeConsoleLogViewer();
+        initializeSettingsHeaderSearchUi();
         initializeYoutubePlaylistConverterUI();
         initializeLocalLanIpToolUI();
         initializeUpdateHistoryFilterUI();

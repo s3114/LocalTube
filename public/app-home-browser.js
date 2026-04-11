@@ -1229,6 +1229,8 @@
         currentSortState.sortOrder,
       );
       homeSearchInput?.addEventListener("input", () => {
+        const homePage = document.getElementById("page-home");
+        if (!homePage?.classList.contains("active-page")) return;
         syncAndRender();
       });
       updateHomeSearchPlaceholder();

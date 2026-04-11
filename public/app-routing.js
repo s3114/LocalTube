@@ -282,10 +282,19 @@
       const buttons = document.querySelectorAll(".icon-btn");
       const pages = document.querySelectorAll(".page");
       const headerSearchWrap = document.querySelector(".header-search-wrap");
+      const headerFilterContainer = document.querySelector(".header-filter-container");
+      const headerSortContainer = document.querySelector(".header-sort-container");
 
       global.updateHeaderSearchVisibility = (pageId) => {
         if (!headerSearchWrap) return;
-        headerSearchWrap.style.display = pageId === "page-home" ? "flex" : "none";
+        const showSearch = pageId === "page-home" || pageId === "page-settings";
+        headerSearchWrap.style.display = showSearch ? "flex" : "none";
+        if (headerFilterContainer) {
+          headerFilterContainer.style.display = pageId === "page-home" ? "" : "none";
+        }
+        if (headerSortContainer) {
+          headerSortContainer.style.display = pageId === "page-home" ? "" : "none";
+        }
       };
 
       function showPage(pageId) {

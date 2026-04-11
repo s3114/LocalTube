@@ -1434,6 +1434,21 @@
         flex: 1 1 auto;
       }
 
+      #console-log-toolbar {
+        align-items: center;
+      }
+
+      #console-log-toolbar small {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      #console-log-search {
+        margin-left: 12px;
+        flex: 1 1 260px;
+        min-width: 180px;
+      }
+
       .settings-actions-right {
         width: 100%;
         text-align: right;
@@ -4474,15 +4489,23 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.12.5">
+                        <span class="info-updates-date">2026/04/11</span>
+                        <span class="info-updates-version">v1.12.5</span>
+                        <span
+                          class="info-updates-content">コンソールログと設定ページに検索フィルターを追加</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.12.4">
                         <span class="info-updates-date">2026/04/11</span>
                         <span class="info-updates-version">v1.12.4</span>
-                        <span class="info-updates-content">チャンネル情報取得時のタイムアウトを延長</span>
+                        <span
+                          class="info-updates-content">チャンネル情報取得時のタイムアウトを延長</span>
                       </li>
                       <li class="info-updates-item" data-version="1.12.3">
                         <span class="info-updates-date">2026/04/10</span>
                         <span class="info-updates-version">v1.12.3</span>
-                        <span class="info-updates-content">ID固定時のDLに音声が含まれない問題を修正</span>
+                        <span
+                          class="info-updates-content">ID固定時のDLに音声が含まれない問題を修正</span>
                       </li>
                       <li class="info-updates-item" data-version="1.12.2">
                         <span class="info-updates-date">2026/04/09</span>
@@ -4764,7 +4787,8 @@
                   <div class="toggle settings-toggle-top">
                     <div
                       class="settings-stack settings-stack-8 settings-stack-log">
-                      <div class="settings-inline-row settings-gap-8">
+                      <div id="console-log-toolbar"
+                        class="settings-inline-row settings-gap-8">
                         <button id="console-log-clear-btn"
                           class="btn-ui btn-gray"
                           title="表示をクリア"
@@ -4776,6 +4800,11 @@
                           <span class="slider"></span>
                         </label>
                         <small>一時停止</small>
+                        <input
+                          type="text"
+                          id="console-log-search"
+                          class="settings-input-full"
+                          placeholder="コンソールログを検索できます。and検索とnot検索に対応しています" />
                       </div>
                       <div id="console-log-output"
                         class="console-log-panel"
