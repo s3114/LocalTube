@@ -1,5 +1,29 @@
 (function attachAppCore(global) {
   function createAppCore({ jobStates }) {
+    function buildDownloadProgressText(progress) {
+      const percentage = Number(progress?.percentage || 0);
+      const totalSize = String(progress?.totalSize || "").trim();
+      const speed = String(progress?.speed || "").trim();
+      const eta = String(progress?.eta || "").trim();
+      const elapsedText = String(progress?.elapsedText || "").trim();
+      const parts = [`${percentage}%`];
+
+      if (totalSize) {
+        parts.push(`of ${totalSize}`);
+      }
+      if (speed) {
+        parts.push(`at ${speed}`);
+      }
+      if (eta) {
+        parts.push(`ETA ${eta}`);
+      }
+      if (elapsedText) {
+        parts.push(`経過 ${elapsedText}`);
+      }
+
+      return parts.join(" ");
+    }
+
     function getStatusIcon(status) {
       switch (status) {
         case "queued":
@@ -19,7 +43,7 @@
       if (job.status === "downloading") {
         return {
           width: `${job.progress.percentage || 0}%`,
-          text: `${job.progress.percentage}% of ${job.progress.totalSize} at ${job.progress.speed} ETA ${job.progress.eta}`,
+          text: buildDownloadProgressText(job.progress),
           hints: [],
         };
       }

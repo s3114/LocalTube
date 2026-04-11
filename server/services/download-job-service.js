@@ -17,7 +17,23 @@ function createDownloadJobService({
 }) {
   const logger = createLogger("download-job");
   const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
+  const LIVE_NOT_LIVE_SKIP_MESSAGE = 'does not pass filter (live_status=not_live), skipping';
+  const LIVE_ENDED_RETRY_MESSAGES = [
+    "Video is no longer live",
+    "Did not get any data blocks",
+  ];
   let cachedFfmpegCheck = null;
+
+  function normalizeYoutubeUrl(url) {
+    const raw = String(url || "").trim();
+    const studioMatch = raw.match(
+      /^https?:\/\/studio\.youtube\.com\/video\/([A-Za-z0-9_-]{11})\/livestreaming/i,
+    );
+    if (studioMatch) {
+      return `https://www.youtube.com/watch?v=${studioMatch[1]}`;
+    }
+    return raw;
+  }
 
   function getUsableFfmpegPath() {
     if (cachedFfmpegCheck) {
@@ -116,15 +132,26 @@ function createDownloadJobService({
     return args;
   }
 
-  function buildArgs(job, paths, settings) {
-    const { url, options } = job;
+  function buildArgs(job, paths, settings, mode = {}) {
+    const options = job.options;
+    const url = normalizeYoutubeUrl(job.url);
     const { movieDir: targetMovieDir, thumbnailDir: targetThumbDir, tempDir } = paths;
     const ffmpegPath = getUsableFfmpegPath();
-    const downloadThumbEnabled =
+    const baseDownloadThumbEnabled =
       options.downloadThumb === true || options.downloadThumb === "true";
-    const downloadVideoEnabled =
+    const baseDownloadVideoEnabled =
       options.downloadVideo === true || options.downloadVideo === "true";
     const hasCookieOption = Boolean(job.cookieFile?.path || settings?.selectedBrowser);
+    const liveReplayMode = mode.liveReplayMode === true;
+    const liveVideoOnly = mode.liveVideoOnly === true;
+    const liveChatOnly = mode.liveChatOnly === true;
+    const plainRetryMode = mode.plainRetryMode === true;
+    const downloadVideoEnabled = liveChatOnly ? false : baseDownloadVideoEnabled;
+    const downloadThumbEnabled = liveChatOnly ? false : baseDownloadThumbEnabled;
+    const enableComments =
+      !liveVideoOnly && (options.commentOptions === "comments" || options.commentOptions === "both");
+    const enableLiveChat =
+      !liveVideoOnly && (options.commentOptions === "sub" || options.commentOptions === "both");
 
     const args = [
       url,
@@ -141,6 +168,9 @@ function createDownloadJobService({
       "--no-color",
       "--newline",
     ];
+    if (!liveReplayMode && !plainRetryMode) {
+      args.push("--match-filter", "live_status=not_live");
+    }
 
     if (ffmpegPath) {
       args.push("--ffmpeg-location", ffmpegPath);
@@ -186,12 +216,22 @@ function createDownloadJobService({
         "youtube:player-client=default,-tv,web_safari,web_embedded",
       );
     }
-    if (options.commentOptions === "comments" || options.commentOptions === "both") {
+    if (enableComments) {
       args.push("--get-comments");
     }
-    if (options.commentOptions === "sub" || options.commentOptions === "both") {
+    if (enableLiveChat) {
       args.push("--write-subs");
       args.push("--sub-langs", "live_chat,all");
+    }
+    if (liveReplayMode) {
+      args.push(
+        "--live-from-start",
+        "--wait-for-video",
+        "30",
+        "--fragment-retries",
+        "infinite",
+        "--hls-use-mpegts",
+      );
     }
 
     const customArgs = splitCustomCommandArgs(settings?.ytDlpCustomCommand);
@@ -342,10 +382,38 @@ function createDownloadJobService({
     return parseCommentProgressFromLine(line, progressState, currentProgress);
   }
 
+  function applyProgressFromLine(job, line, progressState) {
+    const progress = parseProgressFromLine(line, progressState, job.progress);
+    if (!progress) return false;
+    job.progress = {
+      ...job.progress,
+      ...progress,
+    };
+    broadcast("progress_update", { id: job.id, progress: job.progress });
+    return true;
+  }
+
+  function formatElapsedTime(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function shouldRetryAsCompletedVideo(error) {
+    const message = String(error?.message || "");
+    return LIVE_ENDED_RETRY_MESSAGES.some((token) => message.includes(token));
+  }
+
   function getTitle(ytDlpPath, url, cookiePath, settings) {
     return new Promise((resolve, reject) => {
+      const normalizedUrl = normalizeYoutubeUrl(url);
       const args = [
-        url,
+        normalizedUrl,
         "--get-title",
         "--no-warnings",
       ];
@@ -631,7 +699,7 @@ function createDownloadJobService({
     });
   }
 
-  async function runYtDlpDownload(job, settings, ytDlpPath, paths) {
+  async function runYtDlpDownloadAttempt(job, settings, ytDlpPath, paths, mode = {}) {
     return new Promise((resolve, reject) => {
       const args = buildArgs(
         job,
@@ -641,58 +709,184 @@ function createDownloadJobService({
           tempDir: paths.finalTempDir,
         },
         settings,
+        mode,
       );
       logger.info("ダウンロードコマンド実行", { args: args.join(" ") });
       const ytDlp = spawn(ytDlpPath, args, { windowsHide: true });
 
       let stderrOutput = "";
+      let stdoutOutput = "";
       let stdoutBuffer = "";
+      let skippedByLiveFilter = false;
+      let shouldAbortForCompletedRetry = false;
+      let closed = false;
+      const attemptStartedAt = Date.now();
+      const progressLabel = mode.progressLabel || "";
+      let liveTicker = null;
       const progressState = {
         sawDownload: false,
         commentTotal: null,
         commentCurrent: 0,
       };
 
+      if (mode.liveReplayMode && progressLabel) {
+        liveTicker = setInterval(() => {
+          const elapsedText = formatElapsedTime(Date.now() - attemptStartedAt);
+          job.progress = {
+            ...job.progress,
+            elapsedText,
+          };
+          if (!job.progress.totalSize && !job.progress.speed) {
+            job.progress.eta = progressLabel;
+          }
+          broadcast("progress_update", { id: job.id, progress: job.progress });
+        }, 1000);
+      }
+
       ytDlp.stdout.on("data", (data) => {
-        stdoutBuffer += data.toString();
+        const chunkText = data.toString();
+        stdoutOutput += chunkText;
+        stdoutBuffer += chunkText;
+        if (chunkText.includes(LIVE_NOT_LIVE_SKIP_MESSAGE)) {
+          skippedByLiveFilter = true;
+        }
         const lines = stdoutBuffer.split(/[\r\n]/);
         stdoutBuffer = lines.pop() || "";
 
         for (const line of lines) {
           if (line.trim() === "") continue;
-          const progress = parseProgressFromLine(line, progressState, job.progress);
-          if (!progress) continue;
-          job.progress = {
-            ...job.progress,
-            ...progress,
-          };
-          broadcast("progress_update", { id: job.id, progress: job.progress });
+          applyProgressFromLine(job, line, progressState);
         }
       });
 
       ytDlp.stderr.on("data", (data) => {
-        const errorMsg = data.toString().trim();
+        const chunkText = data.toString();
+        const stderrLines = chunkText.split(/[\r\n]/).filter((line) => line.trim() !== "");
+        const errorMsg = chunkText.trim();
         stderrOutput += `${errorMsg}\n`;
-        logger.warn("yt-dlp stderr", { message: errorMsg });
+        if (chunkText.includes(LIVE_NOT_LIVE_SKIP_MESSAGE)) {
+          skippedByLiveFilter = true;
+        }
+        if (
+          mode.liveReplayMode &&
+          chunkText.includes("Video is no longer live. Giving up after 3 retries")
+        ) {
+          shouldAbortForCompletedRetry = true;
+          if (!closed) {
+            ytDlp.kill();
+          }
+        }
+        let handledAsProgress = false;
+        for (const line of stderrLines) {
+          handledAsProgress = applyProgressFromLine(job, line, progressState) || handledAsProgress;
+        }
+        if (!handledAsProgress && errorMsg !== "") {
+          logger.warn("yt-dlp stderr", { message: errorMsg });
+        }
       });
 
       ytDlp.on("close", (code) => {
+        closed = true;
+        if (liveTicker) clearInterval(liveTicker);
+        if (
+          stdoutBuffer.includes(LIVE_NOT_LIVE_SKIP_MESSAGE) ||
+          stdoutOutput.includes(LIVE_NOT_LIVE_SKIP_MESSAGE) ||
+          stderrOutput.includes(LIVE_NOT_LIVE_SKIP_MESSAGE)
+        ) {
+          skippedByLiveFilter = true;
+        }
+        if (skippedByLiveFilter) {
+          resolve({ skippedByLiveFilter: true });
+          return;
+        }
+        if (shouldAbortForCompletedRetry) {
+          reject(
+            new Error(
+              `yt-dlpがライブ終了を検出しました。Stderr: ${stderrOutput}`,
+            ),
+          );
+          return;
+        }
         if (code === 0) {
-          resolve();
+          resolve({ skippedByLiveFilter: false });
           return;
         }
         reject(new Error(`yt-dlpがエラーコード${code}で終了しました。Stderr: ${stderrOutput}`));
       });
 
       ytDlp.on("error", (err) => {
+        if (liveTicker) clearInterval(liveTicker);
         reject(new Error(`yt-dlpプロセスの起動に失敗: ${err.message}`));
       });
     });
   }
 
+  async function runYtDlpDownload(job, settings, ytDlpPath, paths) {
+    const firstAttempt = await runYtDlpDownloadAttempt(job, settings, ytDlpPath, paths);
+    if (!firstAttempt.skippedByLiveFilter) {
+      return;
+    }
+
+    const downloadVideoEnabled =
+      job.options.downloadVideo === true || job.options.downloadVideo === "true";
+    if (downloadVideoEnabled) {
+      job.progress = {
+        ...job.progress,
+        percentage: Math.max(1, Number(job.progress?.percentage || 0)),
+        speed: "",
+        totalSize: "",
+        eta: "ライブ動画の取得を開始しています...",
+        elapsedText: "00:00",
+      };
+      broadcast("progress_update", { id: job.id, progress: job.progress });
+      logger.info("ライブ配信を検出したため、動画を先に取得します", {
+        url: job.url,
+      });
+      try {
+        await runYtDlpDownloadAttempt(job, settings, ytDlpPath, paths, {
+          liveReplayMode: true,
+          liveVideoOnly: true,
+          progressLabel: "ライブ動画取得中",
+        });
+      } catch (error) {
+        if (shouldRetryAsCompletedVideo(error)) {
+          logger.info("ライブ配信の終了を検出したため、通常動画として再試行します", {
+            url: job.url,
+          });
+          await runYtDlpDownloadAttempt(job, settings, ytDlpPath, paths, {
+            plainRetryMode: true,
+          });
+          return;
+        }
+        throw error;
+      }
+    }
+
+    if (job.options.commentOptions === "sub" || job.options.commentOptions === "both") {
+      job.progress = {
+        ...job.progress,
+        percentage: downloadVideoEnabled ? Math.max(85, Number(job.progress?.percentage || 0)) : 1,
+        speed: "",
+        totalSize: "",
+        eta: "ライブチャット取得を開始しています...",
+        elapsedText: "00:00",
+      };
+      broadcast("progress_update", { id: job.id, progress: job.progress });
+      logger.info("ライブチャット取得を別プロセスで開始します", {
+        url: job.url,
+      });
+      await runYtDlpDownloadAttempt(job, settings, ytDlpPath, paths, {
+        liveReplayMode: true,
+        liveChatOnly: true,
+        progressLabel: "ライブチャット取得中",
+      });
+    }
+  }
+
   async function processDownloadJob(job) {
     const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
     const settings = await loadSettingsSafe();
+    job.url = normalizeYoutubeUrl(job.url);
 
     try {
       const title = await getTitle(ytDlpPath, job.url, job.cookieFile?.path, settings);
