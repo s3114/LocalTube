@@ -402,7 +402,7 @@ function createDownloadJobService({
 
       const channelJson = execFileSync(path.join(baseDir, "yt-dlp.exe"), channelArgs, {
         encoding: "utf-8",
-        timeout: 3000,
+        timeout: 10000,
         windowsHide: true,
       });
       const channelObj = JSON.parse(channelJson);
