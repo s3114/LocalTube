@@ -50,6 +50,58 @@ const appState = window.AppState || {
         showSuccess: () => {},
         showError: () => {},
       };
+      const settingsConfirmModalElements = {
+        backdrop: document.getElementById("settings-confirm-modal-backdrop"),
+        message: document.getElementById("settings-confirm-modal-message"),
+        cancelBtn: document.getElementById("settings-confirm-modal-cancel-btn"),
+        confirmBtn: document.getElementById("settings-confirm-modal-confirm-btn"),
+      };
+
+      function showSettingsConfirmModal(message, options = {}) {
+        const {
+          backdrop,
+          message: messageEl,
+          cancelBtn,
+          confirmBtn,
+        } = settingsConfirmModalElements;
+        if (!backdrop || !messageEl || !cancelBtn || !confirmBtn) {
+          return Promise.resolve(window.confirm(String(message || "")));
+        }
+
+        const confirmLabel = String(options.confirmText || "はい");
+        const cancelLabel = String(options.cancelText || "いいえ");
+        const previousConfirmText = confirmBtn.textContent;
+        const previousCancelText = cancelBtn.textContent;
+        messageEl.textContent = String(message || "");
+        confirmBtn.textContent = confirmLabel;
+        cancelBtn.textContent = cancelLabel;
+        backdrop.classList.remove("hidden");
+
+        return new Promise((resolve) => {
+          let settled = false;
+          const cleanup = (result) => {
+            if (settled) return;
+            settled = true;
+            backdrop.classList.add("hidden");
+            confirmBtn.textContent = previousConfirmText;
+            cancelBtn.textContent = previousCancelText;
+            confirmBtn.removeEventListener("click", handleConfirm);
+            cancelBtn.removeEventListener("click", handleCancel);
+            backdrop.removeEventListener("click", handleBackdrop);
+            resolve(result);
+          };
+          const handleConfirm = () => cleanup(true);
+          const handleCancel = () => cleanup(false);
+          const handleBackdrop = (event) => {
+            if (event.target === backdrop) {
+              cleanup(false);
+            }
+          };
+          confirmBtn.addEventListener("click", handleConfirm);
+          cancelBtn.addEventListener("click", handleCancel);
+          backdrop.addEventListener("click", handleBackdrop);
+        });
+      }
 
       const dashboardController = window.createDashboardController({
         jobStates,
@@ -83,6 +135,8 @@ const appState = window.AppState || {
           const suffix = error?.message ? ` ${error.message}` : "";
           uiFeedback.showError(`${message}${suffix}`);
         },
+        showConfirm: showSettingsConfirmModal,
+        showSuccess: (message) => uiFeedback.showSuccess(message),
       });
       const { createVideoDataController, createLocalVideoController } =
         localVideoModule;

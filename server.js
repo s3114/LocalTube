@@ -277,6 +277,7 @@ registerLocalMediaRoutes(app, {
   findCachedFallbackThumbnailPath: localVideoService.findCachedFallbackThumbnailPath,
   ensureFallbackThumbnail: localVideoService.ensureFallbackThumbnail,
   ensureCachedThumbnailFromPath: localVideoService.ensureCachedThumbnailFromPath,
+  runCommand,
 });
 
 registerNetworkRoutes(app, {

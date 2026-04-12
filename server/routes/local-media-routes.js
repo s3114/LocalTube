@@ -15,6 +15,7 @@ function registerLocalMediaRoutes(app, deps) {
     findCachedFallbackThumbnailPath,
     ensureFallbackThumbnail,
     ensureCachedThumbnailFromPath,
+    runCommand,
     apiOk,
     apiError,
   } = deps;
@@ -27,6 +28,8 @@ function registerLocalMediaRoutes(app, deps) {
   const LOCAL_VIDEOS_INDEX_PATH = path.join(baseDir, "cache", "local-videos-index.json");
   const MEMBER_EMOJI_DIR = path.join(baseDir, "downloads", "メンバー絵文字");
   const MEMBER_BADGE_DIR = path.join(baseDir, "downloads", "メンバーバッチ");
+  const POWERSHELL_EXE =
+    "C:\\Program Files\\PowerShell\\7\\pwsh.exe";
   const SKIP_SCAN_DIR_NAMES = new Set([
     "コメント",
     "ライブチャット",
@@ -338,6 +341,114 @@ function registerLocalMediaRoutes(app, deps) {
     return candidates[0] || null;
   }
 
+  function isLoopbackRequest(req) {
+    const remote = String(req.socket?.remoteAddress || "").toLowerCase();
+    return remote === "::1" || remote === "127.0.0.1" || remote === "::ffff:127.0.0.1";
+  }
+
+  function normalizeVideoBaseName(videoPath) {
+    return path
+      .parse(String(videoPath || ""))
+      .name.replace(/\.live_chat\.json$/i, "");
+  }
+
+  function addExistingPath(targetSet, candidatePath) {
+    const value = String(candidatePath || "").trim();
+    if (!value) return;
+    const resolved = path.resolve(value);
+    if (!fs.existsSync(resolved)) return;
+    targetSet.add(resolved);
+  }
+
+  async function addMatchingFilesFromDir(targetSet, dirPath, matcher) {
+    const resolvedDir = String(dirPath || "").trim();
+    if (!resolvedDir || !fs.existsSync(resolvedDir)) return;
+    let entries = [];
+    try {
+      entries = await fs.promises.readdir(resolvedDir, { withFileTypes: true });
+    } catch (_error) {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!matcher(entry.name)) continue;
+      targetSet.add(path.resolve(path.join(resolvedDir, entry.name)));
+    }
+  }
+
+  async function movePathToRecycleBin(targetPath) {
+    const resolved = path.resolve(targetPath);
+    const targetStat = await fs.promises.stat(resolved);
+    const escapedTarget = resolved.replace(/'/g, "''");
+    const kind = targetStat.isDirectory() ? "dir" : "file";
+    const script =
+      `$target = '${escapedTarget}';` +
+      `$kind = '${kind}';` +
+      "Add-Type -AssemblyName Microsoft.VisualBasic;" +
+      "if ($kind -eq 'dir') {" +
+      "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($target,[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin);" +
+      "} else {" +
+      "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($target,[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin);" +
+      "}";
+    await runCommand(POWERSHELL_EXE, [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      script,
+    ]);
+  }
+
+  async function collectDeleteTargets(videoPath) {
+    const targets = new Set();
+    const resolvedVideoPath = path.resolve(videoPath);
+    const sourceDir = path.resolve(path.dirname(resolvedVideoPath));
+    const libraryRoot = inferLibraryRootFromVideoPath(resolvedVideoPath);
+    const videoBaseName = normalizeVideoBaseName(resolvedVideoPath);
+
+    addExistingPath(targets, resolvedVideoPath);
+    addExistingPath(targets, findExistingThumbnailPath(resolvedVideoPath, true));
+    addExistingPath(targets, findCachedFallbackThumbnailPath(resolvedVideoPath));
+
+    const commentDirs = [
+      libraryRoot ? path.join(libraryRoot, "コメント") : "",
+      libraryRoot ? path.join(libraryRoot, "仮コメント") : "",
+    ];
+    for (const commentDir of commentDirs) {
+      addExistingPath(targets, path.join(commentDir, `${videoBaseName}.info.json`));
+    }
+
+    const liveChatDirs = [
+      libraryRoot ? path.join(libraryRoot, "ライブチャット") : "",
+      libraryRoot || "",
+    ];
+    for (const liveChatDir of liveChatDirs) {
+      await addMatchingFilesFromDir(
+        targets,
+        liveChatDir,
+        (fileName) => fileName.startsWith(`${videoBaseName}.live_chat.json`),
+      );
+    }
+
+    const thumbnailDirs = [
+      sourceDir,
+      libraryRoot ? path.join(libraryRoot, "サムネ") : "",
+      libraryRoot ? path.join(libraryRoot, "サムネイル") : "",
+      fallbackThumbnailDir,
+    ];
+    for (const thumbnailDirPath of thumbnailDirs) {
+      await addMatchingFilesFromDir(targets, thumbnailDirPath, (fileName) => {
+        const parsed = path.parse(fileName);
+        return (
+          THUMB_EXT.includes(parsed.ext.toLowerCase()) &&
+          parsed.name.toLowerCase() === videoBaseName.toLowerCase()
+        );
+      });
+    }
+
+    return Array.from(targets);
+  }
+
   function deriveLibraryRootsFromSourceDirs(sourceDirs) {
     const roots = new Set();
     for (const sourceDir of sourceDirs) {
@@ -546,6 +657,56 @@ function registerLocalMediaRoutes(app, deps) {
     }
   });
 
+  app.post("/api/local-video/delete", async (req, res) => {
+    try {
+      if (!isLoopbackRequest(req)) {
+        return apiError(res, 403, "この操作はサーバー本体PC（localhost）からのみ実行できます。");
+      }
+
+      const videoPath = String(req.body?.videoPath || "").trim();
+      if (!videoPath) {
+        return apiError(res, 400, "videoPath が必要です。");
+      }
+
+      const allowedVideoDirs = await getLocalVideoDirs();
+      const isAllowed = allowedVideoDirs.some((dir) => isPathWithin(videoPath, dir));
+      if (!isAllowed) {
+        return apiError(res, 403, "アクセスが許可されていません。");
+      }
+
+      const ext = path.extname(videoPath).toLowerCase();
+      if (!VIDEO_EXT.includes(ext)) {
+        return apiError(res, 400, "無効な動画ファイルです。");
+      }
+
+      if (!fs.existsSync(videoPath)) {
+        return apiError(res, 404, "動画が見つかりません。");
+      }
+
+      const deleteTargets = await collectDeleteTargets(videoPath);
+      for (const targetPath of deleteTargets) {
+        await movePathToRecycleBin(targetPath);
+      }
+
+      localVideosCache = {
+        expiresAt: 0,
+        signature: "",
+        data: null,
+      };
+
+      apiOk(res, {
+        message: "ローカル動画をごみ箱へ移動しました。",
+        deletedCount: deleteTargets.length,
+        deletedPaths: deleteTargets,
+      });
+    } catch (error) {
+      logger.warn("ローカル動画の削除に失敗", {
+        error: error.message,
+      });
+      apiError(res, 500, "ローカル動画の削除に失敗しました。");
+    }
+  });
+
   app.get("/api/local-videos", async (_req, res) => {
     try {
       const startedAt = Date.now();
@@ -637,6 +798,7 @@ function registerLocalMediaRoutes(app, deps) {
             return {
               title: base,
               video: `/api/local-media?type=video&path=${encodeURIComponent(fullPath)}`,
+              videoPath: fullPath,
               thumb: thumbPath
                 ? `/api/local-media?type=thumb&path=${encodeURIComponent(thumbPath)}&videoPath=${encodeURIComponent(fullPath)}`
                 : fallbackEnabled

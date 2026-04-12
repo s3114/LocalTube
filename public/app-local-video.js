@@ -16,6 +16,8 @@
     createChatLineElementFromMessage,
     onMetric = (_name, _value, _meta) => {},
     onError = (message, error) => console.error(message, error),
+    showConfirm = async () => true,
+    showSuccess = (_message) => {},
   }) {
     async function copyTextToClipboard(text) {
       const value = String(text || "");
@@ -968,7 +970,16 @@
         <button type="button" class="local-video-options-item" data-action="share">
           <i class="fa-solid fa-share-nodes"></i>共有
         </button>
+        <button type="button" class="local-video-options-item" data-action="delete-local">
+          <i class="fa-solid fa-trash"></i>ローカルから削除
+        </button>
       `;
+      optionsMenuEl.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+      });
+      optionsMenuEl.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
       document.body.appendChild(optionsMenuEl);
 
       const playlistSavePanelEl = document.createElement("div");
@@ -1274,6 +1285,89 @@
         renderPlaybackPlaylistSidebar();
       }
 
+      function removeVideoFromTransientQueue(filename) {
+        if (!filename) return;
+        for (let index = transientQueue.length - 1; index >= 0; index -= 1) {
+          if (transientQueue[index] === filename) {
+            transientQueue.splice(index, 1);
+          }
+        }
+      }
+
+      function removeVideoFromAllPlaylists(filename) {
+        if (!filename) return;
+        updatePlaylistsState({
+          ...playlistsState,
+          playlists: playlistsState.playlists.map((playlist) => ({
+            ...playlist,
+            items: Array.isArray(playlist.items)
+              ? playlist.items.filter((itemName) => itemName !== filename)
+              : [],
+          })),
+        });
+      }
+
+      function releaseCurrentVideoIfNeeded(video) {
+        if (!video?.filename) return false;
+        if (String(appState.lastSelectedFilename || "") !== String(video.filename)) {
+          return false;
+        }
+        try {
+          videoPlayer.pause();
+          videoPlayer.removeAttribute("src");
+          videoPlayer.poster = "";
+          videoPlayer.load();
+        } catch (_error) {
+          // noop
+        }
+        appState.lastSelectedFilename = "";
+        if (titleEl) {
+          titleEl.textContent = "";
+        }
+        if (window.location.hash.startsWith("#player/")) {
+          window.location.hash = "#home";
+        }
+        return true;
+      }
+
+      async function deleteLocalVideo(video) {
+        if (!video?.videoPath) {
+          throw new Error("削除対象のパス情報が見つかりません。");
+        }
+
+        const accepted = await showConfirm("本当に削除しますか？", {
+          confirmText: "削除",
+          cancelText: "キャンセル",
+        });
+        if (!accepted) return;
+
+        releaseCurrentVideoIfNeeded(video);
+
+        const response = await fetch("/api/local-video/delete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            videoPath: video.videoPath,
+          }),
+        });
+        const result = await parseApiResponse(response);
+        if (!result.ok) {
+          throw new Error(result.error || "ローカル動画の削除に失敗しました。");
+        }
+
+        removeVideoFromTransientQueue(video.filename);
+        removeVideoFromAllPlaylists(video.filename);
+        await loadLocalVideos(true);
+        const movedCount = Number(result.data?.deletedCount || 0);
+        showSuccess(
+          movedCount > 0
+            ? `ごみ箱へ移動しました。(${movedCount}件)`
+            : "ごみ箱へ移動しました。",
+        );
+      }
+
       function createPlaybackSidebarItem(video, labelPrefix, onClick) {
         const row = document.createElement("div");
         row.className = "local-video-item";
@@ -1447,6 +1541,8 @@
         });
 
         optionsMenuEl.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           const button = event.target.closest(".local-video-options-item");
           if (!button) return;
           const action = button.getAttribute("data-action");
@@ -1471,6 +1567,14 @@
               await copyVideoShareUrl(targetVideo);
             } catch (error) {
               onError("共有URLのコピーに失敗:", error);
+            }
+            return;
+          }
+          if (action === "delete-local") {
+            try {
+              await deleteLocalVideo(targetVideo);
+            } catch (error) {
+              onError("ローカル動画の削除に失敗:", error);
             }
           }
         });
