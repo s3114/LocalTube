@@ -409,6 +409,16 @@
         { signal },
       );
       const parsed = await parseApiResponse(response);
+      if (response.status === 404) {
+        return {
+          missing: true,
+          items: [],
+          startSec: Math.max(0, Math.floor(startSec)),
+          endSec: Math.max(0, Math.floor(endSec)),
+          hasMoreAfter: false,
+          hasMoreBefore: false,
+        };
+      }
       if (!parsed.ok) {
         throw new Error(parsed.error || "ライブチャットの取得に失敗しました");
       }
@@ -432,6 +442,22 @@
         undefined,
       );
       if (requestVersion !== replayState.requestVersion) return;
+      if (payload?.missing) {
+        replayState.currentRangeStartSec = startSec;
+        replayState.currentRangeEndSec = endSec;
+        replayState.hasMoreAfter = false;
+        replayState.hasMoreBefore = false;
+        replayState.queue = [];
+        replayState.lastSyncSec = currentSec;
+        replayState.isFetching = false;
+        chatContainer.__chatRenderCompleted = true;
+        chatContainer.innerHTML = "";
+        chatContainer.__chatTimedLines = [];
+        chatContainer.__chatTimedIndex = 0;
+        chatContainer.__lastSyncedSecond = undefined;
+        chatContainer.__lastChatTargetTime = "";
+        return;
+      }
 
       replayState.currentRangeStartSec = payload.startSec ?? startSec;
       replayState.currentRangeEndSec = payload.endSec ?? endSec;
@@ -476,6 +502,12 @@
           replayState.limit,
           undefined,
         );
+        if (payload?.missing) {
+          replayState.hasMoreAfter = false;
+          replayState.hasMoreBefore = false;
+          replayState.queue = [];
+          return 0;
+        }
 
         replayState.currentRangeStartSec = payload.startSec ?? probeStartSec;
         replayState.currentRangeEndSec = payload.endSec ?? probeEndSec;
@@ -523,6 +555,12 @@
           undefined,
         );
         if (requestVersion !== replayState.requestVersion) return;
+        if (payload?.missing) {
+          replayState.currentRangeEndSec = nextEndSec;
+          replayState.hasMoreAfter = false;
+          replayState.hasMoreBefore = false;
+          return;
+        }
 
         const items = Array.isArray(payload.items) ? payload.items : [];
         replayState.queue.push(...items);
