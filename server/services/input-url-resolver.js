@@ -1,12 +1,42 @@
 const { createLogger } = require("./logger-service");
 
-function createInputUrlResolver({ spawn, path, baseDir, logger }) {
+function createInputUrlResolver({ spawn, path, baseDir, logger, fetchWithTimeout }) {
   if (typeof spawn !== "function") throw new Error("spawn is required");
   if (!path) throw new Error("path is required");
   if (!baseDir) throw new Error("baseDir is required");
   const serviceLogger = logger || createLogger("input-url-resolver");
 
-  function getUrlsFromInput(url, cookiePath) {
+  async function resolveAbemaShortUrl(url) {
+    const raw = String(url || "").trim();
+    if (!/^https?:\/\/abema\.go\.link\/[^/?#]+/i.test(raw)) {
+      return raw;
+    }
+    if (typeof fetchWithTimeout !== "function") {
+      return raw;
+    }
+
+    try {
+      const response = await fetchWithTimeout(
+        raw,
+        {
+          method: "HEAD",
+          redirect: "follow",
+        },
+        10000,
+      );
+      return String(response?.url || raw).trim() || raw;
+    } catch (error) {
+      serviceLogger.warn("abema短縮URLの解決に失敗", {
+        url: raw,
+        error: error.message,
+      });
+      return raw;
+    }
+  }
+
+  async function getUrlsFromInput(url, cookiePath) {
+    const resolvedUrl = await resolveAbemaShortUrl(url);
+
     return new Promise((resolve, reject) => {
       const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
       let args = [];
@@ -15,21 +45,21 @@ function createInputUrlResolver({ spawn, path, baseDir, logger }) {
         commonArgs.push("--cookies", cookiePath);
       }
 
-      if (url.includes("youtube.com/playlist?list=")) {
-        args = [url, "--flat-playlist", "--get-url", ...commonArgs];
-      } else if (url.includes("youtube.com/watch?v=") || url.includes("youtu.be/")) {
-        const cleanUrl = url.split("&")[0];
+      if (resolvedUrl.includes("youtube.com/playlist?list=")) {
+        args = [resolvedUrl, "--flat-playlist", "--get-url", ...commonArgs];
+      } else if (resolvedUrl.includes("youtube.com/watch?v=") || resolvedUrl.includes("youtu.be/")) {
+        const cleanUrl = resolvedUrl.split("&")[0];
         resolve([cleanUrl]);
         return;
-      } else if (url.includes("youtube.com/@") || url.includes("youtube.com/channel")) {
-        args = [url, "--flat-playlist", "--get-id", ...commonArgs];
-      } else if (url.includes("abema.tv/video/title/")) {
-        args = [url, "--flat-playlist", "--get-url", ...commonArgs];
-      } else if (url.includes("abema.tv/video/episode/")) {
-        resolve([url]);
+      } else if (resolvedUrl.includes("youtube.com/@") || resolvedUrl.includes("youtube.com/channel")) {
+        args = [resolvedUrl, "--flat-playlist", "--get-id", ...commonArgs];
+      } else if (resolvedUrl.includes("abema.tv/video/title/")) {
+        args = [resolvedUrl, "--flat-playlist", "--get-url", ...commonArgs];
+      } else if (resolvedUrl.includes("abema.tv/video/episode/")) {
+        resolve([resolvedUrl]);
         return;
       } else {
-        resolve([url]);
+        resolve([resolvedUrl]);
         return;
       }
 
@@ -44,20 +74,20 @@ function createInputUrlResolver({ spawn, path, baseDir, logger }) {
       });
 
       ytDlp.stderr.on("data", (data) => {
-        serviceLogger.warn("yt-dlp stderr", { url, message: String(data).trim() });
+        serviceLogger.warn("yt-dlp stderr", { url: resolvedUrl, message: String(data).trim() });
       });
 
       ytDlp.on("close", (code) => {
         if (code === 0) {
           const urls = videoUrls.split("\n").filter((u) => u.trim() !== "");
-          if (url.includes("youtube.com/@") || url.includes("youtube.com/channel")) {
+          if (resolvedUrl.includes("youtube.com/@") || resolvedUrl.includes("youtube.com/channel")) {
             resolve(urls.map((id) => `https://www.youtube.com/watch?v=${id}`));
           } else {
             resolve(urls);
           }
           return;
         }
-        reject(new Error(`yt-dlp exited with code ${code} for URL: ${url}`));
+        reject(new Error(`yt-dlp exited with code ${code} for URL: ${resolvedUrl}`));
       });
 
       ytDlp.on("error", (err) => {

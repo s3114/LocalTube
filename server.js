@@ -68,6 +68,7 @@ const { createLogger } = require("./server/services/logger-service");
 const app = express();
 const logger = createLogger("server");
 const port = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000; // サーバーがリッスンするポート番号
+const fetchWithTimeout = createFetchWithTimeout();
 const publicDir = process.env.YTDL_PUBLIC_DIR
   ? path.resolve(process.env.YTDL_PUBLIC_DIR)
   : path.join(__dirname, "public");
@@ -170,6 +171,7 @@ const inputUrlResolver = createInputUrlResolver({
   spawn,
   path,
   baseDir: __dirname,
+  fetchWithTimeout,
 });
 // --------------------------------------------------
 
@@ -195,7 +197,6 @@ const localPathService = createLocalPathService({
   loadConfig,
 });
 
-const fetchWithTimeout = createFetchWithTimeout();
 const wallpaperService = createWallpaperService({
   fs,
   path,
