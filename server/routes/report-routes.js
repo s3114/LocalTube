@@ -18,12 +18,25 @@ function formatIsoToLocalText(isoText) {
   if (!isoText) return "不明";
   const date = new Date(isoText);
   if (Number.isNaN(date.getTime())) return String(isoText);
-  const yyyy = date.getFullYear();
-  const MM = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  const ss = String(date.getSeconds()).padStart(2, "0");
+  const formatter = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const pick = (type) =>
+    parts.find((part) => part.type === type)?.value || "00";
+  const yyyy = pick("year");
+  const MM = pick("month");
+  const dd = pick("day");
+  const hh = pick("hour");
+  const mm = pick("minute");
+  const ss = pick("second");
   return `${yyyy}-${MM}-${dd} ${hh}:${mm}:${ss}`;
 }
 
@@ -506,13 +519,21 @@ function buildRootFilesHtml(files) {
 }
 
 function buildToolVersionsRows(toolVersions) {
+  const formatToolVersionOutput = (tool) => {
+    const output = String(tool?.output || "不明").trim();
+    if (/ETIMEDOUT/i.test(output)) {
+      return "タイムアウトしました";
+    }
+    return output || "不明";
+  };
+
   return [
-    { key: "yt-dlp", value: escapeHtml(toolVersions.ytDlp.output) },
-    { key: "ffmpeg", value: escapeHtml(toolVersions.ffmpeg.output) },
-    { key: "deno", value: escapeHtml(toolVersions.deno.output) },
+    { key: "yt-dlp", value: escapeHtml(formatToolVersionOutput(toolVersions.ytDlp)) },
+    { key: "ffmpeg", value: escapeHtml(formatToolVersionOutput(toolVersions.ffmpeg)) },
+    { key: "deno", value: escapeHtml(formatToolVersionOutput(toolVersions.deno)) },
     {
       key: "AtomicParsley",
-      value: escapeHtml(toolVersions.atomicParsley.output),
+      value: escapeHtml(formatToolVersionOutput(toolVersions.atomicParsley)),
     },
   ];
 }
@@ -526,7 +547,7 @@ function buildWarnLogsHtml(entries) {
     .map(
       (entry) => `
         <div class="log-card">
-          <div class="log-meta">${escapeHtml(entry.timestamp)} [${escapeHtml(entry.scope)}]</div>
+          <div class="log-meta">${escapeHtml(formatIsoToLocalText(entry.timestamp))} [${escapeHtml(entry.scope)}]</div>
           <pre>${escapeHtml(entry.message)}</pre>
         </div>
       `,
@@ -683,10 +704,6 @@ function buildReportHtml({
             )} / 全体: ${escapeHtml(
               formatBytesToReadable(storageInfo.totalBytes),
             )}</span>`,
-          },
-          {
-            key: "ブラウザ",
-            value: `${escapeHtml(browserName)}<span class="sub-line">${escapeHtml(browserUserAgent)}</span>`,
           },
         ])}
       </div>
