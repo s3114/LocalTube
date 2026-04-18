@@ -328,35 +328,65 @@ function readRootDirectorySnapshot(baseDir) {
 }
 
 function readCommandVersion(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: options.timeoutMs || 5000,
-    shell: false,
-  });
+  const initialTimeoutMs = Math.max(10000, Number(options.timeoutMs || 0) || 10000);
+  const retryTimeoutMs = Math.max(
+    initialTimeoutMs,
+    Number(options.retryTimeoutMs || 0) || 20000,
+  );
+  const attempts = [initialTimeoutMs, retryTimeoutMs];
+  const resolvedCommand = String(command || "");
+  const commandDir =
+    resolvedCommand && path.isAbsolute(resolvedCommand)
+      ? path.dirname(resolvedCommand)
+      : undefined;
+  let lastFailure = "不明";
 
-  if (result.error) {
-    return {
-      ok: false,
-      command,
-      output: result.error.message,
-    };
+  for (let index = 0; index < attempts.length; index += 1) {
+    const timeoutMs = attempts[index];
+    const result = spawnSync(command, args, {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: timeoutMs,
+      shell: false,
+      cwd: commandDir,
+    });
+
+    const combined = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
+    const firstLine = combined.split(/\r?\n/).find(Boolean) || "";
+
+    if (result.status === 0) {
+      return {
+        ok: true,
+        command,
+        output: firstLine,
+      };
+    }
+
+    if (result.error?.code === "ETIMEDOUT") {
+      if (firstLine) {
+        return {
+          ok: true,
+          command,
+          output: firstLine,
+        };
+      }
+      lastFailure = result.error.message;
+      continue;
+    }
+
+    if (result.error) {
+      lastFailure = result.error.message;
+      break;
+    }
+
+    lastFailure = combined || `終了コード ${result.status}`;
+    break;
   }
 
-  const combined = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
-  if (result.status !== 0) {
-    return {
-      ok: false,
-      command,
-      output: combined || `終了コード ${result.status}`,
-    };
-  }
-
-  const firstLine = combined.split(/\r?\n/).find(Boolean) || "";
   return {
-    ok: true,
+    ok: false,
     command,
-    output: firstLine,
+    output: lastFailure,
   };
 }
 
