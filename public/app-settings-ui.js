@@ -14,6 +14,10 @@ const FEEDBACK_DISCORD_DESKTOP_URL =
   "discord://discord.com/channels/1332943491688300566/1470084207937196143";
 const FEEDBACK_QUESTION_MESSAGE =
   "ここでの質問に返答することはできません。\n質問はdiscordフォームにてお願いします。";
+const FEEDBACK_BUG_NOTICE =
+  "ここでの不具合報告に返信することはできません。返信が不要な場合のみお願いします。必要な場合はdiscordフォームまで。";
+const FEEDBACK_DEFAULT_PLACEHOLDER =
+  "フィードバックの内容をここに入力してください。";
 const SETTINGS_SEARCH_PLACEHOLDER = "設定を検索";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
@@ -1727,6 +1731,8 @@ function clampNumberInRange(value, min, max, fallback) {
 
         const isQuestionCategory = () =>
           String(elements.feedbackCategorySelect.value || "").trim() === "質問";
+        const isBugCategory = () =>
+          String(elements.feedbackCategorySelect.value || "").trim() === "不具合報告";
 
         const setSubmitState = (message = "", tone = "muted") => {
           const text = String(message || "").trim();
@@ -1768,6 +1774,7 @@ function clampNumberInRange(value, min, max, fallback) {
             if (currentMessage.trim() && currentMessage !== FEEDBACK_QUESTION_MESSAGE) {
               lastEditableFeedbackMessage = currentMessage;
             }
+            elements.feedbackMessageInput.placeholder = FEEDBACK_DEFAULT_PLACEHOLDER;
             elements.feedbackMessageInput.value = FEEDBACK_QUESTION_MESSAGE;
             elements.feedbackMessageInput.readOnly = true;
             elements.feedbackModalConfirmBtn.textContent = isSubmitting ? "送信中..." : "開く";
@@ -1779,11 +1786,16 @@ function clampNumberInRange(value, min, max, fallback) {
             elements.feedbackMessageInput.value = lastEditableFeedbackMessage;
           }
           elements.feedbackMessageInput.readOnly = false;
+          elements.feedbackMessageInput.placeholder = isBugCategory()
+            ? FEEDBACK_BUG_NOTICE
+            : FEEDBACK_DEFAULT_PLACEHOLDER;
           elements.feedbackModalConfirmBtn.textContent = isSubmitting ? "送信中..." : "送信";
+          if (!isSubmitting) {
+            setSubmitState("", "muted");
+          }
         };
 
         const openModal = () => {
-          setSubmitState("");
           syncFeedbackCategoryMode();
           elements.feedbackModalBackdrop.classList.remove("hidden");
           global.requestAnimationFrame?.(() => {
