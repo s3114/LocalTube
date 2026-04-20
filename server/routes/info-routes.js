@@ -93,6 +93,12 @@ function registerInfoRoutes(app, deps) {
     return normalized;
   }
 
+  function extractChannelIdFromChannelUrl(channelUrl) {
+    const raw = String(channelUrl || "").trim();
+    const match = raw.match(/youtube\.com\/channel\/([A-Za-z0-9_-]+)/i);
+    return match ? match[1] : "";
+  }
+
   function pickChannelAvatarUrl(channelObj) {
     let avatar = null;
     if (Array.isArray(channelObj?.thumbnails)) {
@@ -126,7 +132,9 @@ function registerInfoRoutes(app, deps) {
     }
 
     try {
-      const existingChannelId = String(infoObj.channel_id || "").trim();
+      const existingChannelId =
+        String(infoObj.channel_id || "").trim() ||
+        extractChannelIdFromChannelUrl(infoObj.channel_url);
       if (existingChannelId) {
         const cachedChannelPath = path.join(
           baseDir,
