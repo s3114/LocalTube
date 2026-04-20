@@ -187,10 +187,32 @@
       };
     }
 
+    function applyLocalVideoListItemInfo(item, video, info) {
+      if (!item) return;
+      const textEl = item.querySelector(".local-video-text");
+      const titleEl = item.querySelector(".local-video-item-title");
+      const channelEl = item.querySelector(".local-video-item-channel");
+      const metaEl = item.querySelector(".local-video-item-meta");
+      if (!textEl || !titleEl || !channelEl || !metaEl) return;
+      const resolvedTitle = String(info?.title || "").trim() || video.title;
+      const resolvedChannel = String(info?.channel || "").trim() || "ローカル動画";
+      const resolvedViews = Number.isFinite(Number(info?.view_count))
+        ? `${Number(info.view_count).toLocaleString()}回視聴`
+        : "視聴回数不明";
+      const resolvedDate = String(info?.upload_date || "").trim()
+        ? formatUploadDateForDescription(info.upload_date)
+        : "投稿日不明";
+      titleEl.textContent = resolvedTitle;
+      channelEl.textContent = resolvedChannel;
+      metaEl.textContent = `${resolvedViews}・${resolvedDate}`;
+      textEl.title = resolvedTitle;
+    }
+
     function createLocalVideoListItemElement(video, onClick, onOpenOptions) {
       const item = document.createElement("div");
       item.className = "local-video-item";
       item.dataset.filename = video.filename;
+      item.dataset.videoId = getVideoIdFromFilename(video.filename) || "";
 
       if (video.thumb) {
         const thumbImg = document.createElement("img");
@@ -211,7 +233,23 @@
 
       const textEl = document.createElement("div");
       textEl.className = "local-video-text";
-      textEl.textContent = video.title;
+      textEl.title = video.title;
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "local-video-item-title";
+      titleEl.textContent = video.title;
+
+      const channelEl = document.createElement("div");
+      channelEl.className = "local-video-item-channel";
+      channelEl.textContent = "ローカル動画";
+
+      const metaEl = document.createElement("div");
+      metaEl.className = "local-video-item-meta";
+      metaEl.textContent = "視聴回数不明・投稿日不明";
+
+      textEl.appendChild(titleEl);
+      textEl.appendChild(channelEl);
+      textEl.appendChild(metaEl);
       item.appendChild(textEl);
 
       const optionBtn = document.createElement("button");
@@ -772,7 +810,7 @@
       onAfterNavigate?.();
     }
 
-    function renderLocalVideoList(videoList, videos, onSelect, onOpenOptions) {
+    function renderLocalVideoList(videoList, videos, onSelect, onOpenOptions, onChunkRendered) {
       videoList.__localThumbLazyLoader?.disconnect?.();
       videoList.innerHTML = "";
       if (videos.length === 0) {
@@ -786,6 +824,7 @@
 
       function renderChunk() {
         const fragment = document.createDocumentFragment();
+        const start = cursor;
         const end = Math.min(cursor + renderChunkSize, videos.length);
         for (; cursor < end; cursor += 1) {
           const video = videos[cursor];
@@ -799,6 +838,7 @@
         }
         videoList.appendChild(fragment);
         thumbLazyLoader.observe();
+        onChunkRendered?.(videos.slice(start, end));
 
         if (cursor >= videos.length) return;
         if (typeof global.requestAnimationFrame === "function") {
@@ -978,9 +1018,14 @@
       onPrefetchHomeInfos,
     }) {
       let allLocalVideos = [];
+      const localVideoById = new Map();
       let playlistsState = loadPlaylistsState();
       const transientQueue = [];
       let currentPlaylistPlayback = { listId: "", index: "" };
+      const localVideoInfoData = new Map();
+      const requestedLocalVideoInfoIds = new Set();
+      let localVideoInfoPrefetchPromise = null;
+      let pendingLocalVideoInfoIds = [];
       let optionMenuVideo = null;
       let playlistSaveTargetVideo = null;
       let playlistModalTargetVideo = null;
@@ -1538,6 +1583,97 @@
         optionsMenuEl.classList.remove("hidden");
       }
 
+      async function fetchLocalVideoInfoBatch(targetVideos) {
+        const uncachedIds = [];
+        targetVideos.forEach((video) => {
+          const videoId = getVideoIdFromFilename(video.filename);
+          if (!videoId) return;
+          if (localVideoInfoData.has(videoId) || requestedLocalVideoInfoIds.has(videoId)) {
+            return;
+          }
+          uncachedIds.push(videoId);
+        });
+        if (uncachedIds.length === 0) return;
+
+        const chunkSize = 20;
+        const chunks = [];
+        for (let i = 0; i < uncachedIds.length; i += chunkSize) {
+          chunks.push(uncachedIds.slice(i, i + chunkSize));
+        }
+        uncachedIds.forEach((id) => requestedLocalVideoInfoIds.add(id));
+
+        while (chunks.length > 0) {
+          const chunk = chunks.shift();
+          if (!chunk || chunk.length === 0) continue;
+          try {
+            const response = await fetch(`/api/home-info?ids=${encodeURIComponent(chunk.join(","))}`);
+            const payload = response.ok ? await response.json() : null;
+            const map = payload?.data || {};
+            chunk.forEach((id) => {
+              if (map[id]) {
+                localVideoInfoData.set(id, map[id]);
+              } else {
+                requestedLocalVideoInfoIds.delete(id);
+              }
+            });
+          } catch (_error) {
+            chunk.forEach((id) => requestedLocalVideoInfoIds.delete(id));
+          }
+        }
+      }
+
+      function applyRenderedLocalVideoInfo(targetVideoIds = null) {
+        const targetIdSet =
+          Array.isArray(targetVideoIds) && targetVideoIds.length > 0
+            ? new Set(targetVideoIds)
+            : null;
+        videoList.querySelectorAll(".local-video-item").forEach((item) => {
+          const videoId = String(item.dataset.videoId || "").trim();
+          if (!videoId) return;
+          if (targetIdSet && !targetIdSet.has(videoId)) return;
+          const info = localVideoInfoData.get(videoId);
+          if (!info) return;
+          const video = localVideoById.get(videoId);
+          if (!video) return;
+          applyLocalVideoListItemInfo(item, video, info);
+        });
+      }
+
+      function scheduleLocalVideoInfoPrefetch(videos) {
+        const idsToQueue = [];
+        (Array.isArray(videos) ? videos : []).forEach((video) => {
+          const videoId = getVideoIdFromFilename(video.filename);
+          if (!videoId) return;
+          if (localVideoInfoData.has(videoId) || requestedLocalVideoInfoIds.has(videoId)) return;
+          idsToQueue.push(videoId);
+        });
+        pendingLocalVideoInfoIds.push(...idsToQueue);
+        if (localVideoInfoPrefetchPromise) return localVideoInfoPrefetchPromise;
+        localVideoInfoPrefetchPromise = (async () => {
+          while (pendingLocalVideoInfoIds.length > 0) {
+            const pendingIds = Array.from(new Set(pendingLocalVideoInfoIds));
+            pendingLocalVideoInfoIds = [];
+            const pendingVideos = pendingIds
+              .map((videoId) => localVideoById.get(videoId))
+              .filter(Boolean);
+            if (pendingVideos.length === 0) continue;
+            await fetchLocalVideoInfoBatch(pendingVideos);
+            applyRenderedLocalVideoInfo(pendingIds);
+            await new Promise((resolve) => {
+              if (typeof global.requestAnimationFrame === "function") {
+                global.requestAnimationFrame(() => resolve());
+                return;
+              }
+              setTimeout(resolve, 0);
+            });
+          }
+        })().finally(() => {
+          pendingLocalVideoInfoIds = [];
+          localVideoInfoPrefetchPromise = null;
+        });
+        return localVideoInfoPrefetchPromise;
+      }
+
       function initializePlaylistEvents() {
         if (playlistSelectEl) {
           playlistSelectEl.addEventListener("change", () => {
@@ -1757,7 +1893,20 @@
 
       function applyLocalVideos(videos) {
         allLocalVideos = Array.isArray(videos) ? videos : [];
-        renderLocalVideoList(videoList, allLocalVideos, playLocalVideo, openOptionsMenu);
+        localVideoById.clear();
+        allLocalVideos.forEach((video) => {
+          const videoId = getVideoIdFromFilename(video.filename);
+          if (videoId) {
+            localVideoById.set(videoId, video);
+          }
+        });
+        renderLocalVideoList(
+          videoList,
+          allLocalVideos,
+          playLocalVideo,
+          openOptionsMenu,
+          (chunkVideos) => void scheduleLocalVideoInfoPrefetch(chunkVideos),
+        );
         onRenderHomeVideos?.(allLocalVideos);
         renderPlaylistUi();
         renderPlaybackPlaylistSidebar();

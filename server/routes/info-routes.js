@@ -122,7 +122,7 @@ function registerInfoRoutes(app, deps) {
     return avatar?.url || "";
   }
 
-  async function enrichInfoWithChannelThumbnail(infoPath, info) {
+  async function enrichInfoWithCachedChannelThumbnail(infoPath, info) {
     const infoObj = info && typeof info === "object" ? { ...info } : {};
     if (String(infoObj.channel_thumbnail || "").trim()) {
       return infoObj;
@@ -135,31 +135,49 @@ function registerInfoRoutes(app, deps) {
       const existingChannelId =
         String(infoObj.channel_id || "").trim() ||
         extractChannelIdFromChannelUrl(infoObj.channel_url);
-      if (existingChannelId) {
-        const cachedChannelPath = path.join(
-          baseDir,
-          "downloads",
-          "チャンネル",
-          `${existingChannelId}.channel.json`,
-        );
-        if (fs.existsSync(cachedChannelPath)) {
-          const cachedChannelJson = await fs.promises.readFile(cachedChannelPath, "utf-8");
-          const cachedChannelObj = JSON.parse(cachedChannelJson);
-          const cachedAvatarUrl = pickChannelAvatarUrl(cachedChannelObj);
-          if (cachedAvatarUrl) {
-            infoObj.channel_thumbnail = cachedAvatarUrl;
-            if (infoPath) {
-              await fs.promises.writeFile(
-                infoPath,
-                JSON.stringify(infoObj, null, 2),
-                "utf-8",
-              );
-            }
-            return infoObj;
-          }
-        }
+      if (!existingChannelId) {
+        return infoObj;
       }
+      const cachedChannelPath = path.join(
+        baseDir,
+        "downloads",
+        "チャンネル",
+        `${existingChannelId}.channel.json`,
+      );
+      if (!fs.existsSync(cachedChannelPath)) {
+        return infoObj;
+      }
+      const cachedChannelJson = await fs.promises.readFile(cachedChannelPath, "utf-8");
+      const cachedChannelObj = JSON.parse(cachedChannelJson);
+      const cachedAvatarUrl = pickChannelAvatarUrl(cachedChannelObj);
+      if (!cachedAvatarUrl) {
+        return infoObj;
+      }
+      infoObj.channel_thumbnail = cachedAvatarUrl;
+      if (infoPath) {
+        await fs.promises.writeFile(
+          infoPath,
+          JSON.stringify(infoObj, null, 2),
+          "utf-8",
+        );
+      }
+    } catch (_error) {
+      // キャッシュ参照失敗時は静かに元の情報を返す
+    }
 
+    return infoObj;
+  }
+
+  async function enrichInfoWithChannelThumbnail(infoPath, info) {
+    const infoObj = await enrichInfoWithCachedChannelThumbnail(infoPath, info);
+    if (String(infoObj.channel_thumbnail || "").trim()) {
+      return infoObj;
+    }
+    if (!String(infoObj.channel_url || "").trim()) {
+      return infoObj;
+    }
+
+    try {
       const channelArgs = ["-J", "--no-warnings", "--flat-playlist", "--playlist-items", "0"];
       const settings = typeof loadConfig === "function" ? await loadConfig() : {};
       if (settings?.selectedBrowser) {
@@ -491,8 +509,8 @@ function registerInfoRoutes(app, deps) {
     if (infoPath) {
       const raw = await fs.promises.readFile(infoPath, "utf-8");
       const parsed = JSON.parse(raw);
-      scheduleChannelThumbnailEnrichment(infoPath, parsed);
-      return pickHomeLiteFields(parsed);
+      const enriched = await enrichInfoWithCachedChannelThumbnail(infoPath, parsed);
+      return pickHomeLiteFields(enriched);
     }
 
     if (fs.existsSync(provisionalPath)) {
@@ -500,8 +518,8 @@ function registerInfoRoutes(app, deps) {
         const raw = await fs.promises.readFile(provisionalPath, "utf-8");
         const parsed = JSON.parse(raw);
         if (parsed?._provisional_info_version >= 3) {
-          scheduleChannelThumbnailEnrichment(provisionalPath, parsed);
-          return pickHomeLiteFields(parsed);
+          const enriched = await enrichInfoWithCachedChannelThumbnail(provisionalPath, parsed);
+          return pickHomeLiteFields(enriched);
         }
       } catch (_error) {
         // ignore
@@ -513,11 +531,11 @@ function registerInfoRoutes(app, deps) {
 
     if (typeof ensureProvisionalInfo === "function") {
       const generated = await ensureProvisionalInfo(videoPath, videoId);
-      scheduleChannelThumbnailEnrichment(
+      const enriched = await enrichInfoWithCachedChannelThumbnail(
         generated?.path || provisionalPath,
         generated?.info || {},
       );
-      return pickHomeLiteFields(generated?.info || {});
+      return pickHomeLiteFields(enriched);
     }
 
     const provisionalInfo = await createProvisionalInfoFromVideo(videoPath, videoId);
@@ -526,7 +544,8 @@ function registerInfoRoutes(app, deps) {
       JSON.stringify(provisionalInfo, null, 2),
       "utf-8",
     );
-    return pickHomeLiteFields(provisionalInfo);
+    const enriched = await enrichInfoWithCachedChannelThumbnail(provisionalPath, provisionalInfo);
+    return pickHomeLiteFields(enriched);
   }
 
   app.get("/info/:videoId", async (req, res) => {

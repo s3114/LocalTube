@@ -970,10 +970,10 @@
 
       .player-title,
       .yt-title {
-        font-size: 18px;
-        font-weight: 600;
-        line-height: 1.3;
-      }
+          font-size: 18px;
+          font-weight: 600;
+          line-height: 1.3;
+        }
 
       .player-meta,
       .yt-meta {
@@ -1943,9 +1943,38 @@
       }
 
       .local-video-text {
-        flex: 1;
-        font-size: 13px;
-      }
+          min-width: 0;
+          font-size: 13px;
+        }
+
+      .local-video-item-title {
+          font-size: 13px;
+          line-height: 1.35;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 3;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          word-break: break-word;
+        }
+
+      .local-video-item-channel {
+          margin-top: 4px;
+          font-size: 12px;
+          color: #aaa;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+      .local-video-item-meta {
+          margin-top: 2px;
+          font-size: 12px;
+          color: #aaa;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
 
       .local-video-option-btn {
         align-self: center;
@@ -2925,10 +2954,10 @@
       }
 
       .channel-text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
 
       .channel-name {
         color: #fff;
@@ -2942,13 +2971,13 @@
       }
 
       .channel-meta {
-        font-size: 12px;
-        color: #aaa;
-      }
+          font-size: 12px;
+          color: #aaa;
+        }
 
       .channel-meta .dot {
-        margin: 0 6px;
-      }
+          margin: 0 6px;
+        }
 
       /* アイコンをクリック可能に見せる */
       #channel-avatar-link {
@@ -4489,6 +4518,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.14.6">
+                        <span class="info-updates-date">2026/04/20</span>
+                        <span class="info-updates-version">v1.14.6</span>
+                        <span
+                          class="info-updates-content">player画面でinfo.jsonを参照し動画を描画するように</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.14.5">
                         <span class="info-updates-date">2026/04/20</span>
                         <span class="info-updates-version">v1.14.5</span>
