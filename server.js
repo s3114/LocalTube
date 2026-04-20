@@ -260,6 +260,7 @@ registerLiveChatRoutes(app, {
 
 registerInfoRoutes(app, {
   ...routeBaseDeps,
+  loadConfig,
   getLocalVideoDirs: localPathService.getLocalVideoDirs,
   getProvisionalInfoPath: localVideoService.getProvisionalInfoPath,
   findLocalVideoPathById: localVideoService.findLocalVideoPathById,

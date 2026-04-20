@@ -1,12 +1,16 @@
+const { execFile } = require("child_process");
+const { promisify } = require("util");
 const { createLogger } = require("../services/logger-service");
 
 function registerInfoRoutes(app, deps) {
+  const execFileAsync = promisify(execFile);
   const {
     fs,
     path,
     baseDir,
     apiOk,
     apiError,
+    loadConfig,
     getLocalVideoDirs,
     getProvisionalInfoPath,
     findLocalVideoPathById,
@@ -22,6 +26,184 @@ function registerInfoRoutes(app, deps) {
     expiresAt: 0,
     entries: [],
   };
+  const channelThumbnailEnrichmentState = new Map();
+  const CHANNEL_THUMBNAIL_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
+
+  function buildChannelThumbnailEnrichmentKey(infoPath, infoObj) {
+    if (String(infoPath || "").trim()) return `path:${path.resolve(String(infoPath))}`;
+    const channelUrl = String(infoObj?.channel_url || "").trim();
+    if (channelUrl) return `url:${channelUrl}`;
+    const videoId = String(infoObj?.id || "").trim();
+    if (videoId) return `id:${videoId}`;
+    return "";
+  }
+
+  function shouldStartChannelThumbnailEnrichment(key) {
+    if (!key) return false;
+    const now = Date.now();
+    const state = channelThumbnailEnrichmentState.get(key);
+    if (!state) {
+      channelThumbnailEnrichmentState.set(key, { status: "running", nextAllowedAt: 0 });
+      return true;
+    }
+    if (state.status === "running") return false;
+    if (state.nextAllowedAt > now) return false;
+    state.status = "running";
+    state.nextAllowedAt = 0;
+    return true;
+  }
+
+  function finishChannelThumbnailEnrichment(key, succeeded) {
+    if (!key) return;
+    channelThumbnailEnrichmentState.set(key, {
+      status: succeeded ? "done" : "idle",
+      nextAllowedAt: succeeded ? 0 : Date.now() + CHANNEL_THUMBNAIL_RETRY_COOLDOWN_MS,
+    });
+  }
+
+  function scheduleChannelThumbnailEnrichment(infoPath, info) {
+    const infoObj = info && typeof info === "object" ? { ...info } : {};
+    if (String(infoObj.channel_thumbnail || "").trim()) return;
+    if (!String(infoObj.channel_url || "").trim()) return;
+    const key = buildChannelThumbnailEnrichmentKey(infoPath, infoObj);
+    if (!shouldStartChannelThumbnailEnrichment(key)) return;
+
+    setImmediate(() => {
+      enrichInfoWithChannelThumbnail(infoPath, infoObj)
+        .then((enriched) => {
+          finishChannelThumbnailEnrichment(
+            key,
+            Boolean(String(enriched?.channel_thumbnail || "").trim()),
+          );
+        })
+        .catch((error) => {
+          logger.warn("channel_thumbnail 非同期補完失敗", { error: error.message });
+          finishChannelThumbnailEnrichment(key, false);
+        });
+    });
+  }
+
+  function normalizeChannelMetadataUrl(channelUrl) {
+    const raw = String(channelUrl || "").trim();
+    if (!raw || raw === "#") return "";
+    const normalized = raw.replace(/\/+$/, "");
+    if (/youtube\.com\/(channel|@|c\/|user\/)/i.test(normalized) && !/\/(videos|featured|streams|shorts)$/i.test(normalized)) {
+      return `${normalized}/videos`;
+    }
+    return normalized;
+  }
+
+  function pickChannelAvatarUrl(channelObj) {
+    let avatar = null;
+    if (Array.isArray(channelObj?.thumbnails)) {
+      avatar = channelObj.thumbnails.find((thumb) => thumb.id === "avatar_uncropped");
+      if (!avatar) {
+        avatar = channelObj.thumbnails.reduce((best, current) => {
+          if (!best) return current;
+          if (
+            typeof current.preference === "number" &&
+            typeof best.preference === "number"
+          ) {
+            return current.preference > best.preference ? current : best;
+          }
+          return best;
+        }, null);
+      }
+      if (!avatar && channelObj.thumbnails.length > 0) {
+        avatar = channelObj.thumbnails[0];
+      }
+    }
+    return avatar?.url || "";
+  }
+
+  async function enrichInfoWithChannelThumbnail(infoPath, info) {
+    const infoObj = info && typeof info === "object" ? { ...info } : {};
+    if (String(infoObj.channel_thumbnail || "").trim()) {
+      return infoObj;
+    }
+    if (!String(infoObj.channel_url || "").trim()) {
+      return infoObj;
+    }
+
+    try {
+      const existingChannelId = String(infoObj.channel_id || "").trim();
+      if (existingChannelId) {
+        const cachedChannelPath = path.join(
+          baseDir,
+          "downloads",
+          "チャンネル",
+          `${existingChannelId}.channel.json`,
+        );
+        if (fs.existsSync(cachedChannelPath)) {
+          const cachedChannelJson = await fs.promises.readFile(cachedChannelPath, "utf-8");
+          const cachedChannelObj = JSON.parse(cachedChannelJson);
+          const cachedAvatarUrl = pickChannelAvatarUrl(cachedChannelObj);
+          if (cachedAvatarUrl) {
+            infoObj.channel_thumbnail = cachedAvatarUrl;
+            if (infoPath) {
+              await fs.promises.writeFile(
+                infoPath,
+                JSON.stringify(infoObj, null, 2),
+                "utf-8",
+              );
+            }
+            return infoObj;
+          }
+        }
+      }
+
+      const channelArgs = ["-J", "--no-warnings", "--flat-playlist", "--playlist-items", "0"];
+      const settings = typeof loadConfig === "function" ? await loadConfig() : {};
+      if (settings?.selectedBrowser) {
+        channelArgs.push("--cookies-from-browser", settings.selectedBrowser);
+      }
+      channelArgs.push(normalizeChannelMetadataUrl(infoObj.channel_url));
+
+      const { stdout: channelJson } = await execFileAsync(
+        path.join(baseDir, "yt-dlp.exe"),
+        channelArgs,
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+          windowsHide: true,
+        },
+      );
+      const channelObj = JSON.parse(channelJson);
+
+      try {
+        const channelSaveDir = path.join(baseDir, "downloads", "チャンネル");
+        fs.mkdirSync(channelSaveDir, { recursive: true });
+        if (channelObj?.channel_id) {
+          fs.writeFileSync(
+            path.join(channelSaveDir, `${channelObj.channel_id}.channel.json`),
+            channelJson,
+            "utf-8",
+          );
+        }
+      } catch (error) {
+        logger.warn("チャンネルJSON保存失敗", { error: error.message });
+      }
+
+      const avatarUrl = pickChannelAvatarUrl(channelObj);
+      if (avatarUrl) {
+        infoObj.channel_thumbnail = avatarUrl;
+        if (infoPath) {
+          await fs.promises.writeFile(
+            infoPath,
+            JSON.stringify(infoObj, null, 2),
+            "utf-8",
+          );
+        }
+      }
+    } catch (error) {
+      logger.warn("チャンネル情報取得失敗", {
+        error: error.message,
+        stderr: String(error?.stderr || "").trim(),
+      });
+    }
+
+    return infoObj;
+  }
 
   function pickHomeLiteFields(info = {}) {
     return {
@@ -300,7 +482,9 @@ function registerInfoRoutes(app, deps) {
     const infoPath = await resolveInfoJsonPath(videoId);
     if (infoPath) {
       const raw = await fs.promises.readFile(infoPath, "utf-8");
-      return pickHomeLiteFields(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      scheduleChannelThumbnailEnrichment(infoPath, parsed);
+      return pickHomeLiteFields(parsed);
     }
 
     if (fs.existsSync(provisionalPath)) {
@@ -308,6 +492,7 @@ function registerInfoRoutes(app, deps) {
         const raw = await fs.promises.readFile(provisionalPath, "utf-8");
         const parsed = JSON.parse(raw);
         if (parsed?._provisional_info_version >= 3) {
+          scheduleChannelThumbnailEnrichment(provisionalPath, parsed);
           return pickHomeLiteFields(parsed);
         }
       } catch (_error) {
@@ -320,6 +505,10 @@ function registerInfoRoutes(app, deps) {
 
     if (typeof ensureProvisionalInfo === "function") {
       const generated = await ensureProvisionalInfo(videoPath, videoId);
+      scheduleChannelThumbnailEnrichment(
+        generated?.path || provisionalPath,
+        generated?.info || {},
+      );
       return pickHomeLiteFields(generated?.info || {});
     }
 
@@ -348,6 +537,7 @@ function registerInfoRoutes(app, deps) {
             const cachedRaw = await fs.promises.readFile(provisionalPath, "utf-8");
             const cached = JSON.parse(cachedRaw);
             if (cached?._provisional_info_version >= 3) {
+              scheduleChannelThumbnailEnrichment(provisionalPath, cached);
               res.type("application/json; charset=utf-8");
               return res.sendFile(provisionalPath);
             }
@@ -364,6 +554,10 @@ function registerInfoRoutes(app, deps) {
 
         if (typeof ensureProvisionalInfo === "function") {
           const generated = await ensureProvisionalInfo(videoPath, videoId);
+          scheduleChannelThumbnailEnrichment(
+            generated?.path || provisionalPath,
+            generated?.info || {},
+          );
           logger.info("provisional info resolved", {
             provisionalPath: generated?.path || provisionalPath,
             fromCache: Boolean(generated?.fromCache),
@@ -390,6 +584,15 @@ function registerInfoRoutes(app, deps) {
         infoPath,
         elapsedMs: Date.now() - startedAt,
       });
+
+      try {
+        const raw = await fs.promises.readFile(infoPath, "utf-8");
+        scheduleChannelThumbnailEnrichment(infoPath, JSON.parse(raw));
+      } catch (error) {
+        logger.warn("info.json の channel_thumbnail 非同期補完予約失敗", {
+          error: error.message,
+        });
+      }
 
       res.type("application/json; charset=utf-8");
       res.sendFile(infoPath);

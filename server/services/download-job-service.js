@@ -454,13 +454,71 @@ function createDownloadJobService({
 
   function enrichInfoWithChannelThumbnail(infoObj, job, settings) {
     if (typeof infoObj.channel_url !== "string") return infoObj;
+    if (typeof infoObj.channel_thumbnail === "string" && infoObj.channel_thumbnail.trim()) {
+      return infoObj;
+    }
+
+    function normalizeChannelMetadataUrl(channelUrl) {
+      const raw = String(channelUrl || "").trim();
+      if (!raw || raw === "#") return "";
+      const normalized = raw.replace(/\/+$/, "");
+      if (
+        /youtube\.com\/(channel|@|c\/|user\/)/i.test(normalized) &&
+        !/\/(videos|featured|streams|shorts)$/i.test(normalized)
+      ) {
+        return `${normalized}/videos`;
+      }
+      return normalized;
+    }
+
+    function pickChannelAvatarUrl(channelObj) {
+      let avatar = null;
+      if (Array.isArray(channelObj?.thumbnails)) {
+        avatar = channelObj.thumbnails.find((t) => t.id === "avatar_uncropped");
+        if (!avatar) {
+          avatar = channelObj.thumbnails.reduce((best, cur) => {
+            if (!best) return cur;
+            if (
+              typeof cur.preference === "number" &&
+              typeof best.preference === "number"
+            ) {
+              return cur.preference > best.preference ? cur : best;
+            }
+            return best;
+          }, null);
+        }
+        if (!avatar && channelObj.thumbnails.length > 0) {
+          avatar = channelObj.thumbnails[0];
+        }
+      }
+      return avatar?.url || "";
+    }
 
     try {
+      const existingChannelId = String(infoObj.channel_id || "").trim();
+      if (existingChannelId) {
+        const cachedChannelPath = path.join(
+          downloadsDir,
+          "チャンネル",
+          `${existingChannelId}.channel.json`,
+        );
+        if (fs.existsSync(cachedChannelPath)) {
+          const cachedChannelJson = fs.readFileSync(cachedChannelPath, "utf-8");
+          const cachedChannelObj = JSON.parse(cachedChannelJson);
+          const cachedAvatarUrl = pickChannelAvatarUrl(cachedChannelObj);
+          if (cachedAvatarUrl) {
+            infoObj.channel_thumbnail = cachedAvatarUrl;
+            return infoObj;
+          }
+        }
+      }
+
       const channelArgs = [
         "-J",
-        "--no-playlist",
+        "--flat-playlist",
         "--playlist-items",
         "0",
+        "--no-warnings",
       ];
       const ffmpegPath = getUsableFfmpegPath();
       if (ffmpegPath) {
@@ -471,7 +529,9 @@ function createDownloadJobService({
       } else if (settings && settings.selectedBrowser) {
         channelArgs.push("--cookies-from-browser", settings.selectedBrowser);
       }
-      channelArgs.push(infoObj.channel_url);
+      const metadataUrl = normalizeChannelMetadataUrl(infoObj.channel_url);
+      if (!metadataUrl) return infoObj;
+      channelArgs.push(metadataUrl);
 
       const channelJson = execFileSync(path.join(baseDir, "yt-dlp.exe"), channelArgs, {
         encoding: "utf-8",
@@ -492,31 +552,15 @@ function createDownloadJobService({
         logger.warn("チャンネルJSON保存失敗", { error: err.message });
       }
 
-      let avatar = null;
-      if (Array.isArray(channelObj.thumbnails)) {
-        avatar = channelObj.thumbnails.find((t) => t.id === "avatar_uncropped");
-        if (!avatar) {
-          avatar = channelObj.thumbnails.reduce((best, cur) => {
-            if (!best) return cur;
-            if (
-              typeof cur.preference === "number" &&
-              typeof best.preference === "number"
-            ) {
-              return cur.preference > best.preference ? cur : best;
-            }
-            return best;
-          }, null);
-        }
-        if (!avatar && channelObj.thumbnails.length > 0) {
-          avatar = channelObj.thumbnails[0];
-        }
-      }
-
-      if (avatar?.url) {
-        infoObj.channel_thumbnail = avatar.url;
+      const avatarUrl = pickChannelAvatarUrl(channelObj);
+      if (avatarUrl) {
+        infoObj.channel_thumbnail = avatarUrl;
       }
     } catch (err) {
-      logger.warn("チャンネル情報取得失敗", { error: err.message });
+      logger.warn("チャンネル情報取得失敗", {
+        error: err.message,
+        stderr: String(err?.stderr || "").trim(),
+      });
     }
 
     return infoObj;
