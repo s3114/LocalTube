@@ -1078,6 +1078,7 @@
     const enrichHomeCardInfo = createHomeCardInfoEnricher(homeInfoData);
     const thumbLazyLoader = createHomeThumbLazyLoader(homeVideoGrid);
     let fullInfoFetchPromise = null;
+    let backgroundPrefetchPromise = null;
     const homeSearchInputs = {
       homeSearchInput,
       filterChannel,
@@ -1176,6 +1177,9 @@
         shouldRender: isHomePageActive,
         onMetric,
       });
+      if (countMissingHomeInfo(lastFilteredVideos, homeInfoData) > 0) {
+        void prefetch();
+      }
     }
 
     function bindEvents() {
@@ -1247,31 +1251,38 @@
     }
 
     async function prefetch() {
-      const maxPrefetch = 40;
+      if (backgroundPrefetchPromise) return backgroundPrefetchPromise;
       const prioritized = [
         ...lastFilteredVideos,
         ...allVideos.filter((video) => !lastFilteredVideos.includes(video)),
       ];
-      const targets = prioritized.slice(0, maxPrefetch);
+      const targets = prioritized;
       if (targets.length === 0) return;
 
-      const startedAt = performance.now();
-      const batchSize = 40;
-      for (let i = 0; i < targets.length; i += batchSize) {
-        const batch = targets.slice(i, i + batchSize);
-        await fetchHomeInfoBatch(homeInfoData, requestedHomeInfoIds, batch);
-      }
-      onMetric?.("home_prefetch_ms", performance.now() - startedAt, {
-        targetCount: targets.length,
-      });
-      for (const video of targets) {
-        const videoId = getVideoIdFromFilename(video.filename);
-        const mapped = cardRefsByVideoId.get(videoId);
-        const info = homeInfoData.get(videoId);
-        if (mapped && info) {
-          applyHomeCardInfoFromInfo(mapped.video, mapped.refs, info);
+      backgroundPrefetchPromise = (async () => {
+        const startedAt = performance.now();
+        const batchSize = 40;
+        for (let i = 0; i < targets.length; i += batchSize) {
+          const batch = targets.slice(i, i + batchSize);
+          await fetchHomeInfoBatch(homeInfoData, requestedHomeInfoIds, batch);
+          for (const video of batch) {
+            const videoId = getVideoIdFromFilename(video.filename);
+            const mapped = cardRefsByVideoId.get(videoId);
+            const info = homeInfoData.get(videoId);
+            if (mapped && info) {
+              applyHomeCardInfoFromInfo(mapped.video, mapped.refs, info);
+            }
+          }
+          if (!isHomePageActive()) break;
+          await new Promise((resolve) => scheduleNextFrame(resolve));
         }
-      }
+        onMetric?.("home_prefetch_ms", performance.now() - startedAt, {
+          targetCount: targets.length,
+        });
+      })().finally(() => {
+        backgroundPrefetchPromise = null;
+      });
+      return backgroundPrefetchPromise;
     }
 
     return {
