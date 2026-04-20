@@ -1152,6 +1152,14 @@
         currentSortState.sortOrder,
       );
       lastFilteredVideos = sortHomeVideosWithMode(filtered, homeInfoData, sortMode);
+      const eagerInfoTargets = lastFilteredVideos.slice(0, 40);
+      if (eagerInfoTargets.length > 0) {
+        await fetchHomeInfoBatch(
+          homeInfoData,
+          requestedHomeInfoIds,
+          eagerInfoTargets,
+        );
+      }
       await renderHomeVideoBrowserGrid({
         homeVideoGrid,
         allVideos: lastFilteredVideos,
@@ -1213,7 +1221,7 @@
       window.addEventListener("app:page-changed", (event) => {
         const pageId = event?.detail?.pageId;
         if (pageId === "page-home") {
-          render();
+          render().then(() => prefetch()).catch(() => {});
           return;
         }
         thumbLazyLoader.disconnect();
