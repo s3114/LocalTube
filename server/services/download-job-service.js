@@ -17,7 +17,7 @@ function createDownloadJobService({
 }) {
   const logger = createLogger("download-job");
   const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
-  const LIVE_NOT_LIVE_SKIP_MESSAGE = 'does not pass filter (live_status=not_live), skipping';
+  const LIVE_FILTER_SKIP_FRAGMENT = "does not pass filter";
   const LIVE_ENDED_RETRY_MESSAGES = [
     "Video is no longer live",
     "Did not get any data blocks",
@@ -169,7 +169,9 @@ function createDownloadJobService({
       "--newline",
     ];
     if (!liveReplayMode && !plainRetryMode) {
-      args.push("--match-filter", "live_status=not_live");
+      // ライブ特別処理の対象は「現在ライブ中」のみ。
+      // was_live/post_live は通常動画として扱い、アーカイブを巻き込まない。
+      args.push("--match-filter", "!is_live");
     }
 
     if (ffmpegPath) {
@@ -791,7 +793,7 @@ function createDownloadJobService({
         const chunkText = data.toString();
         stdoutOutput += chunkText;
         stdoutBuffer += chunkText;
-        if (chunkText.includes(LIVE_NOT_LIVE_SKIP_MESSAGE)) {
+        if (chunkText.includes(LIVE_FILTER_SKIP_FRAGMENT)) {
           skippedByLiveFilter = true;
         }
         const lines = stdoutBuffer.split(/[\r\n]/);
@@ -808,7 +810,7 @@ function createDownloadJobService({
         const stderrLines = chunkText.split(/[\r\n]/).filter((line) => line.trim() !== "");
         const errorMsg = chunkText.trim();
         stderrOutput += `${errorMsg}\n`;
-        if (chunkText.includes(LIVE_NOT_LIVE_SKIP_MESSAGE)) {
+        if (chunkText.includes(LIVE_FILTER_SKIP_FRAGMENT)) {
           skippedByLiveFilter = true;
         }
         if (
@@ -833,9 +835,9 @@ function createDownloadJobService({
         closed = true;
         if (liveTicker) clearInterval(liveTicker);
         if (
-          stdoutBuffer.includes(LIVE_NOT_LIVE_SKIP_MESSAGE) ||
-          stdoutOutput.includes(LIVE_NOT_LIVE_SKIP_MESSAGE) ||
-          stderrOutput.includes(LIVE_NOT_LIVE_SKIP_MESSAGE)
+          stdoutBuffer.includes(LIVE_FILTER_SKIP_FRAGMENT) ||
+          stdoutOutput.includes(LIVE_FILTER_SKIP_FRAGMENT) ||
+          stderrOutput.includes(LIVE_FILTER_SKIP_FRAGMENT)
         ) {
           skippedByLiveFilter = true;
         }
