@@ -13,6 +13,76 @@ function loadActions() {
 function createDoc(values = {}) {
   const elements = {
     "download-btn": { disabled: false },
+    "download-estimate-status": { textContent: "" },
+    "download-estimate-list-section": {
+      classList: {
+        values: new Set(["hidden"]),
+        add(value) {
+          this.values.add(value);
+        },
+        remove(value) {
+          this.values.delete(value);
+        },
+        contains(value) {
+          return this.values.has(value);
+        },
+      },
+    },
+    "download-estimate-list-total": { textContent: "" },
+    "download-estimate-list-toggle": {
+      textContent: "",
+      classList: {
+        values: new Set(),
+        add(value) {
+          this.values.add(value);
+        },
+        remove(value) {
+          this.values.delete(value);
+        },
+        toggle(value, force) {
+          if (typeof force === "boolean") {
+            if (force) {
+              this.values.add(value);
+              return true;
+            }
+            this.values.delete(value);
+            return false;
+          }
+          if (this.values.has(value)) {
+            this.values.delete(value);
+            return false;
+          }
+          this.values.add(value);
+          return true;
+        },
+        contains(value) {
+          return this.values.has(value);
+        },
+      },
+    },
+    "download-estimate-list": {
+      innerHTML: "",
+      children: [],
+      classList: {
+        values: new Set(),
+        add(value) {
+          this.values.add(value);
+        },
+        remove(value) {
+          this.values.delete(value);
+        },
+        contains(value) {
+          return this.values.has(value);
+        },
+      },
+      appendChild(node) {
+        if (Array.isArray(node?.children)) {
+          this.children.push(...node.children);
+          return;
+        }
+        this.children.push(node);
+      },
+    },
     urls: { value: values.urls || "" },
     fmt: { value: "best" },
     optHistory: { checked: true },
@@ -28,6 +98,21 @@ function createDoc(values = {}) {
   };
 
   return {
+    createElement(tagName) {
+      return {
+        tagName,
+        className: "",
+        textContent: "",
+      };
+    },
+    createDocumentFragment() {
+      return {
+        children: [],
+        appendChild(node) {
+          this.children.push(node);
+        },
+      };
+    },
     getElementById(id) {
       return elements[id];
     },
@@ -39,9 +124,10 @@ test("download action validates and submits then clears input", async () => {
   loadActions();
   const alerts = [];
   const fetchCalls = [];
-  const { getElementById, elements } = createDoc({
+  const doc = createDoc({
     urls: "https://example.com/video1 https://example.com/video2",
   });
+  const { elements } = doc;
 
   const parseApiResponse = async (response) => response.__parsed;
   const fetchImpl = async (url, init) => {
@@ -49,14 +135,29 @@ test("download action validates and submits then clears input", async () => {
     if (String(url).startsWith("/api/validate-url")) {
       return { __parsed: { ok: true, data: { isValid: true } } };
     }
+    if (String(url) === "/api/download-estimate") {
+      return {
+        __parsed: {
+          ok: true,
+          data: {
+            entries: [
+              { url: "https://example.com/video1", estimatedSizeText: "1.2 GB" },
+              { url: "https://example.com/video2", estimatedSizeText: "800 MB" },
+            ],
+            summary: { totalText: "2.0 GB", count: 2 },
+          },
+        },
+      };
+    }
     return { __parsed: { ok: true, data: { message: "ok" } } };
   };
 
   const actions = global.createDownloadActions({
     parseApiResponse,
     fetchImpl,
-    doc: { getElementById },
+    doc,
     alertImpl: (msg) => alerts.push(msg),
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: false }),
   });
 
   await actions.startDownload();
@@ -64,6 +165,18 @@ test("download action validates and submits then clears input", async () => {
   assert.equal(alerts.length, 0);
   assert.equal(elements.urls.value, "");
   assert.equal(elements["download-btn"].disabled, false);
+  assert.equal(elements["download-estimate-status"].textContent, "予測サイズ: 2.0 GB (2件)");
+  assert.equal(elements["download-estimate-list-section"].classList.contains("hidden"), false);
+  assert.equal(elements["download-estimate-list-total"].textContent, "https://example.com/video1 - 1.2 GB");
+  assert.equal(elements["download-estimate-list-toggle"].textContent, "折りたたむ");
+  assert.equal(elements["download-estimate-list-toggle"].classList.contains("hidden"), false);
+  assert.deepEqual(
+    elements["download-estimate-list"].children.map((item) => item.textContent),
+    [
+      "https://example.com/video2 - 800 MB",
+    ],
+  );
+  assert.ok(fetchCalls.some((c) => c.url === "/api/download-estimate"));
   assert.ok(fetchCalls.some((c) => c.url === "/download"));
 });
 
@@ -71,7 +184,7 @@ test("download action blocks invalid URL before submit", async () => {
   loadActions();
   const alerts = [];
   const fetchCalls = [];
-  const { getElementById } = createDoc({ urls: "http://invalid.local/video" });
+  const doc = createDoc({ urls: "http://invalid.local/video" });
 
   const actions = global.createDownloadActions({
     parseApiResponse: async (response) => response.__parsed,
@@ -79,7 +192,7 @@ test("download action blocks invalid URL before submit", async () => {
       fetchCalls.push({ url, init });
       return { __parsed: { ok: true, data: { isValid: true } } };
     },
-    doc: { getElementById },
+    doc,
     alertImpl: (msg) => alerts.push(msg),
   });
 
@@ -94,7 +207,8 @@ test("download action blocks submit when URL validation API returns invalid", as
   loadActions();
   const alerts = [];
   const fetchCalls = [];
-  const { getElementById, elements } = createDoc({ urls: "https://example.com/video" });
+  const doc = createDoc({ urls: "https://example.com/video" });
+  const { elements } = doc;
 
   const actions = global.createDownloadActions({
     parseApiResponse: async (response) => response.__parsed,
@@ -108,7 +222,7 @@ test("download action blocks submit when URL validation API returns invalid", as
         },
       };
     },
-    doc: { getElementById },
+    doc,
     alertImpl: (msg) => alerts.push(msg),
   });
 
@@ -125,14 +239,15 @@ test("download action reports network error and re-enables button", async () => 
   loadActions();
   const alerts = [];
   const errors = [];
-  const { getElementById, elements } = createDoc({ urls: "https://example.com/video" });
+  const doc = createDoc({ urls: "https://example.com/video" });
+  const { elements } = doc;
 
   const actions = global.createDownloadActions({
     parseApiResponse: async (response) => response.__parsed,
     fetchImpl: async () => {
       throw new Error("network down");
     },
-    doc: { getElementById },
+    doc,
     alertImpl: (msg) => alerts.push(msg),
     onError: (error) => errors.push(error.message),
   });
@@ -149,7 +264,8 @@ test("download action does nothing when comments, chat, and video are all off", 
   loadActions();
   const alerts = [];
   const fetchCalls = [];
-  const { getElementById, elements } = createDoc({ urls: "https://example.com/video" });
+  const doc = createDoc({ urls: "https://example.com/video" });
+  const { elements } = doc;
   elements.optDownloadComments.checked = false;
   elements.optDownloadChat.checked = false;
   elements.optDownloadVideo.checked = false;
@@ -160,7 +276,7 @@ test("download action does nothing when comments, chat, and video are all off", 
       fetchCalls.push({ url, init });
       return { __parsed: { ok: true, data: { isValid: true } } };
     },
-    doc: { getElementById },
+    doc,
     alertImpl: (msg) => alerts.push(msg),
   });
 
@@ -169,6 +285,71 @@ test("download action does nothing when comments, chat, and video are all off", 
   assert.equal(fetchCalls.length, 0);
   assert.equal(alerts.length, 0);
   assert.equal(elements["download-btn"].disabled, false);
+});
+
+test("download action persists skip-confirm preference when requested", async () => {
+  loadActions();
+  const saved = [];
+  const doc = createDoc({ urls: "https://example.com/video" });
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      if (String(url) === "/api/download-estimate") {
+        return {
+          __parsed: {
+            ok: true,
+            data: { entries: [], summary: { totalText: "1.0 GB", count: 1 } },
+          },
+        };
+      }
+      return { __parsed: { ok: true, data: { message: "ok" } } };
+    },
+    doc,
+    alertImpl: () => {},
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: true }),
+    saveSetting: (key, value) => saved.push({ key, value }),
+  });
+
+  await actions.startDownload();
+
+  assert.deepEqual(saved, [
+    { key: "localtube.skipDownloadConfirm.v1", value: true },
+  ]);
+});
+
+test("download action skips estimate fetch when disabled by setting", async () => {
+  loadActions();
+  const fetchCalls = [];
+  const doc = createDoc({ urls: "https://example.com/video" });
+  const { elements } = doc;
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      fetchCalls.push(String(url));
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      return { __parsed: { ok: true, data: { message: "ok" } } };
+    },
+    doc,
+    alertImpl: () => {},
+    loadSetting: (key, defaultValue) => {
+      if (key === "optDownloadEstimates") return false;
+      return defaultValue;
+    },
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: false }),
+  });
+
+  await actions.startDownload();
+
+  assert.equal(fetchCalls.includes("/api/download-estimate"), false);
+  assert.equal(elements["download-estimate-status"].textContent, "");
+  assert.equal(elements["download-estimate-list-section"].classList.contains("hidden"), true);
 });
 
 test("app-actions pure utils parse URL inputs", () => {
@@ -209,5 +390,9 @@ test("app-actions pure utils validate HTTPS scheme", () => {
   assert.equal(
     utils.resolveCommentOptions({ downloadComments: false, downloadChat: false }),
     "none",
+  );
+  assert.equal(
+    utils.formatEstimateSummary({ totalText: "1.2 GB", count: 2 }),
+    "予測サイズ: 1.2 GB (2件)",
   );
 });

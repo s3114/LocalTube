@@ -112,6 +112,19 @@ function clampNumberInRange(value, min, max, fallback) {
         );
       }
 
+      function applyDownloadEstimateSettingFromServer(elements, settings) {
+        const enabled = settings.enableDownloadEstimates !== false;
+        if (elements.optDownloadEstimates) {
+          elements.optDownloadEstimates.checked = enabled;
+        }
+        saveLocalSetting("optDownloadEstimates", enabled);
+        setSettingStatus(
+          elements.downloadEstimateStatus,
+          enabled ? "有効です" : "無効です",
+          "muted",
+        );
+      }
+
       function applyYtDlpCustomCommandFromServer(elements, settings) {
         if (!elements.ytDlpCustomCommandInput) return;
         elements.ytDlpCustomCommandInput.value = String(
@@ -293,6 +306,9 @@ function clampNumberInRange(value, min, max, fallback) {
         if (elements.optDownloadVideo) {
           elements.optDownloadVideo.checked = loadLocalSetting("optDownloadVideo", true);
         }
+        if (elements.optDownloadEstimates) {
+          elements.optDownloadEstimates.checked = loadLocalSetting("optDownloadEstimates", true);
+        }
 
         elements.fmt.addEventListener("change", (e) =>
           saveLocalSetting("fmt", e.target.value),
@@ -340,6 +356,9 @@ function clampNumberInRange(value, min, max, fallback) {
         );
         elements.optDownloadVideo?.addEventListener("change", (e) =>
           saveLocalSetting("optDownloadVideo", e.target.checked),
+        );
+        elements.optDownloadEstimates?.addEventListener("change", (e) =>
+          saveLocalSetting("optDownloadEstimates", e.target.checked),
         );
       }
 
@@ -1157,6 +1176,7 @@ function clampNumberInRange(value, min, max, fallback) {
             );
             applyLocalVideoDirsFromServer(elements, settings);
             applyFallbackThumbnailSettingFromServer(elements, settings);
+            applyDownloadEstimateSettingFromServer(elements, settings);
             applyYtDlpCustomCommandFromServer(elements, settings);
             const { blurValue, brightnessValue } =
               getWallpaperStyleFromServerSettings(settings);
@@ -1363,6 +1383,22 @@ function clampNumberInRange(value, min, max, fallback) {
         return true;
       }
 
+      async function saveDownloadEstimateSettingWithRecovery(bridge, enabled) {
+        const result = await bridge.postSettings({
+          enableDownloadEstimates: enabled,
+        });
+        const savedValue = result.data?.settings?.enableDownloadEstimates;
+        const saved = result.ok && savedValue === enabled;
+        if (saved) return true;
+
+        const refreshed = await bridge.loadServerSettings();
+        const recovered = refreshed?.enableDownloadEstimates === enabled;
+        if (!recovered) {
+          throw new Error(`サイズ表示設定の保存に失敗しました (status: ${result.status})`);
+        }
+        return true;
+      }
+
       function initializeWallpaperSettingsUI(elements, bridge) {
         initializeWallpaperSettingsData(bridge).catch((error) => {
           console.error("壁紙設定の初期化に失敗:", error);
@@ -1520,6 +1556,34 @@ function clampNumberInRange(value, min, max, fallback) {
             }
             setSettingStatus(
               elements.fallbackThumbStatus,
+              "保存に失敗しました。再試行してください。",
+              "error",
+            );
+          }
+        });
+      }
+
+      function initializeDownloadEstimateSettingUI(elements, bridge) {
+        if (!elements.optDownloadEstimates) return;
+        elements.optDownloadEstimates.addEventListener("change", async (e) => {
+          const enabled = e.target.checked;
+          setSettingStatus(elements.downloadEstimateStatus, "保存中...", "info");
+          try {
+            await saveDownloadEstimateSettingWithRecovery(bridge, enabled);
+            saveLocalSetting("optDownloadEstimates", enabled);
+            setSettingStatus(
+              elements.downloadEstimateStatus,
+              enabled ? "有効にしました" : "無効にしました",
+              "success",
+            );
+          } catch (error) {
+            console.error("サイズ表示設定の保存に失敗:", error);
+            const refreshed = await bridge.loadServerSettings();
+            if (!refreshed) {
+              elements.optDownloadEstimates.checked = !enabled;
+            }
+            setSettingStatus(
+              elements.downloadEstimateStatus,
               "保存に失敗しました。再試行してください。",
               "error",
             );
@@ -2019,6 +2083,7 @@ function initializeSettingsUiController({
           bridge,
           onLocalVideosChanged,
         );
+        initializeDownloadEstimateSettingUI(elements, bridge);
       }
 
 global.initializeSettingsUiController = initializeSettingsUiController;
@@ -2027,5 +2092,6 @@ global.__settingsUiTestUtils = {
     buildLocalVideoDirsStatusText,
     applyLocalVideoDirsFromServer,
     applyFallbackThumbnailSettingFromServer,
+    applyDownloadEstimateSettingFromServer,
   };
 })(window);

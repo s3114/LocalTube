@@ -143,6 +143,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         browser,
         localVideoDirs,
         enableFallbackThumbnails,
+        enableDownloadEstimates,
         wallpaperBlur,
         wallpaperBrightness,
         ytDlpCustomCommand,
@@ -153,6 +154,7 @@ function registerSettingsWallpaperRoutes(app, deps) {
         typeof browser === "undefined" &&
         typeof localVideoDirs === "undefined" &&
         typeof enableFallbackThumbnails === "undefined" &&
+        typeof enableDownloadEstimates === "undefined" &&
         typeof wallpaperBlur === "undefined" &&
         typeof wallpaperBrightness === "undefined" &&
         typeof ytDlpCustomCommand === "undefined" &&
@@ -174,6 +176,10 @@ function registerSettingsWallpaperRoutes(app, deps) {
 
       if (typeof enableFallbackThumbnails !== "undefined") {
         currentConfig.enableFallbackThumbnails = Boolean(enableFallbackThumbnails);
+      }
+
+      if (typeof enableDownloadEstimates !== "undefined") {
+        currentConfig.enableDownloadEstimates = Boolean(enableDownloadEstimates);
       }
 
       if (typeof wallpaperBlur !== "undefined") {

@@ -1,4 +1,7 @@
 (function attachAppActions(global) {
+  const SKIP_DOWNLOAD_CONFIRM_SETTING_KEY = "localtube.skipDownloadConfirm.v1";
+  const DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY = "optDownloadEstimates";
+
   function parseUrlsFromInputValue(value) {
     const rawUrls = String(value || "").trim();
     if (rawUrls === "") {
@@ -27,6 +30,29 @@
     return "none";
   }
 
+  function formatEstimateSummary(summary) {
+    const totalText = String(summary?.totalText || "").trim();
+    const count = Number(summary?.count || 0);
+    if (!totalText) return "";
+    return `予測サイズ: ${totalText}${count > 0 ? ` (${count}件)` : ""}`;
+  }
+
+  function buildEstimateLines(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .map((entry) => {
+        const title = String(entry?.title || entry?.url || "").trim();
+        const size = String(entry?.estimatedSizeText || "不明").trim() || "不明";
+        if (!title) return "";
+        return `${title} - ${size}`;
+      })
+      .filter(Boolean);
+  }
+
+  function getEstimateToggleLabel(isCollapsed) {
+    return isCollapsed ? "展開" : "折りたたむ";
+  }
+
   function createDownloadActions({
     parseApiResponse,
     fetchImpl = fetch,
@@ -34,11 +60,88 @@
     alertImpl = alert,
     notifyInfo = () => {},
     notifyError = (message) => alertImpl(message),
+    showDownloadConfirm = async () => ({ confirmed: true, skipFuture: false }),
+    loadSetting = (key, defaultValue) =>
+      typeof global.loadLocalSetting === "function"
+        ? global.loadLocalSetting(key, defaultValue)
+        : defaultValue,
+    saveSetting = (key, value) => {
+      if (typeof global.saveLocalSetting === "function") {
+        global.saveLocalSetting(key, value);
+      }
+    },
     getSelectedCookieFile = () => global.selectedCookieFile,
     onError = (error) => console.error("Fetch error:", error),
   }) {
     function setButtonDisabled(button, disabled) {
       if (button) button.disabled = disabled;
+    }
+
+    function updateEstimateStatus(message) {
+      const statusEl = doc.getElementById("download-estimate-status");
+      if (!statusEl) return;
+      statusEl.textContent = String(message || "").trim();
+    }
+
+    function clearEstimateUi() {
+      updateEstimateStatus("");
+      const sectionEl = doc.getElementById("download-estimate-list-section");
+      const totalEl = doc.getElementById("download-estimate-list-total");
+      const listEl = doc.getElementById("download-estimate-list");
+      const toggleBtn = doc.getElementById("download-estimate-list-toggle");
+      if (totalEl) totalEl.textContent = "";
+      if (listEl) {
+        listEl.innerHTML = "";
+        listEl.classList.remove("collapsed");
+      }
+      if (toggleBtn) {
+        toggleBtn.textContent = getEstimateToggleLabel(false);
+        toggleBtn.classList.add("hidden");
+      }
+      sectionEl?.classList.add("hidden");
+    }
+
+    function updateEstimateList(entries) {
+      const sectionEl = doc.getElementById("download-estimate-list-section");
+      const totalEl = doc.getElementById("download-estimate-list-total");
+      const listEl = doc.getElementById("download-estimate-list");
+      const toggleBtn = doc.getElementById("download-estimate-list-toggle");
+      if (!sectionEl || !listEl) return;
+
+      const lines = buildEstimateLines(entries);
+      listEl.innerHTML = "";
+      if (lines.length === 0) {
+        sectionEl.classList.add("hidden");
+        return;
+      }
+
+      if (totalEl) {
+        totalEl.textContent = lines[0] || "";
+      }
+
+      const fragment = doc.createDocumentFragment
+        ? doc.createDocumentFragment()
+        : null;
+      lines.forEach((line, index) => {
+        if (index === 0) return;
+        const item = doc.createElement("div");
+        item.className = "download-estimate-list-item";
+        item.textContent = line;
+        if (fragment) {
+          fragment.appendChild(item);
+        } else {
+          listEl.appendChild(item);
+        }
+      });
+      if (fragment) {
+        listEl.appendChild(fragment);
+      }
+      if (toggleBtn) {
+        const isCollapsed = listEl.classList.contains("collapsed");
+        toggleBtn.textContent = getEstimateToggleLabel(isCollapsed);
+        toggleBtn.classList.toggle("hidden", lines.length <= 1);
+      }
+      sectionEl.classList.remove("hidden");
     }
 
     function parseInputUrls(urlsInput) {
@@ -131,6 +234,19 @@
       return formData;
     }
 
+    function appendEstimateEntries(formData, estimateData) {
+      const entries = Array.isArray(estimateData?.entries) ? estimateData.entries : [];
+      formData.append("estimateEntriesJson", JSON.stringify(entries));
+    }
+
+    async function fetchDownloadEstimate(formData) {
+      const response = await fetchImpl("/api/download-estimate", {
+        method: "POST",
+        body: formData,
+      });
+      return parseApiResponse(response);
+    }
+
     async function submitDownload(formData) {
       const response = await fetchImpl("/download", {
         method: "POST",
@@ -163,7 +279,38 @@
         const valid = await validateUrls(urls);
         if (!valid) return;
 
+        const estimatesEnabled = loadSetting(DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY, true) !== false;
+        let estimateResult = { ok: true, data: { entries: [], summary: null } };
+        let estimateLabel = "";
+        if (estimatesEnabled) {
+          const estimateFormData = buildDownloadFormData(urlsInput);
+          estimateResult = await fetchDownloadEstimate(estimateFormData);
+          if (!estimateResult.ok) {
+            notifyError(`エラー: ${estimateResult.error || "サイズ見積もりに失敗しました。"}`);
+            return;
+          }
+
+          estimateLabel = formatEstimateSummary(estimateResult.data?.summary);
+          updateEstimateStatus(estimateLabel);
+          updateEstimateList(estimateResult.data?.entries);
+        } else {
+          clearEstimateUi();
+        }
+
+        const skipConfirm = loadSetting(SKIP_DOWNLOAD_CONFIRM_SETTING_KEY, false) === true;
+        if (!skipConfirm) {
+          const confirmResult = await showDownloadConfirm({
+            message: "ダウンロードを開始しますか？",
+            estimateText: estimateLabel,
+          });
+          if (!confirmResult?.confirmed) return;
+          if (confirmResult.skipFuture) {
+            saveSetting(SKIP_DOWNLOAD_CONFIRM_SETTING_KEY, true);
+          }
+        }
+
         const formData = buildDownloadFormData(urlsInput);
+        appendEstimateEntries(formData, estimateResult.data);
         const submitted = await submitDownload(formData);
         if (submitted) {
           notifyInfo("ダウンロードを開始しました。");
@@ -187,5 +334,7 @@
     parseUrlsFromInputValue,
     isHttpsUrl,
     resolveCommentOptions,
+    formatEstimateSummary,
+    DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY,
   };
 })(window);

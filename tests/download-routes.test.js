@@ -119,7 +119,109 @@ test("download-routes creates jobs and enqueues them", async () => {
   assert.equal(maxParallel, "2");
   assert.equal(enqueued.length, 1);
   assert.equal(enqueued[0].status, "queued");
+  assert.equal(enqueued[0].progress.estimatedTotalSize, "");
   assert.ok(broadcasts.some((ev) => ev.event === "jobs_added"));
+});
+
+test("download-routes attaches estimated size to queued job when provided", async () => {
+  const app = createRouteCaptureApp();
+  const api = createApiFns();
+  const enqueued = [];
+
+  registerDownloadRoutes(app, {
+    upload: { single: () => (_req, _res, next) => next?.() },
+    crypto,
+    jobHistory: new Map(),
+    broadcast: () => {},
+    downloadQueueService: {
+      setMaxConcurrentDownloads: () => {},
+      enqueueJobs: (jobs) => enqueued.push(...jobs),
+    },
+    getUrlsFromInput: async () => ["https://www.youtube.com/watch?v=abc"],
+    fs: require("node:fs"),
+    path,
+    baseDir: process.cwd(),
+    apiOk: api.apiOk,
+    apiError: api.apiError,
+  });
+
+  const handler = app.routes.post.get("/download");
+  const res = {};
+  await handler(
+    {
+      body: {
+        urls: "https://www.youtube.com/watch?v=abc",
+        parallelDownloads: "1",
+        estimateEntriesJson: JSON.stringify([
+          {
+            url: "https://www.youtube.com/watch?v=abc",
+            title: "sample title",
+            estimatedSizeText: "1.2 GB",
+          },
+        ]),
+      },
+      file: null,
+    },
+    res,
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(enqueued[0].title, "sample title");
+  assert.equal(enqueued[0].progress.estimatedTotalSize, "1.2 GB");
+});
+
+test("download-routes returns size estimates", async () => {
+  const app = createRouteCaptureApp();
+  const api = createApiFns();
+
+  registerDownloadRoutes(app, {
+    upload: { single: () => (_req, _res, next) => next?.() },
+    crypto,
+    jobHistory: new Map(),
+    broadcast: () => {},
+    downloadQueueService: {
+      setMaxConcurrentDownloads: () => {},
+      enqueueJobs: () => {},
+    },
+    getUrlsFromInput: async () => ["https://www.youtube.com/watch?v=abc"],
+    fs: require("node:fs"),
+    path,
+    baseDir: process.cwd(),
+    apiOk: api.apiOk,
+    apiError: api.apiError,
+    downloadEstimateService: {
+      estimateUrl: async () => ({
+        url: "https://www.youtube.com/watch?v=abc",
+        title: "sample title",
+        estimatedBytes: 1024,
+        estimatedSizeText: "1 KB",
+      }),
+      buildEstimateSummary: () => ({
+        totalText: "1 KB",
+        count: 1,
+        label: "予測サイズ: 1 KB (1件)",
+      }),
+    },
+  });
+
+  const handler = app.routes.post.get("/api/download-estimate");
+  const res = {};
+  await handler(
+    {
+      body: {
+        urls: "https://www.youtube.com/watch?v=abc",
+        downloadVideo: "true",
+        format: "best",
+      },
+      file: null,
+    },
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.data.entries[0].estimatedSizeText, "1 KB");
+  assert.equal(res.body.data.summary.totalText, "1 KB");
 });
 
 test("download-routes clears history file", async () => {

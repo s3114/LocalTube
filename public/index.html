@@ -760,6 +760,77 @@
         min-height: 1.2em;
       }
 
+      .download-estimate-status {
+        margin-top: 8px;
+        color: var(--subtext);
+        font-size: 12px;
+        min-height: 1.2em;
+      }
+
+      .download-estimate-list-section {
+        margin-top: 16px;
+      }
+
+      .download-estimate-list-section.hidden {
+        display: none;
+      }
+
+      .download-estimate-list-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .download-estimate-list-header h3 {
+        margin: 0;
+      }
+
+      .download-estimate-list-total {
+        margin-top: 8px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.5;
+        word-break: break-word;
+      }
+
+      .download-estimate-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .download-estimate-list.collapsed {
+        display: none;
+      }
+
+      .download-estimate-list-item {
+        color: var(--subtext);
+        font-size: 12px;
+        line-height: 1.5;
+        word-break: break-word;
+      }
+
+      .download-estimate-toggle {
+        background: transparent;
+        border: none;
+        color: #aaa;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0 8px;
+        border-radius: 6px;
+      }
+
+      .download-estimate-toggle:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .download-estimate-toggle.hidden {
+        display: none;
+      }
+
       .cookie-error-hint {
         color: var(--accent); /* Red color */
         font-weight: bold;
@@ -2225,6 +2296,20 @@
         display: flex;
         justify-content: flex-end;
         gap: 8px;
+      }
+
+      .download-confirm-modal-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 0 4px;
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .download-confirm-modal-check input {
+        width: 16px;
+        height: 16px;
       }
 
       .feedback-modal {
@@ -3931,6 +4016,9 @@
                 </button>
               </div>
             </div>
+            <div id="download-estimate-status"
+              class="download-estimate-status"
+              aria-live="polite"></div>
             <div class="options">
               <div class="field-row">
                 <div class="field-label">画質</div>
@@ -4199,6 +4287,20 @@
                 <div id="completion-text" class="completion-text">0%</div>
               </div>
             </div>
+            <div id="download-estimate-list-section"
+              class="download-estimate-list-section hidden">
+              <div class="download-estimate-list-header">
+                <h3>予測サイズ</h3>
+                <button id="download-estimate-list-toggle"
+                  class="download-estimate-toggle"
+                  type="button">折りたたむ</button>
+              </div>
+              <div id="download-estimate-list-total"
+                class="download-estimate-list-total"></div>
+              <div id="download-estimate-list"
+                class="download-estimate-list"
+                aria-live="polite"></div>
+            </div>
           </div>
         </div>
         <div id="job-queue"></div>
@@ -4379,6 +4481,18 @@
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="opt-fallback-thumbnails" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="toggle">
+                <div>
+                  ダウンロード前のサイズ表示
+                  <small>ダウンロード前に予測サイズを取得して表示します。</small>
+                  <!-- <small id="download-estimate-setting-status"
+                    class="settings-hint-blue"></small> -->
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="opt-download-estimates" checked />
                   <span class="slider"></span>
                 </label>
               </div>
@@ -5004,6 +5118,31 @@
                 <button id="settings-confirm-modal-cancel-btn"
                   class="btn-ui btn-gray">いいえ</button>
                 <button id="settings-confirm-modal-confirm-btn"
+                  class="btn-ui btn-blue">はい</button>
+              </div>
+            </div>
+          </div>
+          <div id="download-confirm-modal-backdrop"
+            class="report-modal-backdrop hidden">
+            <div class="report-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="download-confirm-modal-title">
+              <h3 id="download-confirm-modal-title"
+                class="report-modal-title">ダウンロード確認</h3>
+              <div id="download-confirm-modal-message"
+                class="report-modal-copy">ダウンロードを開始しますか？</div>
+              <div id="download-confirm-modal-estimate"
+                class="report-modal-copy hidden"></div>
+              <label class="download-confirm-modal-check">
+                <input type="checkbox"
+                  id="download-confirm-modal-skip-checkbox" />
+                <span>次回以降確認をしないようにする</span>
+              </label>
+              <div class="report-modal-actions">
+                <button id="download-confirm-modal-cancel-btn"
+                  class="btn-ui btn-gray">いいえ</button>
+                <button id="download-confirm-modal-confirm-btn"
                   class="btn-ui btn-blue">はい</button>
               </div>
             </div>

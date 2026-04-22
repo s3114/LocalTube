@@ -19,6 +19,7 @@ test("GET /api/settings returns expected shape", async () => {
   assert.equal(typeof body.data, "object");
   assert.equal(Array.isArray(body.data.localVideoDirs), true);
   assert.equal(typeof body.data.enableFallbackThumbnails, "boolean");
+  assert.equal(typeof body.data.enableDownloadEstimates, "boolean");
   assert.equal(typeof body.data.emojiDictionary, "object");
 });
 
@@ -61,6 +62,30 @@ test("POST /api/settings persists fallback thumbnail toggle", async () => {
 
   loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
   assert.equal(loaded.body.data.enableFallbackThumbnails, true);
+});
+
+test("POST /api/settings persists download estimate toggle", async () => {
+  const saveFalse = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enableDownloadEstimates: false }),
+  });
+  assert.equal(saveFalse.status, 200);
+  assert.equal(saveFalse.body.ok, true);
+
+  let loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
+  assert.equal(loaded.body.data.enableDownloadEstimates, false);
+
+  const saveTrue = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enableDownloadEstimates: true }),
+  });
+  assert.equal(saveTrue.status, 200);
+  assert.equal(saveTrue.body.ok, true);
+
+  loaded = await ctx.fetchJson(`${ctx.baseUrl}/api/settings`);
+  assert.equal(loaded.body.data.enableDownloadEstimates, true);
 });
 
 test("POST /api/settings persists wallpaper blur and brightness", async () => {
