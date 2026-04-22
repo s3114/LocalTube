@@ -19,6 +19,7 @@ function registerDownloadRoutes(
   },
 ) {
   const routeLogger = logger || createLogger("route-download");
+  const DOWNLOAD_ESTIMATE_CONCURRENCY = 30;
 
   function parseEstimateEntries(rawValue) {
     const text = String(rawValue || "").trim();
@@ -31,22 +32,76 @@ function registerDownloadRoutes(
     }
   }
 
-  async function buildResolvedEntries(inputUrls, cookieFile) {
-    const entries = [];
-    for (const url of inputUrls) {
-      try {
-        const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
-        for (const videoUrl of videoUrls) {
-          entries.push({
-            inputUrl: String(url || "").trim(),
-            resolvedUrl: String(videoUrl || "").trim(),
-          });
+  async function mapWithConcurrency(items, concurrency, iteratee) {
+    const list = Array.isArray(items) ? items : [];
+    const limit = Math.max(1, Number(concurrency) || 1);
+    const results = new Array(list.length);
+    let nextIndex = 0;
+
+    async function worker() {
+      while (true) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        if (currentIndex >= list.length) {
+          return;
         }
-      } catch (error) {
-        routeLogger.warn("URLの解析に失敗", { url, error: error.message });
+        results[currentIndex] = await iteratee(list[currentIndex], currentIndex);
       }
     }
-    return entries;
+
+    const workerCount = Math.min(limit, list.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+  }
+
+  async function buildResolvedEntries(inputUrls, cookieFile) {
+    const resolvedGroups = await mapWithConcurrency(
+      inputUrls,
+      DOWNLOAD_ESTIMATE_CONCURRENCY,
+      async (url) => {
+        const entries = [];
+        try {
+          const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
+          for (const videoUrl of videoUrls) {
+            entries.push({
+              inputUrl: String(url || "").trim(),
+              resolvedUrl: String(videoUrl || "").trim(),
+            });
+          }
+        } catch (error) {
+          routeLogger.warn("URLの解析に失敗", { url, error: error.message });
+        }
+        return entries;
+      },
+    );
+    return resolvedGroups.flat();
+  }
+
+  async function buildEstimatedEntries(resolvedEntries, { cookieFile, format, downloadVideo }) {
+    return mapWithConcurrency(
+      resolvedEntries,
+      DOWNLOAD_ESTIMATE_CONCURRENCY,
+      async (entry) => {
+      try {
+        return await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
+          cookiePath: cookieFile?.path,
+          format,
+          downloadVideo,
+        });
+      } catch (error) {
+        routeLogger.warn("サイズ見積もりに失敗", {
+          url: entry.resolvedUrl,
+          error: error.message,
+        });
+        return {
+          url: entry.resolvedUrl,
+          title: entry.resolvedUrl,
+          estimatedBytes: null,
+          estimatedSizeText: "不明",
+        };
+      }
+      },
+    );
   }
 
   function buildEstimateMap(rawValue) {
@@ -92,29 +147,11 @@ function registerDownloadRoutes(
 
     const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
     const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile);
-    const estimatedEntries = [];
-
-    for (const entry of resolvedEntries) {
-      try {
-        const estimated = await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
-          cookiePath: cookieFile?.path,
-          format,
-          downloadVideo,
-        });
-        estimatedEntries.push(estimated);
-      } catch (error) {
-        routeLogger.warn("サイズ見積もりに失敗", {
-          url: entry.resolvedUrl,
-          error: error.message,
-        });
-        estimatedEntries.push({
-          url: entry.resolvedUrl,
-          title: entry.resolvedUrl,
-          estimatedBytes: null,
-          estimatedSizeText: "不明",
-        });
-      }
-    }
+    const estimatedEntries = await buildEstimatedEntries(resolvedEntries, {
+      cookieFile,
+      format,
+      downloadVideo,
+    });
 
     apiOk(res, {
       entries: estimatedEntries,

@@ -71,6 +71,22 @@ function createDoc(values = {}) {
         remove(value) {
           this.values.delete(value);
         },
+        toggle(value, force) {
+          if (typeof force === "boolean") {
+            if (force) {
+              this.values.add(value);
+              return true;
+            }
+            this.values.delete(value);
+            return false;
+          }
+          if (this.values.has(value)) {
+            this.values.delete(value);
+            return false;
+          }
+          this.values.add(value);
+          return true;
+        },
         contains(value) {
           return this.values.has(value);
         },
@@ -167,12 +183,13 @@ test("download action validates and submits then clears input", async () => {
   assert.equal(elements["download-btn"].disabled, false);
   assert.equal(elements["download-estimate-status"].textContent, "予測サイズ: 2.0 GB (2件)");
   assert.equal(elements["download-estimate-list-section"].classList.contains("hidden"), false);
-  assert.equal(elements["download-estimate-list-total"].textContent, "https://example.com/video1 - 1.2 GB");
+  assert.equal(elements["download-estimate-list-total"].textContent, "合計: 2.0 GB");
   assert.equal(elements["download-estimate-list-toggle"].textContent, "折りたたむ");
   assert.equal(elements["download-estimate-list-toggle"].classList.contains("hidden"), false);
   assert.deepEqual(
     elements["download-estimate-list"].children.map((item) => item.textContent),
     [
+      "https://example.com/video1 - 1.2 GB",
       "https://example.com/video2 - 800 MB",
     ],
   );
@@ -352,6 +369,89 @@ test("download action skips estimate fetch when disabled by setting", async () =
   assert.equal(elements["download-estimate-list-section"].classList.contains("hidden"), true);
 });
 
+test("download action shows a single estimate entry without hiding it in total row", async () => {
+  loadActions();
+  const doc = createDoc({ urls: "https://example.com/video" });
+  const { elements } = doc;
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      if (String(url) === "/api/download-estimate") {
+        return {
+          __parsed: {
+            ok: true,
+            data: {
+              entries: [
+                { title: "single video", estimatedSizeText: "3 GB" },
+              ],
+              summary: { totalText: "3 GB", count: 1 },
+            },
+          },
+        };
+      }
+      return { __parsed: { ok: true, data: { message: "ok" } } };
+    },
+    doc,
+    alertImpl: () => {},
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: false }),
+  });
+
+  await actions.startDownload();
+
+  assert.equal(elements["download-estimate-list-total"].textContent, "合計: 3 GB");
+  assert.deepEqual(
+    elements["download-estimate-list"].children.map((item) => item.textContent),
+    ["single video - 3 GB"],
+  );
+  assert.equal(elements["download-estimate-list-toggle"].classList.contains("hidden"), true);
+});
+
+test("download action auto-collapses estimate list when six or more lines are shown", async () => {
+  loadActions();
+  const doc = createDoc({ urls: "https://example.com/video" });
+  const { elements } = doc;
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      if (String(url) === "/api/download-estimate") {
+        return {
+          __parsed: {
+            ok: true,
+            data: {
+              entries: [
+                { title: "total", estimatedSizeText: "10 GB" },
+                { title: "a", estimatedSizeText: "1 GB" },
+                { title: "b", estimatedSizeText: "1 GB" },
+                { title: "c", estimatedSizeText: "1 GB" },
+                { title: "d", estimatedSizeText: "1 GB" },
+                { title: "e", estimatedSizeText: "1 GB" },
+              ],
+              summary: { totalText: "10 GB", count: 6 },
+            },
+          },
+        };
+      }
+      return { __parsed: { ok: true, data: { message: "ok" } } };
+    },
+    doc,
+    alertImpl: () => {},
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: false }),
+  });
+
+  await actions.startDownload();
+
+  assert.equal(elements["download-estimate-list"].classList.contains("collapsed"), true);
+  assert.equal(elements["download-estimate-list-toggle"].textContent, "展開");
+});
+
 test("app-actions pure utils parse URL inputs", () => {
   loadActions();
   const utils = global.__appActionsTestUtils;
@@ -394,5 +494,9 @@ test("app-actions pure utils validate HTTPS scheme", () => {
   assert.equal(
     utils.formatEstimateSummary({ totalText: "1.2 GB", count: 2 }),
     "予測サイズ: 1.2 GB (2件)",
+  );
+  assert.equal(
+    utils.formatEstimateTotal({ totalText: "1.2 GB", count: 2 }),
+    "合計: 1.2 GB",
   );
 });

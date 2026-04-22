@@ -69,7 +69,6 @@ function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
         "--dump-single-json",
         "--skip-download",
         "--no-warnings",
-        "--no-call-home",
       ];
       if (
         (downloadVideo === true || downloadVideo === "true") &&

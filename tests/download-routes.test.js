@@ -224,6 +224,79 @@ test("download-routes returns size estimates", async () => {
   assert.equal(res.body.data.summary.totalText, "1 KB");
 });
 
+test("download-routes estimates sizes with concurrency capped at 30", async () => {
+  const app = createRouteCaptureApp();
+  const api = createApiFns();
+  const urlCount = 35;
+  const urls = Array.from({ length: urlCount }, (_, index) => `https://example.com/video${index}`);
+  let resolvingActive = 0;
+  let resolvingMax = 0;
+  let estimatingActive = 0;
+  let estimatingMax = 0;
+
+  registerDownloadRoutes(app, {
+    upload: { single: () => (_req, _res, next) => next?.() },
+    crypto,
+    jobHistory: new Map(),
+    broadcast: () => {},
+    downloadQueueService: {
+      setMaxConcurrentDownloads: () => {},
+      enqueueJobs: () => {},
+    },
+    getUrlsFromInput: async (url) => {
+      resolvingActive += 1;
+      resolvingMax = Math.max(resolvingMax, resolvingActive);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      resolvingActive -= 1;
+      return [url];
+    },
+    fs: require("node:fs"),
+    path,
+    baseDir: process.cwd(),
+    apiOk: api.apiOk,
+    apiError: api.apiError,
+    downloadEstimateService: {
+      estimateUrl: async (url) => {
+        estimatingActive += 1;
+        estimatingMax = Math.max(estimatingMax, estimatingActive);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        estimatingActive -= 1;
+        return {
+          url,
+          title: url,
+          estimatedBytes: 1024,
+          estimatedSizeText: "1 KB",
+        };
+      },
+      buildEstimateSummary: (entries) => ({
+        totalText: `${entries.length} KB`,
+        count: entries.length,
+        label: `予測サイズ: ${entries.length} KB (${entries.length}件)`,
+      }),
+    },
+  });
+
+  const handler = app.routes.post.get("/api/download-estimate");
+  const res = {};
+  await handler(
+    {
+      body: {
+        urls: urls.join("\n"),
+        downloadVideo: "true",
+        format: "best",
+      },
+      file: null,
+    },
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.data.entries.length, urlCount);
+  assert.equal(resolvingMax, 30);
+  assert.equal(estimatingMax, 30);
+});
+
 test("download-routes clears history file", async () => {
   const app = createRouteCaptureApp();
   const api = createApiFns();

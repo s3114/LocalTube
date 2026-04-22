@@ -53,6 +53,15 @@
     return isCollapsed ? "展開" : "折りたたむ";
   }
 
+  function formatEstimateTotal(summary) {
+    const totalText = String(summary?.totalText || "").trim();
+    return totalText ? `合計: ${totalText}` : "";
+  }
+
+  function shouldCollapseEstimateList(lines) {
+    return Array.isArray(lines) && lines.length >= 6;
+  }
+
   function createDownloadActions({
     parseApiResponse,
     fetchImpl = fetch,
@@ -101,7 +110,7 @@
       sectionEl?.classList.add("hidden");
     }
 
-    function updateEstimateList(entries) {
+    function updateEstimateList(entries, summary) {
       const sectionEl = doc.getElementById("download-estimate-list-section");
       const totalEl = doc.getElementById("download-estimate-list-total");
       const listEl = doc.getElementById("download-estimate-list");
@@ -116,14 +125,13 @@
       }
 
       if (totalEl) {
-        totalEl.textContent = lines[0] || "";
+        totalEl.textContent = formatEstimateTotal(summary);
       }
 
       const fragment = doc.createDocumentFragment
         ? doc.createDocumentFragment()
         : null;
-      lines.forEach((line, index) => {
-        if (index === 0) return;
+      lines.forEach((line) => {
         const item = doc.createElement("div");
         item.className = "download-estimate-list-item";
         item.textContent = line;
@@ -137,6 +145,8 @@
         listEl.appendChild(fragment);
       }
       if (toggleBtn) {
+        const shouldCollapse = shouldCollapseEstimateList(lines);
+        listEl.classList.toggle("collapsed", shouldCollapse);
         const isCollapsed = listEl.classList.contains("collapsed");
         toggleBtn.textContent = getEstimateToggleLabel(isCollapsed);
         toggleBtn.classList.toggle("hidden", lines.length <= 1);
@@ -292,7 +302,7 @@
 
           estimateLabel = formatEstimateSummary(estimateResult.data?.summary);
           updateEstimateStatus(estimateLabel);
-          updateEstimateList(estimateResult.data?.entries);
+          updateEstimateList(estimateResult.data?.entries, estimateResult.data?.summary);
         } else {
           clearEstimateUi();
         }
@@ -335,6 +345,7 @@
     isHttpsUrl,
     resolveCommentOptions,
     formatEstimateSummary,
+    formatEstimateTotal,
     DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY,
   };
 })(window);
