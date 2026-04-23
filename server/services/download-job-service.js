@@ -1,5 +1,6 @@
 const { execFileSync } = require("child_process");
 const { createLogger } = require("./logger-service");
+const { resolveFfmpegPath, resolveYtDlpPath } = require("./tool-path-service");
 
 function createDownloadJobService({
   fs,
@@ -40,7 +41,7 @@ function createDownloadJobService({
       return cachedFfmpegCheck.ok ? cachedFfmpegCheck.path : null;
     }
 
-    const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+    const ffmpegPath = resolveFfmpegPath(baseDir);
     try {
       execFileSync(ffmpegPath, ["-version"], {
         windowsHide: true,
@@ -78,7 +79,7 @@ function createDownloadJobService({
 
     if (!needsFfmpeg) return null;
 
-    const checkedPath = cachedFfmpegCheck?.path || path.join(baseDir, "ffmpeg.exe");
+    const checkedPath = cachedFfmpegCheck?.path || resolveFfmpegPath(baseDir) || "ffmpeg";
     const status = cachedFfmpegCheck?.error?.status;
     throw new Error(
       `ffmpeg を起動できません: ${checkedPath}${typeof status === "number" ? ` (status=${status})` : ""}`,
@@ -535,7 +536,7 @@ function createDownloadJobService({
       if (!metadataUrl) return infoObj;
       channelArgs.push(metadataUrl);
 
-      const channelJson = execFileSync(path.join(baseDir, "yt-dlp.exe"), channelArgs, {
+      const channelJson = execFileSync(resolveYtDlpPath(baseDir), channelArgs, {
         encoding: "utf-8",
         timeout: 10000,
         windowsHide: true,
@@ -681,7 +682,7 @@ function createDownloadJobService({
 
   async function runFfmpegRemux(inputPath) {
     return new Promise((resolve, reject) => {
-      const ffmpegPath = path.join(baseDir, "ffmpeg.exe");
+      const ffmpegPath = resolveFfmpegPath(baseDir);
       const parsed = path.parse(inputPath);
       const outputPath = path.join(parsed.dir, `${parsed.name}_fix.mp4`);
       const finalPath = path.join(parsed.dir, `${parsed.name}.mp4`);
@@ -930,7 +931,7 @@ function createDownloadJobService({
   }
 
   async function processDownloadJob(job) {
-    const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
+    const ytDlpPath = resolveYtDlpPath(baseDir);
     const settings = await loadSettingsSafe();
     job.url = normalizeYoutubeUrl(job.url);
 
