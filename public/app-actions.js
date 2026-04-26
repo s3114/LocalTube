@@ -86,6 +86,16 @@
       if (button) button.disabled = disabled;
     }
 
+    function setEstimateLoadingVisible(visible) {
+      const backdrop = doc.getElementById("estimate-loading-backdrop");
+      if (!backdrop?.classList) return;
+      if (visible) {
+        backdrop.classList.remove("hidden");
+      } else {
+        backdrop.classList.add("hidden");
+      }
+    }
+
     function updateEstimateStatus(message) {
       const statusEl = doc.getElementById("download-estimate-status");
       if (!statusEl) return;
@@ -294,7 +304,9 @@
         let estimateLabel = "";
         if (estimatesEnabled) {
           const estimateFormData = buildDownloadFormData(urlsInput);
+          setEstimateLoadingVisible(true);
           estimateResult = await fetchDownloadEstimate(estimateFormData);
+          setEstimateLoadingVisible(false);
           if (!estimateResult.ok) {
             notifyError(`エラー: ${estimateResult.error || "サイズ見積もりに失敗しました。"}`);
             return;
@@ -330,6 +342,7 @@
         notifyError(`ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`);
         onError(error);
       } finally {
+        setEstimateLoadingVisible(false);
         setButtonDisabled(downloadBtn, false);
       }
     }

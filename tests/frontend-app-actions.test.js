@@ -13,6 +13,20 @@ function loadActions() {
 function createDoc(values = {}) {
   const elements = {
     "download-btn": { disabled: false },
+    "estimate-loading-backdrop": {
+      classList: {
+        values: new Set(["hidden"]),
+        add(value) {
+          this.values.add(value);
+        },
+        remove(value) {
+          this.values.delete(value);
+        },
+        contains(value) {
+          return this.values.has(value);
+        },
+      },
+    },
     "download-estimate-status": { textContent: "" },
     "download-estimate-list-section": {
       classList: {
@@ -195,6 +209,57 @@ test("download action validates and submits then clears input", async () => {
   );
   assert.ok(fetchCalls.some((c) => c.url === "/api/download-estimate"));
   assert.ok(fetchCalls.some((c) => c.url === "/download"));
+});
+
+test("download action shows estimate loading overlay while fetching estimate", async () => {
+  loadActions();
+  const doc = createDoc({
+    urls: "https://example.com/video1",
+  });
+  const { elements } = doc;
+  const overlayEvents = [];
+  const originalRemove = elements["estimate-loading-backdrop"].classList.remove;
+  const originalAdd = elements["estimate-loading-backdrop"].classList.add;
+  elements["estimate-loading-backdrop"].classList.remove = function remove(value) {
+    overlayEvents.push(`remove:${value}`);
+    return originalRemove.call(this, value);
+  };
+  elements["estimate-loading-backdrop"].classList.add = function add(value) {
+    overlayEvents.push(`add:${value}`);
+    return originalAdd.call(this, value);
+  };
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      if (String(url) === "/api/download-estimate") {
+        return {
+          __parsed: {
+            ok: true,
+            data: {
+              entries: [
+                { title: "single video", estimatedSizeText: "3 GB" },
+              ],
+              summary: { totalText: "3 GB", count: 1 },
+            },
+          },
+        };
+      }
+      return { __parsed: { ok: true, data: { message: "ok" } } };
+    },
+    doc,
+    alertImpl: () => {},
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: false }),
+  });
+
+  await actions.startDownload();
+
+  assert.ok(overlayEvents.includes("remove:hidden"));
+  assert.ok(overlayEvents.includes("add:hidden"));
+  assert.equal(elements["estimate-loading-backdrop"].classList.contains("hidden"), true);
 });
 
 test("download action blocks invalid URL before submit", async () => {
