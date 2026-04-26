@@ -1,4 +1,5 @@
 const { createLogger } = require("./logger-service");
+const { resolveYtDlpPath } = require("./tool-path-service");
 
 function createInputUrlResolver({ spawn, path, baseDir, logger, fetchWithTimeout }) {
   if (typeof spawn !== "function") throw new Error("spawn is required");
@@ -38,7 +39,7 @@ function createInputUrlResolver({ spawn, path, baseDir, logger, fetchWithTimeout
     const resolvedUrl = await resolveAbemaShortUrl(url);
 
     return new Promise((resolve, reject) => {
-      const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
+      const ytDlpPath = resolveYtDlpPath(baseDir);
       let args = [];
       const commonArgs = ["--skip-download", "--quiet", "--no-warnings"];
       if (cookiePath) {

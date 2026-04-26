@@ -1,6 +1,7 @@
 const { execFile } = require("child_process");
 const { promisify } = require("util");
 const { createLogger } = require("../services/logger-service");
+const { resolveYtDlpPath } = require("../services/tool-path-service");
 
 function registerInfoRoutes(app, deps) {
   const execFileAsync = promisify(execFile);
@@ -186,7 +187,7 @@ function registerInfoRoutes(app, deps) {
       channelArgs.push(normalizeChannelMetadataUrl(infoObj.channel_url));
 
       const { stdout: channelJson } = await execFileAsync(
-        path.join(baseDir, "yt-dlp.exe"),
+        resolveYtDlpPath(baseDir),
         channelArgs,
         {
           encoding: "utf-8",

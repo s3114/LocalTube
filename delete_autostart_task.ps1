@@ -57,4 +57,5 @@ try {
 Set-Content -Path $ResultFilePath -Value $output
 
 # Admin process exits here
+Write-Output $output
 exit $exitCode

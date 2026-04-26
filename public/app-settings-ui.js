@@ -434,10 +434,10 @@ function clampNumberInRange(value, min, max, fallback) {
       }
 
       function initializeAutostartTaskButtons(elements) {
-        const autostartToggle = document.getElementById("opt-autostart-task");
+        const autostartModeSelect = document.getElementById("opt-autostart-mode");
         const autostartStatus = document.getElementById("autostart-status");
 
-        if (!autostartToggle || !autostartStatus) return;
+        if (!autostartModeSelect || !autostartStatus) return;
 
         async function syncAutostartStatus() {
           autostartStatus.textContent = "状態を確認中...";
@@ -449,9 +449,12 @@ function clampNumberInRange(value, min, max, fallback) {
               throw new Error(result.error || "状態の取得に失敗しました。");
             }
             const enabled = Boolean(result.data?.enabled);
-            autostartToggle.checked = enabled;
+            const mode = enabled
+              ? String(result.data?.mode || "startup")
+              : "disabled";
+            autostartModeSelect.value = mode;
             autostartStatus.textContent = enabled
-              ? "現在: 有効"
+              ? `現在: ${mode === "logon" ? "ログオン時" : "システム起動時"}`
               : "現在: 無効";
             autostartStatus.style.color = enabled ? "var(--green)" : "var(--main-txt)";
           } catch (error) {
@@ -461,50 +464,65 @@ function clampNumberInRange(value, min, max, fallback) {
           }
         }
 
-        async function handleAutostart(endpoint, nextCheckedState) {
+        async function handleAutostart(nextMode, previousMode) {
           try {
             autostartStatus.textContent = "処理中...";
             autostartStatus.style.color = "var(--blue)";
-            const response = await settingsUiDeps.fetchImpl(endpoint, { method: "POST" });
+            const isDelete = nextMode === "disabled";
+            const response = await settingsUiDeps.fetchImpl(
+              isDelete ? "/api/schedule/delete" : "/api/schedule/create",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: isDelete ? "{}" : JSON.stringify({ mode: nextMode }),
+              },
+            );
             const result = await settingsUiDeps.parseApiResponseImpl(response);
 
             if (result.ok) {
               autostartStatus.textContent = result.data?.message || "完了しました。";
               autostartStatus.style.color = "var(--green)";
             } else {
-              autostartToggle.checked = !nextCheckedState;
+              autostartModeSelect.value = previousMode;
               autostartStatus.textContent = `エラー: ${result.error || "処理に失敗しました。"}`;
               autostartStatus.style.color = "var(--accent)";
             }
           } catch (error) {
             console.error("自動起動タスク操作エラー:", error);
-            autostartToggle.checked = !nextCheckedState;
+            autostartModeSelect.value = previousMode;
             autostartStatus.textContent = "通信エラーが発生しました。";
             autostartStatus.style.color = "var(--accent)";
           }
         }
 
-        autostartToggle.addEventListener("change", async () => {
-          const nextCheckedState = autostartToggle.checked;
+        autostartModeSelect.addEventListener("change", async () => {
+          const previousMode = autostartModeSelect.dataset.previousMode || "disabled";
+          const nextMode = autostartModeSelect.value || "disabled";
+          if (nextMode === previousMode) return;
+
           const confirmed = await showSettingsConfirmModal(
             elements,
-            nextCheckedState
-              ? "PC起動時にこのアプリケーションを自動で起動するように設定しますか？"
-              : "PC起動時の自動実行を解除しますか？",
+            nextMode === "disabled"
+              ? "自動起動を解除しますか？"
+              : nextMode === "logon"
+                ? "ログオン時にこのアプリケーションを自動で起動するように設定しますか？"
+                : "システム起動時にこのアプリケーションを自動で起動するように設定しますか？",
           );
 
           if (!confirmed) {
-            autostartToggle.checked = !nextCheckedState;
+            autostartModeSelect.value = previousMode;
             return;
           }
 
-          const endpoint = nextCheckedState
-            ? "/api/schedule/create"
-            : "/api/schedule/delete";
-          handleAutostart(endpoint, nextCheckedState);
+          await handleAutostart(nextMode, previousMode);
+          autostartModeSelect.dataset.previousMode = autostartModeSelect.value;
         });
 
-        syncAutostartStatus();
+        syncAutostartStatus().then(() => {
+          autostartModeSelect.dataset.previousMode = autostartModeSelect.value || "disabled";
+        });
       }
 
       function initializeServerRestartButton(elements) {

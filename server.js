@@ -27,7 +27,10 @@ const { registerInfoRoutes } = require("./server/routes/info-routes");
 const { registerNetworkRoutes } = require("./server/routes/network-routes");
 const { registerScheduleRoutes } = require("./server/routes/schedule-routes");
 const { registerLogRoutes } = require("./server/routes/log-routes");
-const { registerReportRoutes } = require("./server/routes/report-routes");
+const {
+  registerReportRoutes,
+  buildFormatsReportResponse,
+} = require("./server/routes/report-routes");
 const { createSseBus } = require("./server/services/sse-bus");
 const { apiOk, apiError } = require("./server/services/http-utils");
 const {
@@ -258,6 +261,14 @@ registerDownloadRoutes(app, {
   downloadQueueService,
   getUrlsFromInput: inputUrlResolver.getUrlsFromInput,
   downloadEstimateService,
+  loadConfig,
+  buildFormatsReportResponse: (options) =>
+    buildFormatsReportResponse({
+      ...options,
+      baseDir: __dirname,
+      serverStartTime,
+      jobHistory,
+    }),
 });
 
 registerLiveChatRoutes(app, {

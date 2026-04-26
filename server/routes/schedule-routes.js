@@ -1,3 +1,4 @@
+const fs = require("fs");
 const { createLogger } = require("../services/logger-service");
 
 function buildScheduleResultFromStdout(stdout) {
@@ -16,6 +17,36 @@ function buildScheduleResultFromStdout(stdout) {
   }
 
   return null;
+}
+
+function detectScheduleModeFromXml(xmlText) {
+  const xml = String(xmlText || "");
+  if (/<LogonTrigger\b/i.test(xml)) return "logon";
+  if (/<BootTrigger\b/i.test(xml)) return "startup";
+  return "unknown";
+}
+
+function readResultFileContent(resultFilePath) {
+  const targetPath = String(resultFilePath || "").trim();
+  if (!targetPath) return "";
+  try {
+    if (!fs.existsSync(targetPath)) return "";
+    return fs.readFileSync(targetPath, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+function removeResultFileQuietly(resultFilePath) {
+  const targetPath = String(resultFilePath || "").trim();
+  if (!targetPath) return;
+  try {
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+  } catch {
+    // noop
+  }
 }
 
 function registerScheduleRoutes(app, deps) {
@@ -82,12 +113,11 @@ function registerScheduleRoutes(app, deps) {
 
   app.get("/api/schedule/status", async (_req, res) => {
     const taskName = "YoutubeDL-AutoStart";
-    const { error, code, stderr } = await runSchtasks([
+    const { error, code, stdout, stderr } = await runSchtasks([
       "/query",
       "/tn",
       taskName,
-      "/fo",
-      "list",
+      "/xml",
     ]);
 
     if (error) {
@@ -97,25 +127,34 @@ function registerScheduleRoutes(app, deps) {
     }
 
     if (code === 0) {
-      return apiOk(res, { enabled: true });
+      return apiOk(res, {
+        enabled: true,
+        mode: detectScheduleModeFromXml(stdout),
+      });
     }
 
-    return apiOk(res, { enabled: false });
+    return apiOk(res, { enabled: false, mode: "disabled" });
   });
 
-  app.post("/api/schedule/create", async (_req, res) => {
+  app.post("/api/schedule/create", async (req, res) => {
     const taskName = "YoutubeDL-AutoStart";
     const batPath = path.resolve(baseDir, "起動.bat");
     const psScriptPath = path.resolve(baseDir, "create_autostart_task.ps1");
+    const triggerMode = String(req.body?.mode || "startup").trim().toLowerCase();
     const resultFilePath = path.join(
       os.tmpdir(),
       `autostart_result_create_${Date.now()}.txt`,
     );
 
+    if (!["startup", "logon"].includes(triggerMode)) {
+      return apiError(res, 400, "無効な自動起動モードです。");
+    }
+
     logger.info("executing PowerShell script", {
       psScriptPath,
       taskName,
       batPath,
+      triggerMode,
     });
 
     const { error, stdout, stderr } = await runPowerShellScript(psScriptPath, [
@@ -123,28 +162,35 @@ function registerScheduleRoutes(app, deps) {
       taskName,
       "-BatPath",
       batPath,
+      "-TriggerMode",
+      triggerMode,
       "-ResultFilePath",
       resultFilePath,
     ]);
 
-    const result = buildScheduleResultFromStdout(stdout);
-    if (result?.ok) {
-      return apiOk(res, { message: result.message });
+    try {
+      const resultText = stdout.trim() || readResultFileContent(resultFilePath);
+      const result = buildScheduleResultFromStdout(resultText);
+      if (result?.ok) {
+        return apiOk(res, { message: result.message });
+      }
+      if (result && !result.ok) {
+        return apiError(res, 500, result.message, { detail: result.detail });
+      }
+      if (error) {
+        return apiError(res, 500, "コマンド実行に失敗しました。", {
+          detail: stderr || error.message,
+        });
+      }
+      return apiError(
+        res,
+        500,
+        "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
+        { detail: `stdout: ${stdout}, stderr: ${stderr}, resultFile: ${resultText}` },
+      );
+    } finally {
+      removeResultFileQuietly(resultFilePath);
     }
-    if (result && !result.ok) {
-      return apiError(res, 500, result.message, { detail: result.detail });
-    }
-    if (error) {
-      return apiError(res, 500, "コマンド実行に失敗しました。", {
-        detail: stderr || error.message,
-      });
-    }
-    return apiError(
-      res,
-      500,
-      "タスク作成リクエストの処理中に予期せぬ問題が発生しました。",
-      { detail: `stdout: ${stdout}, stderr: ${stderr}` },
-    );
   });
 
   app.post("/api/schedule/delete", async (_req, res) => {
@@ -164,28 +210,34 @@ function registerScheduleRoutes(app, deps) {
       resultFilePath,
     ]);
 
-    const result = buildScheduleResultFromStdout(stdout);
-    if (result?.ok) {
-      return apiOk(res, { message: result.message });
+    try {
+      const resultText = stdout.trim() || readResultFileContent(resultFilePath);
+      const result = buildScheduleResultFromStdout(resultText);
+      if (result?.ok) {
+        return apiOk(res, { message: result.message });
+      }
+      if (result && !result.ok) {
+        return apiError(res, 500, result.message, { detail: result.detail });
+      }
+      if (error) {
+        return apiError(res, 500, "コマンド実行に失敗しました。", {
+          detail: stderr || error.message,
+        });
+      }
+      return apiError(
+        res,
+        500,
+        "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
+        { detail: `stdout: ${stdout}, stderr: ${stderr}, resultFile: ${resultText}` },
+      );
+    } finally {
+      removeResultFileQuietly(resultFilePath);
     }
-    if (result && !result.ok) {
-      return apiError(res, 500, result.message, { detail: result.detail });
-    }
-    if (error) {
-      return apiError(res, 500, "コマンド実行に失敗しました。", {
-        detail: stderr || error.message,
-      });
-    }
-    return apiError(
-      res,
-      500,
-      "タスク削除リクエストの処理中に予期せぬ問題が発生しました。",
-      { detail: `stdout: ${stdout}, stderr: ${stderr}` },
-    );
   });
 }
 
 module.exports = {
   registerScheduleRoutes,
   buildScheduleResultFromStdout,
+  detectScheduleModeFromXml,
 };

@@ -1,4 +1,5 @@
 const { createLogger } = require("../services/logger-service");
+const { hasListFormatsCommand } = require("./report-routes");
 
 function registerDownloadRoutes(
   app,
@@ -16,6 +17,8 @@ function registerDownloadRoutes(
     apiError,
     logger,
     downloadEstimateService,
+    loadConfig,
+    buildFormatsReportResponse,
   },
 ) {
   const routeLogger = logger || createLogger("route-download");
@@ -82,24 +85,24 @@ function registerDownloadRoutes(
       resolvedEntries,
       DOWNLOAD_ESTIMATE_CONCURRENCY,
       async (entry) => {
-      try {
-        return await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
-          cookiePath: cookieFile?.path,
-          format,
-          downloadVideo,
-        });
-      } catch (error) {
-        routeLogger.warn("サイズ見積もりに失敗", {
-          url: entry.resolvedUrl,
-          error: error.message,
-        });
-        return {
-          url: entry.resolvedUrl,
-          title: entry.resolvedUrl,
-          estimatedBytes: null,
-          estimatedSizeText: "不明",
-        };
-      }
+        try {
+          return await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
+            cookiePath: cookieFile?.path,
+            format,
+            downloadVideo,
+          });
+        } catch (error) {
+          routeLogger.warn("サイズ見積もりに失敗", {
+            url: entry.resolvedUrl,
+            error: error.message,
+          });
+          return {
+            url: entry.resolvedUrl,
+            title: entry.resolvedUrl,
+            estimatedBytes: null,
+            estimatedSizeText: "不明",
+          };
+        }
       },
     );
   }
@@ -112,6 +115,16 @@ function registerDownloadRoutes(
       map.set(key, entry);
     }
     return map;
+  }
+
+  function parseJsonField(rawValue, fallbackValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) return fallbackValue;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return fallbackValue;
+    }
   }
 
   app.post("/api/clear-history", async (_req, res) => {
@@ -185,9 +198,51 @@ function registerDownloadRoutes(
       return apiError(res, 400, "動画のURLは必須です。");
     }
 
+    const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
+    const settings = typeof loadConfig === "function" ? await loadConfig() : {};
+
+    if (
+      hasListFormatsCommand(settings?.ytDlpCustomCommand) &&
+      typeof buildFormatsReportResponse === "function"
+    ) {
+      const resolvedVideoUrls = [];
+      for (const url of inputUrls) {
+        try {
+          const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
+          resolvedVideoUrls.push(
+            ...videoUrls.map((videoUrl) => String(videoUrl || "").trim()).filter(Boolean),
+          );
+        } catch (error) {
+          routeLogger.warn("URLの解析に失敗", { url, error: error.message });
+        }
+      }
+
+      const reportResponse = buildFormatsReportResponse({
+        settings,
+        client: {
+          currentUrl: String(req.body.currentUrl || "").trim(),
+          browserUserAgent: String(req.body.browserUserAgent || "").trim(),
+          browserBrands: parseJsonField(req.body.browserBrands, []),
+          generatedAt: String(req.body.generatedAt || "").trim(),
+          cookieInfo: parseJsonField(req.body.cookieInfo, {}),
+          downloadSettings: parseJsonField(req.body.downloadSettings, {}),
+        },
+        urls: resolvedVideoUrls.length > 0 ? resolvedVideoUrls : inputUrls,
+        cookieFilePath: cookieFile?.path,
+      });
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${reportResponse.filename}"`,
+      );
+      res.statusCode = 200;
+      res.send(reportResponse.html);
+      return;
+    }
+
     downloadQueueService.setMaxConcurrentDownloads(parallelDownloads);
 
-    const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
     const estimateMap = buildEstimateMap(estimateEntriesJson);
     const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile);
     const newJobs = [];

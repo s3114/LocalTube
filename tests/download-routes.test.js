@@ -170,6 +170,67 @@ test("download-routes attaches estimated size to queued job when provided", asyn
   assert.equal(enqueued[0].progress.estimatedTotalSize, "1.2 GB");
 });
 
+test("download-routes returns formats report instead of queuing jobs when custom command includes --list-formats", async () => {
+  const app = createRouteCaptureApp();
+  const jobHistory = new Map();
+  const enqueued = [];
+  const api = createApiFns();
+
+  registerDownloadRoutes(app, {
+    upload: { single: () => (_req, _res, next) => next?.() },
+    crypto,
+    jobHistory,
+    broadcast: () => {},
+    downloadQueueService: {
+      setMaxConcurrentDownloads: () => {},
+      enqueueJobs: (jobs) => enqueued.push(...jobs),
+    },
+    getUrlsFromInput: async () => ["https://www.youtube.com/watch?v=abc"],
+    fs: require("node:fs"),
+    path,
+    baseDir: process.cwd(),
+    apiOk: api.apiOk,
+    apiError: api.apiError,
+    loadConfig: async () => ({
+      ytDlpCustomCommand: "--list-formats",
+    }),
+    buildFormatsReportResponse: ({ urls }) => ({
+      filename: "localtube-report-formats-20260427-123456.html",
+      html: `<html><body>${urls.join(",")}</body></html>`,
+    }),
+  });
+
+  const handler = app.routes.post.get("/download");
+  const res = {
+    headers: {},
+    setHeader(name, value) {
+      this.headers[String(name).toLowerCase()] = value;
+    },
+    send(payload) {
+      this.payload = payload;
+    },
+  };
+
+  await handler(
+    {
+      body: {
+        urls: "https://www.youtube.com/watch?v=abc",
+        parallelDownloads: "2",
+      },
+      file: null,
+    },
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(
+    res.headers["content-disposition"],
+    'attachment; filename="localtube-report-formats-20260427-123456.html"',
+  );
+  assert.ok(String(res.payload).includes("https://www.youtube.com/watch?v=abc"));
+  assert.equal(enqueued.length, 0);
+});
+
 test("download-routes returns size estimates", async () => {
   const app = createRouteCaptureApp();
   const api = createApiFns();
@@ -228,7 +289,10 @@ test("download-routes estimates sizes with concurrency capped at 30", async () =
   const app = createRouteCaptureApp();
   const api = createApiFns();
   const urlCount = 35;
-  const urls = Array.from({ length: urlCount }, (_, index) => `https://example.com/video${index}`);
+  const urls = Array.from(
+    { length: urlCount },
+    (_, index) => `https://example.com/video${index}`,
+  );
   let resolvingActive = 0;
   let resolvingMax = 0;
   let estimatingActive = 0;
