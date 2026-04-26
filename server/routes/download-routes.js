@@ -1,4 +1,5 @@
 const { createLogger } = require("../services/logger-service");
+const { hasListFormatsCommand } = require("./report-routes");
 
 function registerDownloadRoutes(
   app,
@@ -15,9 +16,21 @@ function registerDownloadRoutes(
     apiOk,
     apiError,
     logger,
+    loadConfig,
+    buildFormatsReportResponse,
   },
 ) {
   const routeLogger = logger || createLogger("route-download");
+
+  function parseJsonField(rawValue, fallbackValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) return fallbackValue;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return fallbackValue;
+    }
+  }
 
   app.post("/api/clear-history", async (_req, res) => {
     try {
@@ -60,9 +73,51 @@ function registerDownloadRoutes(
       return apiError(res, 400, "動画のURLは必須です。");
     }
 
+    const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
+    const settings = typeof loadConfig === "function" ? await loadConfig() : {};
+
+    if (
+      hasListFormatsCommand(settings?.ytDlpCustomCommand) &&
+      typeof buildFormatsReportResponse === "function"
+    ) {
+      const resolvedVideoUrls = [];
+      for (const url of inputUrls) {
+        try {
+          const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
+          resolvedVideoUrls.push(
+            ...videoUrls.map((videoUrl) => String(videoUrl || "").trim()).filter(Boolean),
+          );
+        } catch (error) {
+          routeLogger.warn("URLの解析に失敗", { url, error: error.message });
+        }
+      }
+
+      const reportResponse = buildFormatsReportResponse({
+        settings,
+        client: {
+          currentUrl: String(req.body.currentUrl || "").trim(),
+          browserUserAgent: String(req.body.browserUserAgent || "").trim(),
+          browserBrands: parseJsonField(req.body.browserBrands, []),
+          generatedAt: String(req.body.generatedAt || "").trim(),
+          cookieInfo: parseJsonField(req.body.cookieInfo, {}),
+          downloadSettings: parseJsonField(req.body.downloadSettings, {}),
+        },
+        urls: resolvedVideoUrls.length > 0 ? resolvedVideoUrls : inputUrls,
+        cookieFilePath: cookieFile?.path,
+      });
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${reportResponse.filename}"`,
+      );
+      res.statusCode = 200;
+      res.send(reportResponse.html);
+      return;
+    }
+
     downloadQueueService.setMaxConcurrentDownloads(parallelDownloads);
 
-    const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
     const newJobs = [];
 
     for (const url of inputUrls) {

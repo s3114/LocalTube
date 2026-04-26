@@ -4,6 +4,10 @@ const os = require("os");
 const { spawnSync } = require("child_process");
 const { getLogEntries } = require("../services/log-stream-service");
 const { getLocalTubeErrorHints } = require("../../shared/error-hints");
+const {
+  resolveFfmpegPath,
+  resolveYtDlpPath,
+} = require("../services/tool-path-service");
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -61,6 +65,81 @@ function buildJapanTimestampForFilename(date = new Date()) {
   const mm = pick("minute");
   const ss = pick("second");
   return `${yyyy}${MM}${dd}-${hh}${mm}${ss}`;
+}
+
+function buildFormatReportTimestampForFilename(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const pick = (type) =>
+    parts.find((part) => part.type === type)?.value || "00";
+  const yyyy = pick("year");
+  const MM = pick("month");
+  const dd = pick("day");
+  const hh = pick("hour");
+  const mm = pick("minute");
+  const ss = pick("second");
+  return `w${yyyy.slice(-2)}${MM}${dd}-${hh}${mm}${ss}`;
+}
+
+function splitCustomCommandArgs(commandText) {
+  const text = String(commandText || "").trim();
+  if (!text) return [];
+
+  const args = [];
+  let current = "";
+  let quote = null;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === "\\" && quote && next === quote) {
+      current += next;
+      index += 1;
+      continue;
+    }
+
+    if ((char === '"' || char === "'")) {
+      if (!quote) {
+        quote = char;
+        continue;
+      }
+      if (quote === char) {
+        quote = null;
+        continue;
+      }
+    }
+
+    if (!quote && /\s/.test(char)) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) {
+    args.push(current);
+  }
+
+  return args;
+}
+
+function hasListFormatsCommand(commandText) {
+  const args = splitCustomCommandArgs(commandText);
+  return args.some((arg) => arg === "--list-formats" || arg === "-F");
 }
 
 function formatDurationFromMs(ms) {
@@ -614,12 +693,33 @@ function buildFailedJobsHtml(jobHistory) {
     .join("");
 }
 
+function buildFormatReportsHtml(formatReports) {
+  const reports = Array.isArray(formatReports) ? formatReports : [];
+  if (!reports.length) {
+    return "<p>フォーマット情報はありません。</p>";
+  }
+
+  return reports
+    .map(
+      (report) => `
+        <div class="log-card">
+          <div><strong>URL:</strong> ${escapeHtml(report.url || "不明")}</div>
+          <div><strong>結果:</strong> ${escapeHtml(report.ok ? "成功" : "失敗")}</div>
+          <div class="log-meta">${escapeHtml(report.command || "")}</div>
+          <pre>${escapeHtml(report.output || "出力なし")}</pre>
+        </div>
+      `,
+    )
+    .join("");
+}
+
 function buildReportHtml({
   baseDir,
   serverStartTime,
   settings,
   client,
   jobHistory,
+  formatReports,
 }) {
   const now = new Date();
   const warnLogs = getLogEntries({ sinceId: 0, limit: 2000 }).filter(
@@ -775,8 +875,98 @@ function buildReportHtml({
     <h3>失敗した動画と LocalTube 側のエラー</h3>
     ${buildFailedJobsHtml(jobHistory)}
   </section>
+  ${Array.isArray(formatReports) && formatReports.length
+    ? `
+  <h2>6. フォーマット</h2>
+  <section>
+    <h3>対象動画に対する yt-dlp --list-formats の結果</h3>
+    ${buildFormatReportsHtml(formatReports)}
+  </section>`
+    : ""}
 </body>
 </html>`;
+}
+
+function runListFormatsForUrl({
+  baseDir,
+  url,
+  settings,
+  cookieFilePath,
+}) {
+  const ytDlpPath = resolveYtDlpPath(baseDir);
+  const ffmpegPath = resolveFfmpegPath(baseDir);
+  const args = [
+    String(url || "").trim(),
+    "--list-formats",
+    "--no-warnings",
+  ];
+
+  if (ffmpegPath) {
+    args.push("--ffmpeg-location", ffmpegPath);
+  }
+  if (cookieFilePath) {
+    args.push("--cookies", cookieFilePath);
+  } else if (settings?.selectedBrowser) {
+    args.push("--cookies-from-browser", settings.selectedBrowser);
+  }
+
+  const result = spawnSync(ytDlpPath, args, {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 30000,
+    shell: false,
+    cwd:
+      ytDlpPath && path.isAbsolute(ytDlpPath)
+        ? path.dirname(ytDlpPath)
+        : undefined,
+  });
+  const combinedOutput = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
+
+  return {
+    url: String(url || "").trim(),
+    command: `${ytDlpPath} ${args.join(" ")}`.trim(),
+    ok: result.status === 0 && !result.error,
+    output:
+      combinedOutput ||
+      result.error?.message ||
+      (typeof result.status === "number" ? `終了コード ${result.status}` : "出力なし"),
+  };
+}
+
+function buildFormatsReportResponse({
+  baseDir,
+  serverStartTime,
+  settings,
+  client,
+  jobHistory,
+  urls,
+  cookieFilePath,
+}) {
+  const targetUrls = Array.isArray(urls)
+    ? urls.map((url) => String(url || "").trim()).filter(Boolean)
+    : [];
+  const formatReports = targetUrls.map((url) =>
+    runListFormatsForUrl({
+      baseDir,
+      url,
+      settings,
+      cookieFilePath,
+    }),
+  );
+  const html = buildReportHtml({
+    baseDir,
+    serverStartTime,
+    settings,
+    client,
+    jobHistory,
+    formatReports,
+  });
+
+  return {
+    html,
+    filename: `localtube-report-formats-${buildFormatReportTimestampForFilename(new Date())}.html`,
+    formatReports,
+  };
 }
 
 function registerReportRoutes(app, deps) {
@@ -810,4 +1000,7 @@ function registerReportRoutes(app, deps) {
 
 module.exports = {
   registerReportRoutes,
+  buildReportHtml,
+  buildFormatsReportResponse,
+  hasListFormatsCommand,
 };

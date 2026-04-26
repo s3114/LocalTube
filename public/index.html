@@ -2199,6 +2199,61 @@
         padding: 18px;
       }
 
+      .format-report-loading-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.62);
+        z-index: 3060;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .format-report-loading-backdrop.hidden {
+        display: none;
+      }
+
+      .format-report-loading-modal {
+        width: min(420px, calc(100vw - 32px));
+        background: #171717;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        padding: 24px 22px;
+        text-align: center;
+      }
+
+      .format-report-loading-title {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .format-report-loading-copy {
+        color: var(--subtext);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .format-report-loading-spinner {
+        width: 42px;
+        height: 42px;
+        margin: 0 auto 14px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 255, 255, 0.16);
+        border-top-color: var(--blue);
+        animation: format-report-spin 0.85s linear infinite;
+      }
+
+      @keyframes format-report-spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
       .report-modal-title {
         margin: 0 0 10px;
         font-size: 18px;
@@ -4931,6 +4986,18 @@
                 <button id="report-modal-confirm-btn"
                   class="btn-ui btn-blue">はい</button>
               </div>
+            </div>
+          </div>
+
+          <div id="format-report-loading-backdrop"
+            class="format-report-loading-backdrop hidden">
+            <div class="format-report-loading-modal"
+              role="status"
+              aria-live="polite"
+              aria-label="フォーマット取得中">
+              <div class="format-report-loading-spinner"></div>
+              <h3 class="format-report-loading-title">フォーマットの取得をしています。</h3>
+              <div class="format-report-loading-copy">ｸﾞﾙｸﾞﾙ....</div>
             </div>
           </div>
 
