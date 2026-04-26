@@ -57,9 +57,12 @@
       }
 
       if (job.status !== "error") {
+        const estimatedTotalSize = String(job.progress?.estimatedTotalSize || "").trim();
         return {
           width: "0%",
-          text: job.progress.eta || job.status,
+          text: estimatedTotalSize
+            ? `待機中 予測サイズ ${estimatedTotalSize}`
+            : job.progress.eta || job.status,
           hints: [],
         };
       }

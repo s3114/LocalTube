@@ -1,4 +1,6 @@
 (function attachAppActions(global) {
+  const SKIP_DOWNLOAD_CONFIRM_SETTING_KEY = "localtube.skipDownloadConfirm.v1";
+  const DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY = "optDownloadEstimates";
   const COOKIE_MODE_STORAGE_KEY = "localtube.cookieMode";
   const COOKIE_UPDATED_AT_STORAGE_KEY = "localtube.cookieUpdatedAt";
 
@@ -28,6 +30,38 @@
     if (downloadComments) return "comments";
     if (downloadChat) return "sub";
     return "none";
+  }
+
+  function formatEstimateSummary(summary) {
+    const totalText = String(summary?.totalText || "").trim();
+    const count = Number(summary?.count || 0);
+    if (!totalText) return "";
+    return `予測サイズ: ${totalText}${count > 0 ? ` (${count}件)` : ""}`;
+  }
+
+  function buildEstimateLines(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .map((entry) => {
+        const title = String(entry?.title || entry?.url || "").trim();
+        const size = String(entry?.estimatedSizeText || "不明").trim() || "不明";
+        if (!title) return "";
+        return `${title} - ${size}`;
+      })
+      .filter(Boolean);
+  }
+
+  function getEstimateToggleLabel(isCollapsed) {
+    return isCollapsed ? "展開" : "折りたたむ";
+  }
+
+  function formatEstimateTotal(summary) {
+    const totalText = String(summary?.totalText || "").trim();
+    return totalText ? `合計: ${totalText}` : "";
+  }
+
+  function shouldCollapseEstimateList(lines) {
+    return Array.isArray(lines) && lines.length >= 6;
   }
 
   function loadLocalSettingValue(key, defaultValue) {
@@ -172,6 +206,16 @@
     alertImpl = alert,
     notifyInfo = () => {},
     notifyError = (message) => alertImpl(message),
+    showDownloadConfirm = async () => ({ confirmed: true, skipFuture: false }),
+    loadSetting = (key, defaultValue) =>
+      typeof global.loadLocalSetting === "function"
+        ? global.loadLocalSetting(key, defaultValue)
+        : defaultValue,
+    saveSetting = (key, value) => {
+      if (typeof global.saveLocalSetting === "function") {
+        global.saveLocalSetting(key, value);
+      }
+    },
     getSelectedCookieFile = () => global.selectedCookieFile,
     onError = (error) => console.error("Fetch error:", error),
     downloadAttachmentResponse = async (
@@ -196,6 +240,16 @@
       if (button) button.disabled = disabled;
     }
 
+    function setEstimateLoadingVisible(visible) {
+      const backdrop = doc.getElementById("estimate-loading-backdrop");
+      if (!backdrop?.classList) return;
+      if (visible) {
+        backdrop.classList.remove("hidden");
+      } else {
+        backdrop.classList.add("hidden");
+      }
+    }
+
     function setFormatReportLoadingVisible(visible) {
       const backdrop = doc.getElementById("format-report-loading-backdrop");
       if (!backdrop?.classList) return;
@@ -204,6 +258,74 @@
       } else {
         backdrop.classList.add("hidden");
       }
+    }
+
+    function updateEstimateStatus(message) {
+      const statusEl = doc.getElementById("download-estimate-status");
+      if (!statusEl) return;
+      statusEl.textContent = String(message || "").trim();
+    }
+
+    function clearEstimateUi() {
+      updateEstimateStatus("");
+      const sectionEl = doc.getElementById("download-estimate-list-section");
+      const totalEl = doc.getElementById("download-estimate-list-total");
+      const listEl = doc.getElementById("download-estimate-list");
+      const toggleBtn = doc.getElementById("download-estimate-list-toggle");
+      if (totalEl) totalEl.textContent = "";
+      if (listEl) {
+        listEl.innerHTML = "";
+        listEl.classList.remove("collapsed");
+      }
+      if (toggleBtn) {
+        toggleBtn.textContent = getEstimateToggleLabel(false);
+        toggleBtn.classList.add("hidden");
+      }
+      sectionEl?.classList.add("hidden");
+    }
+
+    function updateEstimateList(entries, summary) {
+      const sectionEl = doc.getElementById("download-estimate-list-section");
+      const totalEl = doc.getElementById("download-estimate-list-total");
+      const listEl = doc.getElementById("download-estimate-list");
+      const toggleBtn = doc.getElementById("download-estimate-list-toggle");
+      if (!sectionEl || !listEl) return;
+
+      const lines = buildEstimateLines(entries);
+      listEl.innerHTML = "";
+      if (lines.length === 0) {
+        sectionEl.classList.add("hidden");
+        return;
+      }
+
+      if (totalEl) {
+        totalEl.textContent = formatEstimateTotal(summary);
+      }
+
+      const fragment = doc.createDocumentFragment
+        ? doc.createDocumentFragment()
+        : null;
+      lines.forEach((line) => {
+        const item = doc.createElement("div");
+        item.className = "download-estimate-list-item";
+        item.textContent = line;
+        if (fragment) {
+          fragment.appendChild(item);
+        } else {
+          listEl.appendChild(item);
+        }
+      });
+      if (fragment) {
+        listEl.appendChild(fragment);
+      }
+      if (toggleBtn) {
+        const shouldCollapse = shouldCollapseEstimateList(lines);
+        listEl.classList.toggle("collapsed", shouldCollapse);
+        const isCollapsed = listEl.classList.contains("collapsed");
+        toggleBtn.textContent = getEstimateToggleLabel(isCollapsed);
+        toggleBtn.classList.toggle("hidden", lines.length <= 1);
+      }
+      sectionEl.classList.remove("hidden");
     }
 
     function parseInputUrls(urlsInput) {
@@ -308,6 +430,19 @@
       return formData;
     }
 
+    function appendEstimateEntries(formData, estimateData) {
+      const entries = Array.isArray(estimateData?.entries) ? estimateData.entries : [];
+      formData.append("estimateEntriesJson", JSON.stringify(entries));
+    }
+
+    async function fetchDownloadEstimate(formData) {
+      const response = await fetchImpl("/api/download-estimate", {
+        method: "POST",
+        body: formData,
+      });
+      return parseApiResponse(response);
+    }
+
     async function submitDownload(formData) {
       const response = await fetchImpl("/download", {
         method: "POST",
@@ -349,24 +484,69 @@
         const valid = await validateUrls(urls);
         if (!valid) return;
 
-        if (isFormatReportMode) {
-          setFormatReportLoadingVisible(true);
-        }
-
         const formData = buildDownloadFormData(urlsInput);
-        const submitResult = await submitDownload(formData);
-        if (submitResult.ok) {
+        if (isFormatReportMode) {
+          clearEstimateUi();
+          setFormatReportLoadingVisible(true);
+          const submitResult = await submitDownload(formData);
+          if (!submitResult.ok) return;
           if (submitResult.mode === "report") {
             notifyInfo("フォーマットレポートをダウンロードしました。");
           } else {
             notifyInfo("ダウンロードを開始しました。");
           }
           urlsInput.value = "";
+          return;
+        }
+
+        const estimatesEnabled =
+          loadSetting(DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY, true) !== false;
+        let estimateResult = { ok: true, data: { entries: [], summary: null } };
+        let estimateLabel = "";
+        if (estimatesEnabled) {
+          const estimateFormData = buildDownloadFormData(urlsInput);
+          setEstimateLoadingVisible(true);
+          estimateResult = await fetchDownloadEstimate(estimateFormData);
+          setEstimateLoadingVisible(false);
+          if (!estimateResult.ok) {
+            notifyError(`エラー: ${estimateResult.error || "サイズ見積もりに失敗しました。"}`);
+            return;
+          }
+
+          estimateLabel = formatEstimateSummary(estimateResult.data?.summary);
+          updateEstimateStatus(estimateLabel);
+          updateEstimateList(
+            estimateResult.data?.entries,
+            estimateResult.data?.summary,
+          );
+        } else {
+          clearEstimateUi();
+        }
+
+        const skipConfirm =
+          loadSetting(SKIP_DOWNLOAD_CONFIRM_SETTING_KEY, false) === true;
+        if (!skipConfirm) {
+          const confirmResult = await showDownloadConfirm({
+            message: "ダウンロードを開始しますか？",
+            estimateText: estimateLabel,
+          });
+          if (!confirmResult?.confirmed) return;
+          if (confirmResult.skipFuture) {
+            saveSetting(SKIP_DOWNLOAD_CONFIRM_SETTING_KEY, true);
+          }
+        }
+
+        appendEstimateEntries(formData, estimateResult.data);
+        const submitResult = await submitDownload(formData);
+        if (submitResult.ok) {
+          notifyInfo("ダウンロードを開始しました。");
+          urlsInput.value = "";
         }
       } catch (error) {
         notifyError(`ネットワークエラーまたは検証中に問題が発生しました: ${error.message}`);
         onError(error);
       } finally {
+        setEstimateLoadingVisible(false);
         setFormatReportLoadingVisible(false);
         setButtonDisabled(downloadBtn, false);
       }
@@ -382,6 +562,9 @@
     parseUrlsFromInputValue,
     isHttpsUrl,
     resolveCommentOptions,
+    formatEstimateSummary,
+    formatEstimateTotal,
+    DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY,
     extractFilenameFromDisposition,
     isAttachmentResponse,
     hasListFormatsCommand,

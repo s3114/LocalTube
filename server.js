@@ -45,6 +45,9 @@ const {
   createDownloadJobService,
 } = require("./server/services/download-job-service");
 const {
+  createDownloadEstimateService,
+} = require("./server/services/download-estimate-service");
+const {
   createDownloadQueueService,
 } = require("./server/services/download-queue-service");
 const {
@@ -163,6 +166,11 @@ const downloadJobService = createDownloadJobService({
   broadcast,
   loadConfig,
 });
+const downloadEstimateService = createDownloadEstimateService({
+  spawn,
+  path,
+  baseDir: __dirname,
+});
 
 const downloadQueueService = createDownloadQueueService({
   jobHistory,
@@ -252,6 +260,7 @@ registerDownloadRoutes(app, {
   broadcast,
   downloadQueueService,
   getUrlsFromInput: inputUrlResolver.getUrlsFromInput,
+  downloadEstimateService,
   loadConfig,
   buildFormatsReportResponse: (options) =>
     buildFormatsReportResponse({

@@ -56,6 +56,14 @@ const appState = window.AppState || {
         cancelBtn: document.getElementById("settings-confirm-modal-cancel-btn"),
         confirmBtn: document.getElementById("settings-confirm-modal-confirm-btn"),
       };
+      const downloadConfirmModalElements = {
+        backdrop: document.getElementById("download-confirm-modal-backdrop"),
+        message: document.getElementById("download-confirm-modal-message"),
+        estimate: document.getElementById("download-confirm-modal-estimate"),
+        skipCheckbox: document.getElementById("download-confirm-modal-skip-checkbox"),
+        cancelBtn: document.getElementById("download-confirm-modal-cancel-btn"),
+        confirmBtn: document.getElementById("download-confirm-modal-confirm-btn"),
+      };
 
       function showSettingsConfirmModal(message, options = {}) {
         const {
@@ -102,6 +110,66 @@ const appState = window.AppState || {
           backdrop.addEventListener("click", handleBackdrop);
         });
       }
+
+      function showDownloadConfirmModal({ message, estimateText } = {}) {
+        const {
+          backdrop,
+          message: messageEl,
+          estimate,
+          skipCheckbox,
+          cancelBtn,
+          confirmBtn,
+        } = downloadConfirmModalElements;
+        if (!backdrop || !messageEl || !skipCheckbox || !cancelBtn || !confirmBtn) {
+          return Promise.resolve({
+            confirmed: window.confirm(String(message || "")),
+            skipFuture: false,
+          });
+        }
+
+        messageEl.textContent = String(message || "");
+        const estimateValue = String(estimateText || "").trim();
+        if (estimate) {
+          estimate.textContent = estimateValue;
+          estimate.classList.toggle("hidden", estimateValue === "");
+        }
+        skipCheckbox.checked = false;
+        backdrop.classList.remove("hidden");
+
+        return new Promise((resolve) => {
+          let settled = false;
+          const cleanup = (confirmed) => {
+            if (settled) return;
+            settled = true;
+            backdrop.classList.add("hidden");
+            cancelBtn.removeEventListener("click", handleCancel);
+            confirmBtn.removeEventListener("click", handleConfirm);
+            backdrop.removeEventListener("click", handleBackdrop);
+            resolve({
+              confirmed,
+              skipFuture: confirmed && skipCheckbox.checked,
+            });
+          };
+          const handleCancel = () => cleanup(false);
+          const handleConfirm = () => cleanup(true);
+          const handleBackdrop = (event) => {
+            if (event.target === backdrop) {
+              cleanup(false);
+            }
+          };
+          cancelBtn.addEventListener("click", handleCancel);
+          confirmBtn.addEventListener("click", handleConfirm);
+          backdrop.addEventListener("click", handleBackdrop);
+        });
+      }
+
+      const downloadEstimateListToggle = document.getElementById("download-estimate-list-toggle");
+      const downloadEstimateList = document.getElementById("download-estimate-list");
+      downloadEstimateListToggle?.addEventListener("click", () => {
+        if (!downloadEstimateList) return;
+        const collapsed = downloadEstimateList.classList.toggle("collapsed");
+        downloadEstimateListToggle.textContent = collapsed ? "展開" : "折りたたむ";
+      });
 
       const dashboardController = window.createDashboardController({
         jobStates,
@@ -229,6 +297,8 @@ const appState = window.AppState || {
             "opt-fallback-thumbnails",
           ),
           fallbackThumbStatus: document.getElementById("fallback-thumb-status"),
+          optDownloadEstimates: document.getElementById("opt-download-estimates"),
+          downloadEstimateStatus: document.getElementById("download-estimate-setting-status"),
           wallpaperStatus: document.getElementById("wallpaper-status"),
           wallpaperFileInput: document.getElementById("wallpaper-file-input"),
           wallpaperSelectBtn: document.getElementById("wallpaper-select-btn"),
@@ -310,6 +380,7 @@ const appState = window.AppState || {
         parseApiResponse,
         notifyInfo: (message) => uiFeedback.showSuccess(message),
         notifyError: (message) => uiFeedback.showError(message),
+        showDownloadConfirm: (payload) => showDownloadConfirmModal(payload),
         onError: (error) => {
           console.error("Fetch error:", error);
         },

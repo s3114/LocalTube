@@ -8,6 +8,7 @@ const CONFIG_DEFAULTS = {
   selectedBrowser: "",
   localVideoDirs: [],
   enableFallbackThumbnails: true,
+  enableDownloadEstimates: true,
   wallpaperBlur: 2,
   wallpaperBrightness: 50,
   ytDlpCustomCommand: "",
@@ -105,6 +106,10 @@ function normalizeConfig(config) {
       typeof raw.enableFallbackThumbnails === "boolean"
         ? raw.enableFallbackThumbnails
         : CONFIG_DEFAULTS.enableFallbackThumbnails,
+    enableDownloadEstimates:
+      typeof raw.enableDownloadEstimates === "boolean"
+        ? raw.enableDownloadEstimates
+        : CONFIG_DEFAULTS.enableDownloadEstimates,
     wallpaperBlur: clampNumber(
       raw.wallpaperBlur,
       0,
