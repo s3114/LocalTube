@@ -4441,14 +4441,18 @@
               <div class="toggle">
                 <div>
                   PC起動時の自動実行
-                  <small>PCを起動したときに、このアプリケーションを自動で起動するように設定します。</small>
-                  <!-- <small id="autostart-status"
-                    class="settings-hint-blue"></small> -->
+                  <small>システム起動時またはログオン時に、このアプリケーションを自動で起動するように設定します。</small>
+                  <small id="autostart-status"
+                    class="settings-hint-blue"></small>
                 </div>
-                <label class="switch">
-                  <input type="checkbox" id="opt-autostart-task" />
-                  <span class="slider"></span>
-                </label>
+                <div
+                  class="settings-stack settings-stack-8 settings-stack-wide">
+                  <select id="opt-autostart-mode">
+                    <option value="disabled">無効</option>
+                    <option value="startup">システム起動時（ネットワークドライブや、firefoxのcookieにアクセスできません。）</option>
+                    <option value="logon">ログオン時（通常はこちら）</option>
+                  </select>
+                </div>
               </div>
 
               <div class="toggle settings-toggle-top">
@@ -4572,6 +4576,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.14.10">
+                        <span class="info-updates-date">2026/04/27</span>
+                        <span class="info-updates-version">v1.14.10</span>
+                        <span
+                          class="info-updates-content">自動起動についてシステム起動時とログオン時を選択できるように</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.14.9">
                         <span class="info-updates-date">2026/04/27</span>
                         <span class="info-updates-version">v1.14.9</span>

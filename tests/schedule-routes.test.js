@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   buildScheduleResultFromStdout,
+  detectScheduleModeFromXml,
 } = require("../server/routes/schedule-routes");
 
 test("buildScheduleResultFromStdout parses SUCCESS output", () => {
@@ -26,4 +27,19 @@ test("buildScheduleResultFromStdout parses ERROR output", () => {
 test("buildScheduleResultFromStdout returns null for unknown output", () => {
   const result = buildScheduleResultFromStdout("some unexpected output");
   assert.equal(result, null);
+});
+
+test("detectScheduleModeFromXml detects startup trigger", () => {
+  const result = detectScheduleModeFromXml("<Task><Triggers><BootTrigger /></Triggers></Task>");
+  assert.equal(result, "startup");
+});
+
+test("detectScheduleModeFromXml detects logon trigger", () => {
+  const result = detectScheduleModeFromXml("<Task><Triggers><LogonTrigger /></Triggers></Task>");
+  assert.equal(result, "logon");
+});
+
+test("detectScheduleModeFromXml returns unknown when no trigger is matched", () => {
+  const result = detectScheduleModeFromXml("<Task><Triggers></Triggers></Task>");
+  assert.equal(result, "unknown");
 });

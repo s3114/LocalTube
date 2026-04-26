@@ -2,6 +2,8 @@
 param (
     [string]$TaskName = "YoutubeDL-AutoStart",
     [string]$BatPath = "",
+    [ValidateSet("startup", "logon")]
+    [string]$TriggerMode = "startup",
     [string]$ResultFilePath = (Join-Path $env:TEMP ("autostart_result_create_{0}.txt" -f [DateTimeOffset]::Now.ToUnixTimeMilliseconds()))
 )
 
@@ -38,15 +40,26 @@ if ([string]::IsNullOrWhiteSpace($BatPath)) {
 # Check if running as administrator
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 if (-not $isAdmin) {
+    $powerShellExe = Join-Path $PSHOME "powershell.exe"
     $childArgs = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
         "-File", $PSCommandPath,
         "-TaskName", $TaskName,
         "-BatPath", $BatPath,
+        "-TriggerMode", $TriggerMode,
         "-ResultFilePath", $ResultFilePath
     )
-    $process = Start-Process powershell.exe -ArgumentList $childArgs -Verb RunAs -Wait -PassThru
+    try {
+        $process = Start-Process -FilePath $powerShellExe -ArgumentList $childArgs -Verb RunAs -Wait -PassThru -ErrorAction Stop
+    } catch {
+        $message = "ERROR: Failed to launch elevated PowerShell: $($_.Exception.Message)"
+        if (-not [string]::IsNullOrWhiteSpace($ResultFilePath)) {
+            Set-Content -Path $ResultFilePath -Value $message
+        }
+        Write-Output $message
+        exit 1
+    }
 
     if (-not [string]::IsNullOrWhiteSpace($ResultFilePath) -and (Test-Path -LiteralPath $ResultFilePath)) {
         $fileContent = Get-Content $ResultFilePath -Raw
@@ -68,11 +81,19 @@ try {
     $workingDir = Split-Path -Parent $resolvedBat
 
     $action = New-ScheduledTaskAction -Execute $resolvedBat -WorkingDirectory $workingDir
-    $trigger = New-ScheduledTaskTrigger -AtStartup
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest -Force -ErrorAction Stop | Out-Null
+    if ($TriggerMode -eq "logon") {
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $principal = New-ScheduledTaskPrincipal -GroupId "BUILTIN\Users" -RunLevel Highest
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Force -ErrorAction Stop | Out-Null
+    } else {
+        $trigger = New-ScheduledTaskTrigger -AtStartup
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest -Force -ErrorAction Stop | Out-Null
+    }
     Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop | Out-Null
 
-    $output = "SUCCESS: Auto-start task created successfully.`nBatPath: $resolvedBat`nWorking Directory set to: $workingDir"
+    $modeLabel = if ($TriggerMode -eq "logon") { "logon" } else { "startup" }
+    $userLabel = if ($TriggerMode -eq "logon") { "BUILTIN\Users (any user logon)" } else { "SYSTEM" }
+    $output = "SUCCESS: Auto-start task created successfully.`nMode: $modeLabel`nUser: $userLabel`nBatPath: $resolvedBat`nWorking Directory set to: $workingDir"
     $exitCode = 0
 } catch {
     $output = "ERROR: An exception occurred: $($_.Exception.Message)"
@@ -83,4 +104,5 @@ if (-not [string]::IsNullOrWhiteSpace($ResultFilePath)) {
     Set-Content -Path $ResultFilePath -Value $output
 }
 
+Write-Output $output
 exit $exitCode
