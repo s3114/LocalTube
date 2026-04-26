@@ -87,7 +87,7 @@ function buildFormatReportTimestampForFilename(date = new Date()) {
   const hh = pick("hour");
   const mm = pick("minute");
   const ss = pick("second");
-  return `w${yyyy.slice(-2)}${MM}${dd}-${hh}${mm}${ss}`;
+  return `${yyyy}${MM}${dd}-${hh}${mm}${ss}`;
 }
 
 function splitCustomCommandArgs(commandText) {

@@ -104,7 +104,7 @@ test("download action downloads attachment report when server returns HTML attac
         headers: {
           get(name) {
             if (String(name).toLowerCase() === "content-disposition") {
-              return 'attachment; filename="localtube-report-formats-w260427-123456.html"';
+              return 'attachment; filename="localtube-report-formats-20260427-123456.html"';
             }
             return "";
           },
@@ -129,7 +129,7 @@ test("download action downloads attachment report when server returns HTML attac
   assert.equal(elements["download-btn"].disabled, false);
   assert.deepEqual(downloaded, {
     fallbackFilename: "localtube-report-formats.html",
-    filename: 'attachment; filename="localtube-report-formats-w260427-123456.html"',
+    filename: 'attachment; filename="localtube-report-formats-20260427-123456.html"',
   });
   assert.deepEqual(infos, ["フォーマットレポートをダウンロードしました。"]);
   assert.ok(fetchCalls.some((call) => call.url === "/download"));
@@ -165,7 +165,7 @@ test("download action shows format loading overlay in list-formats mode", async 
         headers: {
           get(name) {
             if (String(name).toLowerCase() === "content-disposition") {
-              return 'attachment; filename="localtube-report-formats-w260427-123456.html"';
+              return 'attachment; filename="localtube-report-formats-20260427-123456.html"';
             }
             return "";
           },
@@ -332,9 +332,9 @@ test("app-actions pure utils validate HTTPS scheme", () => {
   );
   assert.equal(
     utils.extractFilenameFromDisposition(
-      'attachment; filename="localtube-report-formats-w260427-123456.html"',
+      'attachment; filename="localtube-report-formats-20260427-123456.html"',
     ),
-    "localtube-report-formats-w260427-123456.html",
+    "localtube-report-formats-20260427-123456.html",
   );
   assert.equal(
     utils.isAttachmentResponse({

@@ -147,7 +147,7 @@ test("download-routes returns formats report instead of queuing jobs when custom
       ytDlpCustomCommand: "--list-formats",
     }),
     buildFormatsReportResponse: ({ urls }) => ({
-      filename: "localtube-report-formats-w260427-123456.html",
+      filename: "localtube-report-formats-20260427-123456.html",
       html: `<html><body>${urls.join(",")}</body></html>`,
     }),
   });
@@ -176,7 +176,7 @@ test("download-routes returns formats report instead of queuing jobs when custom
   assert.equal(res.statusCode, 200);
   assert.equal(
     res.headers["content-disposition"],
-    'attachment; filename="localtube-report-formats-w260427-123456.html"',
+    'attachment; filename="localtube-report-formats-20260427-123456.html"',
   );
   assert.ok(String(res.payload).includes("https://www.youtube.com/watch?v=abc"));
   assert.equal(enqueued.length, 0);
