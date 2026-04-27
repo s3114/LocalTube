@@ -2367,6 +2367,83 @@
         height: 16px;
       }
 
+      .download-confirm-modal-errors {
+        margin-top: 16px;
+      }
+
+      .download-confirm-modal-errors.hidden {
+        display: none;
+      }
+
+      .download-confirm-modal-errors-copy {
+        margin: 0 0 10px;
+        color: var(--subtext);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .download-confirm-modal-errors-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .download-confirm-modal-error-card {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        padding: 14px 14px 12px 16px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 76, 112, 0.32);
+        background: #0f0f10;
+      }
+
+      .download-confirm-modal-error-icon {
+        color: #ff5a7a;
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 700;
+        padding-top: 4px;
+      }
+
+      .download-confirm-modal-error-body {
+        min-width: 0;
+      }
+
+      .download-confirm-modal-error-title {
+        margin: 0 0 6px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.5;
+        word-break: break-word;
+      }
+
+      .download-confirm-modal-error-message {
+        color: #f0f0f0;
+        font-size: 12px;
+        line-height: 1.6;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .download-confirm-modal-error-urls {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .download-confirm-modal-error-hint {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 12px;
+        line-height: 1.6;
+        font-weight: 700;
+        word-break: break-word;
+      }
+
       .estimate-loading-backdrop {
         position: fixed;
         inset: 0;
@@ -4745,6 +4822,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.15.1">
+                        <span class="info-updates-date">2026/04/28</span>
+                        <span class="info-updates-version">v1.15.1</span>
+                        <span
+                          class="info-updates-content">サイズ予測機能について、エラー時の処理を改善</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.15.0">
                         <span class="info-updates-date">2026/04/27</span>
                         <span class="info-updates-version">v1.15.0</span>
@@ -5187,7 +5270,8 @@
               aria-live="polite"
               aria-label="フォーマット取得中">
               <div class="format-report-loading-spinner"></div>
-              <h3 class="format-report-loading-title">フォーマットの取得をしています。</h3>
+              <h3 class="format-report-loading-title">フォーマットを取得しています。</h3>
+              <div class="format-report-loading-copy">対象動画のフォーマットを確認しています。しばらくお待ちください。</div>
             </div>
           </div>
 
@@ -5278,13 +5362,14 @@
               aria-live="polite"
               aria-label="予測サイズ取得中">
               <div class="estimate-loading-spinner"></div>
-              <h3 class="estimate-loading-title">予測サイズを取得中です。</h3>
+              <h3 class="estimate-loading-title">予測サイズを取得しています。</h3>
+              <div class="estimate-loading-copy">URLごとのサイズを確認しています。しばらくお待ちください。</div>
             </div>
           </div>
 
           <div id="download-confirm-modal-backdrop"
             class="report-modal-backdrop hidden">
-            <div class="report-modal"
+            <div class="report-modal download-confirm-modal"
               role="dialog"
               aria-modal="true"
               aria-labelledby="download-confirm-modal-title">
@@ -5304,6 +5389,13 @@
                   class="btn-ui btn-gray">いいえ</button>
                 <button id="download-confirm-modal-confirm-btn"
                   class="btn-ui btn-blue">はい</button>
+              </div>
+              <div id="download-confirm-modal-errors"
+                class="download-confirm-modal-errors hidden">
+                <div id="download-confirm-modal-errors-copy"
+                  class="download-confirm-modal-errors-copy"></div>
+                <div id="download-confirm-modal-errors-list"
+                  class="download-confirm-modal-errors-list"></div>
               </div>
             </div>
           </div>

@@ -60,6 +60,35 @@
     return totalText ? `合計: ${totalText}` : "";
   }
 
+  function buildEstimateFailureItems(failures) {
+    if (!Array.isArray(failures)) return [];
+    return failures
+      .map((failure) => {
+        const error = String(failure?.error || "").trim();
+        if (!error) return null;
+        const errorHints = Array.isArray(failure?.errorHints)
+          ? failure.errorHints
+          : Array.isArray(global.getLocalTubeErrorHints?.(error))
+            ? global.getLocalTubeErrorHints(error)
+            : [];
+        return {
+          title: String(failure?.title || "").trim(),
+          url: String(failure?.url || "").trim(),
+          error,
+          errorHints: errorHints
+            .map((hint) => String(hint || "").trim())
+            .filter(Boolean),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function resolveEstimateSummaryLabel(summary, failures) {
+    const formatted = formatEstimateSummary(summary);
+    if (formatted) return formatted;
+    return Array.isArray(failures) && failures.length > 0 ? "予測サイズ: 不明" : "";
+  }
+
   function shouldCollapseEstimateList(lines) {
     return Array.isArray(lines) && lines.length >= 6;
   }
@@ -433,6 +462,8 @@
     function appendEstimateEntries(formData, estimateData) {
       const entries = Array.isArray(estimateData?.entries) ? estimateData.entries : [];
       formData.append("estimateEntriesJson", JSON.stringify(entries));
+      const failures = Array.isArray(estimateData?.failures) ? estimateData.failures : [];
+      formData.append("estimateFailuresJson", JSON.stringify(failures));
     }
 
     async function fetchDownloadEstimate(formData) {
@@ -456,7 +487,7 @@
         return { ok: true, mode: "report" };
       }
       const result = await parseApiResponse(response);
-      if (result.ok) return { ok: true, mode: "download" };
+      if (result.ok) return { ok: true, mode: "download", data: result.data || null };
 
       notifyError(`エラー: ${result.error || "ダウンロードの開始に失敗しました。"}`);
       return { ok: false, mode: "download" };
@@ -501,8 +532,9 @@
 
         const estimatesEnabled =
           loadSetting(DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY, true) !== false;
-        let estimateResult = { ok: true, data: { entries: [], summary: null } };
+        let estimateResult = { ok: true, data: { entries: [], failures: [], summary: null } };
         let estimateLabel = "";
+        let estimateFailures = [];
         if (estimatesEnabled) {
           const estimateFormData = buildDownloadFormData(urlsInput);
           setEstimateLoadingVisible(true);
@@ -510,10 +542,14 @@
           setEstimateLoadingVisible(false);
           if (!estimateResult.ok) {
             notifyError(`エラー: ${estimateResult.error || "サイズ見積もりに失敗しました。"}`);
-            return;
-          }
+              return;
+            }
 
-          estimateLabel = formatEstimateSummary(estimateResult.data?.summary);
+          estimateFailures = buildEstimateFailureItems(estimateResult.data?.failures);
+          estimateLabel = resolveEstimateSummaryLabel(
+            estimateResult.data?.summary,
+            estimateFailures,
+          );
           updateEstimateStatus(estimateLabel);
           updateEstimateList(
             estimateResult.data?.entries,
@@ -529,6 +565,7 @@
           const confirmResult = await showDownloadConfirm({
             message: "ダウンロードを開始しますか？",
             estimateText: estimateLabel,
+            failures: estimateFailures,
           });
           if (!confirmResult?.confirmed) return;
           if (confirmResult.skipFuture) {
@@ -539,7 +576,21 @@
         appendEstimateEntries(formData, estimateResult.data);
         const submitResult = await submitDownload(formData);
         if (submitResult.ok) {
-          notifyInfo("ダウンロードを開始しました。");
+          const queuedCount = Number(submitResult.data?.queuedCount || 0);
+          const skippedCount = Number(
+            submitResult.data?.skippedEstimateFailureCount || 0,
+          );
+          if (queuedCount > 0 && skippedCount > 0) {
+            notifyInfo(
+              `ダウンロードを開始しました。${skippedCount}件はサイズ見積もりエラーのため除外しました。`,
+            );
+          } else if (queuedCount > 0) {
+            notifyInfo("ダウンロードを開始しました。");
+          } else if (skippedCount > 0) {
+            notifyInfo(
+              `${skippedCount}件はサイズ見積もりエラーのためダウンロードしませんでした。`,
+            );
+          }
           urlsInput.value = "";
         }
       } catch (error) {

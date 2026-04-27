@@ -1,4 +1,5 @@
 const { createLogger } = require("./logger-service");
+const { resolveYtDlpPath } = require("./tool-path-service");
 
 function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
   if (typeof spawn !== "function") throw new Error("spawn is required");
@@ -51,36 +52,18 @@ function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
     );
   }
 
-  async function estimateUrl(url, { cookiePath, format, downloadVideo } = {}) {
-    const normalizedUrl = String(url || "").trim();
-    if (!normalizedUrl) {
-      return {
-        url: normalizedUrl,
-        title: normalizedUrl,
-        estimatedBytes: null,
-        estimatedSizeText: "不明",
-      };
-    }
+  function isCurrentlyLive(info) {
+    if (info?.is_live === true) return true;
+    return String(info?.live_status || "").trim().toLowerCase() === "is_live";
+  }
 
+  function shouldRetryWithoutFormat(stderrText) {
+    const text = String(stderrText || "").trim().toLowerCase();
+    return text.includes("requested format is not available");
+  }
+
+  function runEstimateCommand(ytDlpPath, args) {
     return new Promise((resolve, reject) => {
-      const ytDlpPath = path.join(baseDir, "yt-dlp.exe");
-      const args = [
-        normalizedUrl,
-        "--dump-single-json",
-        "--skip-download",
-        "--no-warnings",
-      ];
-      if (
-        (downloadVideo === true || downloadVideo === "true") &&
-        format &&
-        !normalizedUrl.includes("abema.tv")
-      ) {
-        args.push("-f", String(format));
-      }
-      if (cookiePath) {
-        args.push("--cookies", cookiePath);
-      }
-
       serviceLogger.info("ダウンロードサイズ見積もりコマンド実行", {
         args: args.join(" "),
       });
@@ -99,29 +82,86 @@ function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
           reject(new Error(stderr || `yt-dlp exited with code ${code}`));
           return;
         }
-
-        try {
-          const info = JSON.parse(stdout);
-          const estimatedBytes = extractEstimatedBytes(info);
-          resolve({
-            url: normalizedUrl,
-            title: String(info?.title || normalizedUrl),
-            estimatedBytes,
-            estimatedSizeText: formatBytes(estimatedBytes),
-          });
-        } catch (error) {
-          reject(error);
-        }
+        resolve({ stdout, stderr });
       });
 
       child.on("error", (error) => reject(error));
     });
   }
 
+  async function estimateUrl(url, { cookiePath, format, downloadVideo } = {}) {
+    const normalizedUrl = String(url || "").trim();
+    if (!normalizedUrl) {
+      return {
+        url: normalizedUrl,
+        title: normalizedUrl,
+        estimatedBytes: null,
+        estimatedSizeText: "不明",
+      };
+    }
+
+    const ytDlpPath = resolveYtDlpPath(baseDir);
+    const baseArgs = [
+      normalizedUrl,
+      "--dump-single-json",
+      "--skip-download",
+      "--no-warnings",
+    ];
+    const canUseFormat =
+      (downloadVideo === true || downloadVideo === "true") &&
+      format &&
+      !normalizedUrl.includes("abema.tv");
+    const formatArgs = canUseFormat ? ["-f", String(format)] : [];
+    const cookieArgs = cookiePath ? ["--cookies", cookiePath] : [];
+
+    return (async () => {
+      let stdout = "";
+
+      try {
+        ({ stdout } = await runEstimateCommand(ytDlpPath, [
+          ...baseArgs,
+          ...formatArgs,
+          ...cookieArgs,
+        ]));
+      } catch (error) {
+        if (!formatArgs.length || !shouldRetryWithoutFormat(error.message)) {
+          throw error;
+        }
+        serviceLogger.warn("サイズ見積もりでformat指定が使えないため再試行", {
+          url: normalizedUrl,
+          error: error.message,
+        });
+        ({ stdout } = await runEstimateCommand(ytDlpPath, [
+          ...baseArgs,
+          ...cookieArgs,
+        ]));
+      }
+
+      const info = JSON.parse(stdout);
+      if (isCurrentlyLive(info)) {
+        return {
+          url: normalizedUrl,
+          title: String(info?.title || normalizedUrl),
+          estimatedBytes: null,
+          estimatedSizeText: "配信中のため未取得",
+          skippedLiveEstimate: true,
+        };
+      }
+      const estimatedBytes = extractEstimatedBytes(info);
+      return {
+        url: normalizedUrl,
+        title: String(info?.title || normalizedUrl),
+        estimatedBytes,
+        estimatedSizeText: formatBytes(estimatedBytes),
+      };
+    })();
+  }
+
   function buildEstimateSummary(entries) {
     const list = Array.isArray(entries) ? entries : [];
-    const known = list.filter((entry) => Number.isFinite(Number(entry?.estimatedBytes)));
-    const unknownCount = list.length - known.length;
+    const liveSkippedCount = list.filter((entry) => entry?.skippedLiveEstimate === true).length;
+    const known = list.filter((entry) => extractNumericSize(entry?.estimatedBytes) !== null);
+    const unknownCount = list.length - known.length - liveSkippedCount;
     const totalKnownBytes = known.reduce(
       (sum, entry) => sum + Number(entry.estimatedBytes || 0),
       0,
@@ -130,17 +170,26 @@ function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
     let totalText = "不明";
     if (known.length > 0) {
       totalText = formatBytes(totalKnownBytes);
+      if (liveSkippedCount > 0) {
+        totalText = `${totalText} + 配信中${liveSkippedCount}件`;
+      }
+      if (unknownCount > 0) {
+        totalText = `${totalText} + 不明${unknownCount}件`;
+      }
+    } else if (liveSkippedCount > 0) {
+      totalText = "配信中のため未取得";
       if (unknownCount > 0) {
         totalText = `${totalText} + 不明${unknownCount}件`;
       }
     } else if (unknownCount > 0) {
-      totalText = `不明 (${unknownCount}件)`;
+      totalText = "不明";
     }
 
     return {
       count: list.length,
       totalKnownBytes,
       unknownCount,
+      liveSkippedCount,
       totalText,
       label: `予測サイズ: ${totalText}${list.length > 0 ? ` (${list.length}件)` : ""}`,
     };

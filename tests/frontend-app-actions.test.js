@@ -138,6 +138,7 @@ test("download action validates and submits then clears input", async () => {
               { url: "https://example.com/video1", estimatedSizeText: "1.2 GB" },
               { url: "https://example.com/video2", estimatedSizeText: "800 MB" },
             ],
+            failures: [],
             summary: { totalText: "2.0 GB", count: 2 },
           },
         },
@@ -470,7 +471,7 @@ test("download action persists skip-confirm preference when requested", async ()
         return {
           __parsed: {
             ok: true,
-            data: { entries: [], summary: { totalText: "1.0 GB", count: 1 } },
+            data: { entries: [], failures: [], summary: { totalText: "1.0 GB", count: 1 } },
           },
         };
       }
@@ -540,6 +541,7 @@ test("download action shows a single estimate entry without hiding it in total r
             ok: true,
             data: {
               entries: [{ title: "single video", estimatedSizeText: "3 GB" }],
+              failures: [],
               summary: { totalText: "3 GB", count: 1 },
             },
           },
@@ -589,6 +591,7 @@ test("download action auto-collapses estimate list when six or more lines are sh
                 { title: "d", estimatedSizeText: "1 GB" },
                 { title: "e", estimatedSizeText: "1 GB" },
               ],
+              failures: [],
               summary: { totalText: "10 GB", count: 6 },
             },
           },
@@ -677,4 +680,111 @@ test("app-actions pure utils expose merged helpers", () => {
   assert.equal(utils.hasListFormatsCommand("-F"), true);
   assert.equal(utils.hasListFormatsCommand("--no-warnings"), false);
   assert.equal(utils.DOWNLOAD_ESTIMATE_ENABLED_STORAGE_KEY, "optDownloadEstimates");
+});
+
+test("download action reports skipped estimate failures in completion info", async () => {
+  loadActions();
+  const infos = [];
+  const doc = createDoc({ urls: "https://example.com/video" });
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      if (String(url) === "/api/download-estimate") {
+        return {
+          __parsed: {
+            ok: true,
+            data: {
+              entries: [{ title: "ok", estimatedSizeText: "1 GB" }],
+              failures: [{ title: "bad", error: "failed" }],
+              summary: { totalText: "1 GB", count: 1 },
+            },
+          },
+        };
+      }
+      return {
+        __parsed: {
+          ok: true,
+          data: { queuedCount: 1, skippedEstimateFailureCount: 1 },
+        },
+      };
+    },
+    doc,
+    alertImpl: () => {},
+    notifyInfo: (message) => infos.push(message),
+    showDownloadConfirm: async () => ({ confirmed: true, skipFuture: false }),
+  });
+
+  await actions.startDownload();
+
+  assert.deepEqual(infos, [
+    "ダウンロードを開始しました。1件はサイズ見積もりエラーのため除外しました。",
+  ]);
+});
+
+test("download action passes estimate failures with hints to confirmation modal", async () => {
+  loadActions();
+  global.getLocalTubeErrorHints = (message) =>
+    String(message).includes("Requested format is not available")
+      ? [
+          "フォーマットが利用できません。ダウンロード通信をID固定を有効にしてみてください。うまくいかない場合は設定ページのinfoのサポートサーバーから質問してください。",
+        ]
+      : [];
+  const doc = createDoc({ urls: "https://example.com/video" });
+  let confirmPayload = null;
+
+  const actions = global.createDownloadActions({
+    parseApiResponse: async (response) => response.__parsed,
+    fetchImpl: async (url) => {
+      if (String(url).startsWith("/api/validate-url")) {
+        return { __parsed: { ok: true, data: { isValid: true } } };
+      }
+      if (String(url) === "/api/download-estimate") {
+        return {
+          __parsed: {
+            ok: true,
+            data: {
+              entries: [],
+              failures: [
+                {
+                  url: "https://www.youtube.com/watch?v=test",
+                  error:
+                    "ERROR: [youtube] test: Requested format is not available. Use --list-formats for a list of available formats",
+                },
+              ],
+              summary: null,
+            },
+          },
+        };
+      }
+      return {
+        __parsed: {
+          ok: true,
+          data: { queuedCount: 0, skippedEstimateFailureCount: 1 },
+        },
+      };
+    },
+    doc,
+    alertImpl: () => {},
+    showDownloadConfirm: async (payload) => {
+      confirmPayload = payload;
+      return { confirmed: true, skipFuture: false };
+    },
+  });
+
+  await actions.startDownload();
+
+  assert.equal(confirmPayload?.estimateText, "予測サイズ: 不明");
+  assert.equal(confirmPayload?.failures?.length, 1);
+  assert.equal(
+    confirmPayload.failures[0].url,
+    "https://www.youtube.com/watch?v=test",
+  );
+  assert.deepEqual(confirmPayload.failures[0].errorHints, [
+    "フォーマットが利用できません。ダウンロード通信をID固定を有効にしてみてください。うまくいかない場合は設定ページのinfoのサポートサーバーから質問してください。",
+  ]);
+  delete global.getLocalTubeErrorHints;
 });

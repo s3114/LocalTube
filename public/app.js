@@ -60,6 +60,9 @@ const appState = window.AppState || {
         backdrop: document.getElementById("download-confirm-modal-backdrop"),
         message: document.getElementById("download-confirm-modal-message"),
         estimate: document.getElementById("download-confirm-modal-estimate"),
+        errors: document.getElementById("download-confirm-modal-errors"),
+        errorsCopy: document.getElementById("download-confirm-modal-errors-copy"),
+        errorsList: document.getElementById("download-confirm-modal-errors-list"),
         skipCheckbox: document.getElementById("download-confirm-modal-skip-checkbox"),
         cancelBtn: document.getElementById("download-confirm-modal-cancel-btn"),
         confirmBtn: document.getElementById("download-confirm-modal-confirm-btn"),
@@ -111,7 +114,131 @@ const appState = window.AppState || {
         });
       }
 
-      function showDownloadConfirmModal({ message, estimateText } = {}) {
+      function normalizeDownloadConfirmFailures(failures) {
+        if (!Array.isArray(failures)) return [];
+        return failures
+          .map((failure) => {
+            const error = String(failure?.error || "").trim();
+            if (!error) return null;
+            const label = String(
+              failure?.url || failure?.title || "対象URL",
+            ).trim() || "対象URL";
+            const hints = Array.isArray(failure?.errorHints)
+              ? failure.errorHints
+              : Array.isArray(window.getLocalTubeErrorHints?.(error))
+                ? window.getLocalTubeErrorHints(error)
+                : [];
+            return {
+              label,
+              error,
+              hints: hints
+                .map((hint) => String(hint || "").trim())
+                .filter(Boolean),
+            };
+          })
+          .filter(Boolean);
+      }
+
+      function simplifyDownloadConfirmErrorMessage(error) {
+        const text = String(error || "").trim();
+        const simplified = text.replace(
+          /^ERROR:\s*\[[^\]]+\]\s*[^:]+:\s*/i,
+          "",
+        );
+        return simplified || text;
+      }
+
+      function groupDownloadConfirmFailures(failures) {
+        const groups = new Map();
+        normalizeDownloadConfirmFailures(failures).forEach((item) => {
+          const message = simplifyDownloadConfirmErrorMessage(item.error);
+          const hints = item.hints;
+          const key = JSON.stringify({ message, hints });
+          if (!groups.has(key)) {
+            groups.set(key, {
+              message,
+              hints,
+              labels: [],
+            });
+          }
+          const group = groups.get(key);
+          if (!group.labels.includes(item.label)) {
+            group.labels.push(item.label);
+          }
+        });
+        return [...groups.values()];
+      }
+
+      function renderDownloadConfirmFailures(failures = []) {
+        const {
+          errors: errorsEl,
+          errorsCopy,
+          errorsList,
+        } = downloadConfirmModalElements;
+        if (!errorsEl || !errorsList) return;
+
+        errorsList.innerHTML = "";
+        const groups = groupDownloadConfirmFailures(failures);
+        if (groups.length === 0) {
+          errorsCopy && (errorsCopy.textContent = "");
+          errorsEl.classList.add("hidden");
+          return;
+        }
+
+        const totalCount = groups.reduce(
+          (sum, group) => sum + group.labels.length,
+          0,
+        );
+        if (errorsCopy) {
+          errorsCopy.textContent =
+            totalCount === 1
+              ? "次のURLはサイズ見積もりの時点でエラーになりました。開始後は自動で除外されます。"
+              : `${totalCount}件のURLはサイズ見積もりの時点でエラーになりました。開始後は自動で除外されます。`;
+        }
+
+        groups.forEach((group) => {
+          const card = document.createElement("div");
+          card.className = "download-confirm-modal-error-card";
+
+          const icon = document.createElement("div");
+          icon.className = "download-confirm-modal-error-icon";
+          icon.textContent = "×";
+
+          const body = document.createElement("div");
+          body.className = "download-confirm-modal-error-body";
+
+          const message = document.createElement("div");
+          message.className = "download-confirm-modal-error-message";
+          message.textContent = group.message;
+
+          group.hints.forEach((hint) => {
+            const hintEl = document.createElement("div");
+            hintEl.className = "download-confirm-modal-error-hint";
+            hintEl.textContent = hint;
+            body.appendChild(hintEl);
+          });
+
+          body.appendChild(message);
+
+          const urls = document.createElement("div");
+          urls.className = "download-confirm-modal-error-urls";
+          group.labels.forEach((label) => {
+            const title = document.createElement("div");
+            title.className = "download-confirm-modal-error-title";
+            title.textContent = label;
+            urls.appendChild(title);
+          });
+          body.appendChild(urls);
+
+          card.appendChild(icon);
+          card.appendChild(body);
+          errorsList.appendChild(card);
+        });
+
+        errorsEl.classList.remove("hidden");
+      }
+
+      function showDownloadConfirmModal({ message, estimateText, failures } = {}) {
         const {
           backdrop,
           message: messageEl,
@@ -133,6 +260,7 @@ const appState = window.AppState || {
           estimate.textContent = estimateValue;
           estimate.classList.toggle("hidden", estimateValue === "");
         }
+        renderDownloadConfirmFailures(failures);
         skipCheckbox.checked = false;
         backdrop.classList.remove("hidden");
 
@@ -142,6 +270,7 @@ const appState = window.AppState || {
             if (settled) return;
             settled = true;
             backdrop.classList.add("hidden");
+            renderDownloadConfirmFailures([]);
             cancelBtn.removeEventListener("click", handleCancel);
             confirmBtn.removeEventListener("click", handleConfirm);
             backdrop.removeEventListener("click", handleBackdrop);

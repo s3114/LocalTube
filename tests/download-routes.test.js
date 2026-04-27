@@ -170,6 +170,77 @@ test("download-routes attaches estimated size to queued job when provided", asyn
   assert.equal(enqueued[0].progress.estimatedTotalSize, "1.2 GB");
 });
 
+test("download-routes skips estimate-failed videos and emits error jobs", async () => {
+  const app = createRouteCaptureApp();
+  const api = createApiFns();
+  const enqueued = [];
+  const broadcasts = [];
+  const jobHistory = new Map();
+
+  registerDownloadRoutes(app, {
+    upload: { single: () => (_req, _res, next) => next?.() },
+    crypto,
+    jobHistory,
+    broadcast: (event, payload) => broadcasts.push({ event, payload }),
+    downloadQueueService: {
+      setMaxConcurrentDownloads: () => {},
+      enqueueJobs: (jobs) => enqueued.push(...jobs),
+    },
+    getUrlsFromInput: async () => [
+      "https://www.youtube.com/watch?v=ok",
+      "https://www.youtube.com/watch?v=bad",
+    ],
+    fs: require("node:fs"),
+    path,
+    baseDir: process.cwd(),
+    apiOk: api.apiOk,
+    apiError: api.apiError,
+  });
+
+  const handler = app.routes.post.get("/download");
+  const res = {};
+  await handler(
+    {
+      body: {
+        urls: "https://www.youtube.com/watch?v=list",
+        parallelDownloads: "1",
+        estimateEntriesJson: JSON.stringify([
+          {
+            url: "https://www.youtube.com/watch?v=ok",
+            title: "ok title",
+            estimatedSizeText: "1.2 GB",
+          },
+        ]),
+        estimateFailuresJson: JSON.stringify([
+          {
+            url: "https://www.youtube.com/watch?v=bad",
+            title: "bad title",
+            error: "ERROR: Requested format is not available",
+          },
+        ]),
+      },
+      file: null,
+    },
+    res,
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.data.queuedCount, 1);
+  assert.equal(res.body.data.skippedEstimateFailureCount, 1);
+  assert.equal(enqueued.length, 1);
+  const jobsAdded = broadcasts.find((item) => item.event === "jobs_added");
+  assert.ok(jobsAdded);
+  assert.equal(jobsAdded.payload.length, 2);
+  const errorJob = jobsAdded.payload.find((job) => job.status === "error");
+  assert.ok(errorJob);
+  assert.equal(errorJob.title, "bad title");
+  assert.equal(errorJob.progress.eta, "ERROR: Requested format is not available");
+  assert.deepEqual(errorJob.progress.errorHints, [
+    "フォーマットが利用できません。ダウンロード通信をID固定を有効にしてみてください。うまくいかない場合は設定ページのinfoのサポートサーバーから質問してください。",
+  ]);
+  assert.equal(jobHistory.get(errorJob.id)?.status, "error");
+});
+
 test("download-routes returns formats report instead of queuing jobs when custom command includes --list-formats", async () => {
   const app = createRouteCaptureApp();
   const jobHistory = new Map();
@@ -282,6 +353,7 @@ test("download-routes returns size estimates", async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.data.entries[0].estimatedSizeText, "1 KB");
+  assert.deepEqual(res.body.data.failures, []);
   assert.equal(res.body.data.summary.totalText, "1 KB");
 });
 

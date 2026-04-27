@@ -68,9 +68,11 @@
       }
 
       const errorMessage = job.progress.eta || "エラー";
-      const hints = Array.isArray(global.getLocalTubeErrorHints?.(errorMessage))
-        ? global.getLocalTubeErrorHints(errorMessage)
-        : [];
+      const hints = Array.isArray(job.progress?.errorHints)
+        ? job.progress.errorHints
+        : Array.isArray(global.getLocalTubeErrorHints?.(errorMessage))
+          ? global.getLocalTubeErrorHints(errorMessage)
+          : [];
 
       return { width: "100%", text: errorMessage, hints };
     }

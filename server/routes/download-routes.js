@@ -1,5 +1,6 @@
 const { createLogger } = require("../services/logger-service");
 const { hasListFormatsCommand } = require("./report-routes");
+const { getLocalTubeErrorHints } = require("../../shared/error-hints");
 
 function registerDownloadRoutes(
   app,
@@ -25,6 +26,17 @@ function registerDownloadRoutes(
   const DOWNLOAD_ESTIMATE_CONCURRENCY = 30;
 
   function parseEstimateEntries(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) return [];
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function parseEstimateFailures(rawValue) {
     const text = String(rawValue || "").trim();
     if (!text) return [];
     try {
@@ -81,30 +93,83 @@ function registerDownloadRoutes(
   }
 
   async function buildEstimatedEntries(resolvedEntries, { cookieFile, format, downloadVideo }) {
-    return mapWithConcurrency(
+    const results = await mapWithConcurrency(
       resolvedEntries,
       DOWNLOAD_ESTIMATE_CONCURRENCY,
       async (entry) => {
         try {
-          return await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
-            cookiePath: cookieFile?.path,
-            format,
-            downloadVideo,
-          });
+          return {
+            ok: true,
+            entry: await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
+              cookiePath: cookieFile?.path,
+              format,
+              downloadVideo,
+            }),
+          };
         } catch (error) {
           routeLogger.warn("サイズ見積もりに失敗", {
             url: entry.resolvedUrl,
             error: error.message,
           });
           return {
-            url: entry.resolvedUrl,
-            title: entry.resolvedUrl,
-            estimatedBytes: null,
-            estimatedSizeText: "不明",
+            ok: false,
+            failure: {
+              url: entry.resolvedUrl,
+              title: entry.resolvedUrl,
+              error: error.message,
+            },
           };
         }
       },
     );
+
+    const entries = [];
+    const failures = [];
+    for (const result of results) {
+      if (result?.ok && result.entry) {
+        entries.push(result.entry);
+      } else if (!result?.ok && result.failure) {
+        failures.push(result.failure);
+      }
+    }
+    return { entries, failures };
+  }
+
+  function buildEstimateFailureMap(rawValue) {
+    const map = new Map();
+    for (const entry of parseEstimateFailures(rawValue)) {
+      const key = String(entry?.url || "").trim();
+      if (!key) continue;
+      map.set(key, {
+        url: key,
+        title: String(entry?.title || key).trim(),
+        error: String(entry?.error || "サイズ見積もりに失敗しました。").trim(),
+      });
+    }
+    return map;
+  }
+
+  function createEstimateFailureJob(entry, failure, jobId) {
+    const errorMessage = String(
+      failure?.error || "サイズ見積もりに失敗しました。",
+    ).trim();
+    return {
+      id: jobId,
+      url: String(entry?.resolvedUrl || failure?.url || "").trim(),
+      options: {},
+      cookieFile: null,
+      status: "error",
+      title: String(failure?.title || entry?.resolvedUrl || "").trim(),
+      progress: {
+        percentage: 0,
+        size: "",
+        totalSize: "",
+        speed: "",
+        eta: errorMessage,
+        errorHints: getLocalTubeErrorHints(errorMessage),
+        estimatedTotalSize: "",
+      },
+    };
   }
 
   function buildEstimateMap(rawValue) {
@@ -160,7 +225,7 @@ function registerDownloadRoutes(
 
     const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
     const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile);
-    const estimatedEntries = await buildEstimatedEntries(resolvedEntries, {
+    const { entries: estimatedEntries, failures } = await buildEstimatedEntries(resolvedEntries, {
       cookieFile,
       format,
       downloadVideo,
@@ -168,6 +233,7 @@ function registerDownloadRoutes(
 
     apiOk(res, {
       entries: estimatedEntries,
+      failures,
       summary: downloadEstimateService.buildEstimateSummary(estimatedEntries),
     });
   });
@@ -191,6 +257,7 @@ function registerDownloadRoutes(
       downloadChat,
       downloadVideo,
       estimateEntriesJson,
+      estimateFailuresJson,
     } = req.body;
     const cookieFile = req.file;
 
@@ -244,10 +311,24 @@ function registerDownloadRoutes(
     downloadQueueService.setMaxConcurrentDownloads(parallelDownloads);
 
     const estimateMap = buildEstimateMap(estimateEntriesJson);
+    const estimateFailureMap = buildEstimateFailureMap(estimateFailuresJson);
     const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile);
     const newJobs = [];
+    const failedEstimateJobs = [];
 
     for (const entry of resolvedEntries) {
+      const failedEstimate = estimateFailureMap.get(entry.resolvedUrl);
+      if (failedEstimate) {
+        const errorJob = createEstimateFailureJob(
+          entry,
+          failedEstimate,
+          crypto.randomUUID(),
+        );
+        failedEstimateJobs.push(errorJob);
+        jobHistory.set(errorJob.id, errorJob);
+        continue;
+      }
+
       const estimate = estimateMap.get(entry.resolvedUrl);
       const jobId = crypto.randomUUID();
       const job = {
@@ -285,11 +366,18 @@ function registerDownloadRoutes(
       newJobs.push(job);
     }
 
-    broadcast("jobs_added", newJobs);
+    const allJobs = [...failedEstimateJobs, ...newJobs];
+    if (allJobs.length > 0) {
+      broadcast("jobs_added", allJobs);
+    }
 
     apiOk(
       res,
-      { message: `${newJobs.length}件のダウンロードがキューに追加されました。` },
+      {
+        message: `${newJobs.length}件のダウンロードがキューに追加されました。`,
+        queuedCount: newJobs.length,
+        skippedEstimateFailureCount: failedEstimateJobs.length,
+      },
       202,
     );
 
