@@ -313,12 +313,14 @@
         const jobs = JSON.parse(e.data);
         replaceDashboardJobs(jobQueueElement, jobs);
         renderDashboardJobCounts(countJobsByStatus());
+        onJobUpdated?.();
       });
 
       eventSource.addEventListener("jobs_added", (e) => {
         const newJobs = JSON.parse(e.data);
         appendDashboardJobs(jobQueueElement, newJobs);
         renderDashboardJobCounts(countJobsByStatus());
+        onJobUpdated?.();
       });
 
       eventSource.addEventListener("title_update", (e) => {

@@ -67,6 +67,16 @@ const appState = window.AppState || {
         cancelBtn: document.getElementById("download-confirm-modal-cancel-btn"),
         confirmBtn: document.getElementById("download-confirm-modal-confirm-btn"),
       };
+      const failedUrlModalElements = {
+        openBtn: document.getElementById("open-failed-url-modal-btn"),
+        backdrop: document.getElementById("failed-url-modal-backdrop"),
+        copy: document.getElementById("failed-url-modal-copy"),
+        preview: document.getElementById("failed-url-modal-preview"),
+        cancelBtn: document.getElementById("failed-url-modal-cancel-btn"),
+        copyBtn: document.getElementById("failed-url-modal-copy-btn"),
+        exportBtn: document.getElementById("failed-url-modal-export-btn"),
+        autofillBtn: document.getElementById("failed-url-modal-autofill-btn"),
+      };
 
       function showSettingsConfirmModal(message, options = {}) {
         const {
@@ -238,6 +248,114 @@ const appState = window.AppState || {
         errorsEl.classList.remove("hidden");
       }
 
+      function collectFailedJobUrls() {
+        const seen = new Set();
+        const urls = [];
+        for (const job of jobStates.values()) {
+          if (job?.status !== "error") continue;
+          const url = String(job?.url || "").trim();
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          urls.push(url);
+        }
+        return urls;
+      }
+
+      function formatFailedUrlExportFilename(now = new Date()) {
+        const yyyy = String(now.getFullYear());
+        const MM = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        const ss = String(now.getSeconds()).padStart(2, "0");
+        return `localtube-errorlist-${yyyy}${MM}${dd}-${hh}${mm}${ss}.txt`;
+      }
+
+      function downloadTextFile(filename, text) {
+        const blob = new Blob([String(text || "")], {
+          type: "text/plain;charset=utf-8",
+        });
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      function updateFailedUrlActionState() {
+        const { openBtn } = failedUrlModalElements;
+        if (!openBtn) return;
+        const count = collectFailedJobUrls().length;
+        openBtn.disabled = count === 0;
+        openBtn.textContent = count > 0 ? `開く (${count}件)` : "開く";
+      }
+
+      function closeFailedUrlModal() {
+        failedUrlModalElements.backdrop?.classList.add("hidden");
+      }
+
+      function openFailedUrlModal() {
+        const {
+          backdrop,
+          copy,
+          preview,
+        } = failedUrlModalElements;
+        if (!backdrop || !copy || !preview) return;
+        const urls = collectFailedJobUrls();
+        if (urls.length === 0) {
+          uiFeedback.showInfo("失敗したURLはありません。");
+          updateFailedUrlActionState();
+          return;
+        }
+        copy.innerHTML = `<span class="failed-url-modal-count">${urls.length}件</span> の失敗URLをまとめています。`;
+        preview.value = urls.join("\n");
+        backdrop.classList.remove("hidden");
+      }
+
+      async function copyFailedUrlsToClipboard() {
+        const urls = collectFailedJobUrls();
+        if (urls.length === 0) {
+          uiFeedback.showInfo("失敗したURLはありません。");
+          updateFailedUrlActionState();
+          return;
+        }
+        await navigator.clipboard.writeText(urls.join("\n"));
+        uiFeedback.showSuccess(`${urls.length}件のURLをコピーしました。`);
+      }
+
+      function exportFailedUrlsToFile() {
+        const urls = collectFailedJobUrls();
+        if (urls.length === 0) {
+          uiFeedback.showInfo("失敗したURLはありません。");
+          updateFailedUrlActionState();
+          return;
+        }
+        downloadTextFile(
+          formatFailedUrlExportFilename(),
+          `${urls.join("\n")}\n`,
+        );
+        uiFeedback.showSuccess(`${urls.length}件のURLをエクスポートしました。`);
+      }
+
+      function autofillFailedUrlsForDownload() {
+        const urls = collectFailedJobUrls();
+        if (urls.length === 0) {
+          uiFeedback.showInfo("失敗したURLはありません。");
+          updateFailedUrlActionState();
+          return;
+        }
+        const urlsInput = document.getElementById("urls");
+        if (!urlsInput) return;
+        urlsInput.value = urls.join("\n");
+        window.location.hash = "#downloader";
+        urlsInput.focus?.();
+        urlsInput.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        uiFeedback.showSuccess(`${urls.length}件のURLをダウンロード欄へ入力しました。`);
+      }
+
       function showDownloadConfirmModal({ message, estimateText, failures } = {}) {
         const {
           backdrop,
@@ -299,6 +417,41 @@ const appState = window.AppState || {
         const collapsed = downloadEstimateList.classList.toggle("collapsed");
         downloadEstimateListToggle.textContent = collapsed ? "展開" : "折りたたむ";
       });
+      failedUrlModalElements.openBtn?.addEventListener("click", openFailedUrlModal);
+      failedUrlModalElements.cancelBtn?.addEventListener("click", closeFailedUrlModal);
+      failedUrlModalElements.backdrop?.addEventListener("click", (event) => {
+        if (event.target === failedUrlModalElements.backdrop) {
+          closeFailedUrlModal();
+        }
+      });
+      failedUrlModalElements.copyBtn?.addEventListener("click", async () => {
+        try {
+          await copyFailedUrlsToClipboard();
+          closeFailedUrlModal();
+        } catch (error) {
+          console.error("Failed URL copy failed:", error);
+          uiFeedback.showError("失敗URLのコピーに失敗しました。");
+        }
+      });
+      failedUrlModalElements.exportBtn?.addEventListener("click", () => {
+        try {
+          exportFailedUrlsToFile();
+          closeFailedUrlModal();
+        } catch (error) {
+          console.error("Failed URL export failed:", error);
+          uiFeedback.showError("失敗URLのエクスポートに失敗しました。");
+        }
+      });
+      failedUrlModalElements.autofillBtn?.addEventListener("click", () => {
+        try {
+          autofillFailedUrlsForDownload();
+          closeFailedUrlModal();
+        } catch (error) {
+          console.error("Failed URL autofill failed:", error);
+          uiFeedback.showError("失敗URLの自動入力に失敗しました。");
+        }
+      });
+      updateFailedUrlActionState();
 
       const dashboardController = window.createDashboardController({
         jobStates,
@@ -457,7 +610,11 @@ const appState = window.AppState || {
 
         dashboardController.createSseController({
           jobQueueElement: elements.jobQueue,
+          onJobUpdated: () => {
+            updateFailedUrlActionState();
+          },
         });
+        updateFailedUrlActionState();
       }
 
       function initializeFormatToggle() {

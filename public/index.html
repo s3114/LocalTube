@@ -2353,6 +2353,28 @@
         gap: 8px;
       }
 
+      .report-modal-actions.wrap {
+        flex-wrap: wrap;
+      }
+
+      .report-modal-actions.wrap .btn-ui {
+        flex: 1 1 140px;
+      }
+
+      .info-item-action {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .info-inline-btn {
+        min-width: 108px;
+      }
+
+      .info-inline-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       .download-confirm-modal-check {
         display: flex;
         align-items: center;
@@ -2442,6 +2464,32 @@
         line-height: 1.6;
         font-weight: 700;
         word-break: break-word;
+      }
+
+      .failed-url-modal-copy {
+        margin-bottom: 10px;
+      }
+
+      .failed-url-modal-count {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .failed-url-modal-preview {
+        width: 100%;
+        min-height: 180px;
+        resize: vertical;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #111;
+        color: var(--text);
+        padding: 12px;
+        font: inherit;
+        line-height: 1.6;
+      }
+
+      .failed-url-modal-preview:focus {
+        outline: 1px solid rgba(255, 255, 255, 0.18);
       }
 
       .estimate-loading-backdrop {
@@ -4466,6 +4514,15 @@
               <div id="info-error-count" class="info-value">0 件</div>
             </div>
             <div class="info-item">
+              <div class="info-label">失敗URL</div>
+              <div class="info-value info-item-action">
+                <button id="open-failed-url-modal-btn"
+                  class="btn-ui btn-gray info-inline-btn"
+                  type="button"
+                  disabled>開く</button>
+              </div>
+            </div>
+            <div class="info-item">
               <div class="info-label">完了率</div>
               <div class="info-value info-value-wide">
                 <div class="completion-bar-container">
@@ -4822,6 +4879,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.16.0">
+                        <span class="info-updates-date">2026/04/28</span>
+                        <span class="info-updates-version">v1.16.0</span>
+                        <span
+                          class="info-updates-content">エラーURLの書き出し機能の実装</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.15.1">
                         <span class="info-updates-date">2026/04/28</span>
                         <span class="info-updates-version">v1.15.1</span>
@@ -5396,6 +5459,36 @@
                   class="download-confirm-modal-errors-copy"></div>
                 <div id="download-confirm-modal-errors-list"
                   class="download-confirm-modal-errors-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="failed-url-modal-backdrop"
+            class="report-modal-backdrop hidden">
+            <div class="report-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="failed-url-modal-title">
+              <h3 id="failed-url-modal-title"
+                class="report-modal-title">失敗した動画のURL</h3>
+              <div id="failed-url-modal-copy"
+                class="report-modal-copy failed-url-modal-copy">失敗したURLをまとめて扱えます。</div>
+              <textarea id="failed-url-modal-preview"
+                class="failed-url-modal-preview"
+                readonly></textarea>
+              <div class="report-modal-actions wrap">
+                <button id="failed-url-modal-cancel-btn"
+                  class="btn-ui btn-gray"
+                  type="button">いいえ</button>
+                <button id="failed-url-modal-copy-btn"
+                  class="btn-ui btn-blue"
+                  type="button">コピー</button>
+                <button id="failed-url-modal-export-btn"
+                  class="btn-ui btn-blue"
+                  type="button">エクスポート</button>
+                <button id="failed-url-modal-autofill-btn"
+                  class="btn-ui btn-blue"
+                  type="button">ダウンロード対象として自動入力</button>
               </div>
             </div>
           </div>
