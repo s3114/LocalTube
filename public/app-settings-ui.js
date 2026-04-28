@@ -19,6 +19,8 @@ const FEEDBACK_BUG_NOTICE =
 const FEEDBACK_DEFAULT_PLACEHOLDER =
   "フィードバックの内容をここに入力してください。";
 const SETTINGS_SEARCH_PLACEHOLDER = "設定を検索";
+let cookieSelectionSessionMode = "";
+let cookieSelectionSessionUpdatedAt = "";
 const defaultSettingsUiDependencies = {
   fetchImpl: (...args) => global.fetch(...args),
   parseApiResponseImpl: (response) => global.parseApiResponse(response),
@@ -142,14 +144,45 @@ function clampNumberInRange(value, min, max, fallback) {
       function setCookieSelectionMetadata(mode) {
         const normalizedMode = String(mode || "none");
         const updatedAt = new Date().toISOString();
-        saveLocalSetting(COOKIE_MODE_STORAGE_KEY, normalizedMode);
-        saveLocalSetting(COOKIE_UPDATED_AT_STORAGE_KEY, updatedAt);
+        cookieSelectionSessionMode = normalizedMode;
+        cookieSelectionSessionUpdatedAt = updatedAt;
+        if (normalizedMode === "firefox") {
+          saveLocalSetting(COOKIE_MODE_STORAGE_KEY, normalizedMode);
+          saveLocalSetting(COOKIE_UPDATED_AT_STORAGE_KEY, updatedAt);
+        } else {
+          try {
+            global.localStorage?.removeItem(COOKIE_MODE_STORAGE_KEY);
+            global.localStorage?.removeItem(COOKIE_UPDATED_AT_STORAGE_KEY);
+          } catch (error) {
+            console.warn("cookie選択情報の削除に失敗:", error);
+          }
+        }
         return updatedAt;
       }
 
       function readCookieSelectionMetadata() {
-        const mode = loadLocalSetting(COOKIE_MODE_STORAGE_KEY, "none");
-        const updatedAt = loadLocalSetting(COOKIE_UPDATED_AT_STORAGE_KEY, "");
+        const storedMode = loadLocalSetting(COOKIE_MODE_STORAGE_KEY, "none");
+        const storedUpdatedAt = loadLocalSetting(COOKIE_UPDATED_AT_STORAGE_KEY, "");
+        const hasSessionMode = cookieSelectionSessionMode !== "";
+        const mode = hasSessionMode
+          ? cookieSelectionSessionMode
+          : storedMode === "firefox"
+            ? storedMode
+            : "none";
+        const updatedAt = hasSessionMode
+          ? cookieSelectionSessionUpdatedAt
+          : mode === "firefox"
+            ? storedUpdatedAt
+            : "";
+
+        if (!hasSessionMode && storedMode !== "firefox" && storedMode !== "none") {
+          try {
+            global.localStorage?.removeItem(COOKIE_MODE_STORAGE_KEY);
+            global.localStorage?.removeItem(COOKIE_UPDATED_AT_STORAGE_KEY);
+          } catch (error) {
+            console.warn("旧cookie選択情報の削除に失敗:", error);
+          }
+        }
         let updatedAtLocal = "";
 
         if (updatedAt) {
