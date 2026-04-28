@@ -1024,6 +1024,16 @@
         overflow: hidden;
       }
 
+      .player-video-wrap:fullscreen,
+      .player-video-wrap:-webkit-full-screen {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        aspect-ratio: auto;
+        border-radius: 0;
+        background: #000;
+      }
+
       #local-player {
         position: absolute; /* 親にピッタリ合わせる */
         top: 0;
@@ -4885,6 +4895,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.17.0">
+                        <span class="info-updates-date">2026/04/28</span>
+                        <span class="info-updates-version">v1.17.0</span>
+                        <span
+                          class="info-updates-content">全画面のUIをLocalTube依存のものに変更</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.16.2">
                         <span class="info-updates-date">2026/04/28</span>
                         <span class="info-updates-version">v1.16.2</span>

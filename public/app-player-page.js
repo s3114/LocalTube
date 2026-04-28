@@ -129,6 +129,7 @@
 
   function createPlayerFullscreenToggleHandler(videoPlayer) {
     let restorePageFullscreenOnExit = false;
+    const playerContainer = document.getElementById("player-container");
     const getFullscreenElement = () =>
       document.fullscreenElement ||
       document.webkitFullscreenElement ||
@@ -169,14 +170,13 @@
     };
 
     return async function toggleFullscreen() {
-      const playerContainer = document.getElementById("player-container");
-      const playerTarget = videoPlayer || playerContainer;
+      const playerTarget = playerContainer || videoPlayer;
       const activeFullscreen = getFullscreenElement();
       const pageRoot = document.documentElement;
 
       if (activeFullscreen) {
         // プレーヤー自身が全画面中なら解除
-        if (activeFullscreen === videoPlayer || activeFullscreen === playerContainer) {
+        if (activeFullscreen === playerContainer || activeFullscreen === videoPlayer) {
           await exitFullscreen();
           if (restorePageFullscreenOnExit) {
             restorePageFullscreenOnExit = false;
@@ -199,9 +199,11 @@
       }
       restorePageFullscreenOnExit = false;
       try {
-        await requestFullscreen(videoPlayer);
+        await requestFullscreen(playerTarget);
       } catch (_e) {
-        await requestFullscreen(playerContainer);
+        if (playerTarget !== videoPlayer) {
+          await requestFullscreen(videoPlayer);
+        }
       }
     };
   }
