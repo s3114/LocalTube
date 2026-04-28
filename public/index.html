@@ -760,12 +760,12 @@
         min-height: 1.2em;
       }
 
-      .download-estimate-status {
+      /* .download-estimate-status {
         margin-top: 8px;
         color: var(--subtext);
         font-size: 12px;
         min-height: 1.2em;
-      }
+      } */
 
       .download-estimate-list-section {
         margin-top: 16px;
@@ -2455,6 +2455,12 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
+        max-height: 108px;
+        overflow-y: auto;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
       }
 
       .download-confirm-modal-error-hint {
@@ -4251,9 +4257,9 @@
                 </button>
               </div>
             </div>
-            <div id="download-estimate-status"
+            <!-- <div id="download-estimate-status"
               class="download-estimate-status"
-              aria-live="polite"></div>
+              aria-live="polite"></div> -->
             <div class="options">
               <div class="field-row">
                 <div class="field-label">画質</div>
@@ -4879,6 +4885,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.16.1">
+                        <span class="info-updates-date">2026/04/28</span>
+                        <span class="info-updates-version">v1.16.1</span>
+                        <span
+                          class="info-updates-content">サイズ予測機能のエラー時のURLの羅列を改善</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.16.0">
                         <span class="info-updates-date">2026/04/28</span>
                         <span class="info-updates-version">v1.16.0</span>
