@@ -197,6 +197,45 @@ function createLocalVideoService(deps) {
     return path.join(provisionalInfoDir, `${safeStem}_${hash}.info.json`);
   }
 
+  function buildVideoInfoSidecarCandidates(videoPath) {
+    const candidates = [];
+    const resolvedVideoPath = path.resolve(String(videoPath || ""));
+    if (!resolvedVideoPath) return candidates;
+
+    const baseName = path.parse(resolvedVideoPath).name;
+    candidates.push(path.join(path.dirname(resolvedVideoPath), `${baseName}.info.json`));
+
+    const libraryRoot = inferLibraryRootFromVideoPath(resolvedVideoPath);
+    if (libraryRoot) {
+      candidates.push(path.join(libraryRoot, "コメント", `${baseName}.info.json`));
+      candidates.push(path.join(libraryRoot, "仮コメント", `${baseName}.info.json`));
+    }
+
+    return candidates;
+  }
+
+  async function sidecarInfoMatchesVideoId(videoPath, videoId) {
+    const normalizedId = String(videoId || "").trim();
+    if (!normalizedId) return false;
+
+    for (const candidate of buildVideoInfoSidecarCandidates(videoPath)) {
+      if (!candidate || !fs.existsSync(candidate)) continue;
+      let raw = "";
+      try {
+        raw = await fs.promises.readFile(candidate, "utf-8");
+      } catch (_error) {
+        continue;
+      }
+      if (!raw) continue;
+      const match = raw.match(/"id"\s*:\s*"([^"]+)"/);
+      if (String(match?.[1] || "").trim() === normalizedId) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   async function findLocalVideoPathById(videoId) {
     const sourceDirs = await getLocalVideoDirs();
     const normalizedId = String(videoId || "").trim();
@@ -230,14 +269,16 @@ function createLocalVideoService(deps) {
 
           const base = path.parse(entry.name).name;
           if (
-            base !== normalizedId &&
-            !base.startsWith(normalizedId) &&
-            !normalizedId.startsWith(base)
+            base === normalizedId ||
+            base.startsWith(normalizedId) ||
+            normalizedId.startsWith(base)
           ) {
-            continue;
+            return fullPath;
           }
 
-          return fullPath;
+          if (await sidecarInfoMatchesVideoId(fullPath, normalizedId)) {
+            return fullPath;
+          }
         }
       }
     }

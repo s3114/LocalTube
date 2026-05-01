@@ -27,6 +27,8 @@ function registerInfoRoutes(app, deps) {
     expiresAt: 0,
     entries: [],
   };
+  const resolvedInfoPathCache = new Map();
+  const RESOLVED_INFO_PATH_TTL_MS = 10 * 60 * 1000;
   const channelThumbnailEnrichmentState = new Map();
   const CHANNEL_THUMBNAIL_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -237,6 +239,8 @@ function registerInfoRoutes(app, deps) {
       id: info.id || null,
       title: info.title || "",
       channel: info.channel || "",
+      channel_id: info.channel_id || "",
+      channel_url: info.channel_url || "",
       uploader: info.uploader || info.uploader_id || "",
       upload_date: info.upload_date || "",
       duration: Number.isFinite(Number(info.duration))
@@ -246,6 +250,10 @@ function registerInfoRoutes(app, deps) {
         ? Number(info.view_count)
         : null,
       channel_thumbnail: info.channel_thumbnail || "",
+      webpage_url: info.webpage_url || "",
+      live_status: info.live_status || "",
+      is_live: info.is_live === true,
+      was_live: info.was_live === true,
     };
   }
 
@@ -472,6 +480,119 @@ function registerInfoRoutes(app, deps) {
     return matched ? matched.fullPath : null;
   }
 
+  function inferLibraryRootFromVideoPath(videoPath) {
+    const resolvedVideoDir = path.resolve(path.dirname(videoPath));
+    const parsed = path.parse(resolvedVideoDir);
+    const relative = resolvedVideoDir.slice(parsed.root.length);
+    const segments = relative.split(path.sep).filter(Boolean);
+    const videoDirIndex = segments.lastIndexOf("動画");
+    if (videoDirIndex < 0) return null;
+    return path.join(parsed.root, ...segments.slice(0, videoDirIndex));
+  }
+
+  function buildSidecarInfoCandidates(videoPath) {
+    if (!videoPath) return [];
+    const libraryRoot = inferLibraryRootFromVideoPath(videoPath);
+    const base = path.parse(videoPath).name;
+    const candidates = [];
+    // Same-directory sidecar (e.g. "<video>.info.json")
+    candidates.push(path.join(path.dirname(videoPath), `${base}.info.json`));
+    if (libraryRoot) {
+      candidates.push(path.join(libraryRoot, "コメント", `${base}.info.json`));
+      candidates.push(path.join(libraryRoot, "仮コメント", `${base}.info.json`));
+    }
+    return candidates;
+  }
+
+  function escapeRegExp(text) {
+    return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function getResolvedInfoPathCache(videoId) {
+    const key = String(videoId || "").trim();
+    if (!key) return null;
+    const hit = resolvedInfoPathCache.get(key);
+    if (!hit) return null;
+    if (hit.expiresAt <= Date.now()) {
+      resolvedInfoPathCache.delete(key);
+      return null;
+    }
+    return hit.path || null;
+  }
+
+  function setResolvedInfoPathCache(videoId, infoPath) {
+    const key = String(videoId || "").trim();
+    if (!key) return;
+    resolvedInfoPathCache.set(key, {
+      path: infoPath || null,
+      expiresAt: Date.now() + RESOLVED_INFO_PATH_TTL_MS,
+    });
+    if (resolvedInfoPathCache.size > 5000) {
+      const firstKey = resolvedInfoPathCache.keys().next().value;
+      if (firstKey) resolvedInfoPathCache.delete(firstKey);
+    }
+  }
+
+  async function findMatchingInfoPathByIdField(videoId, entries) {
+    const normalized = String(videoId || "").trim();
+    if (!normalized) return null;
+
+    const idPattern = new RegExp(`\\"id\\"\\s*:\\s*\\"${escapeRegExp(normalized)}\\"`);
+    const urlPattern = new RegExp(
+      `youtube\\.com\\/watch\\?v=${escapeRegExp(normalized)}\\b`,
+    );
+
+    for (const entry of entries) {
+      const fullPath = entry?.fullPath;
+      if (!fullPath || !fs.existsSync(fullPath)) continue;
+
+      let raw = "";
+      try {
+        raw = await fs.promises.readFile(fullPath, "utf-8");
+      } catch (_error) {
+        continue;
+      }
+      if (!raw) continue;
+
+      if (idPattern.test(raw) || urlPattern.test(raw)) {
+        return fullPath;
+      }
+    }
+
+    return null;
+  }
+
+  async function resolveInfoJsonPathFromVideoId(videoId) {
+    const cached = getResolvedInfoPathCache(videoId);
+    if (cached) return cached;
+
+    const indexedInfoPath = await resolveInfoJsonPath(videoId);
+    if (indexedInfoPath) {
+      setResolvedInfoPathCache(videoId, indexedInfoPath);
+      return indexedInfoPath;
+    }
+
+    const videoPath = await findLocalVideoPathById(videoId);
+    if (videoPath) {
+      for (const candidate of buildSidecarInfoCandidates(videoPath)) {
+        if (!candidate) continue;
+        if (!fs.existsSync(candidate)) continue;
+        setResolvedInfoPathCache(videoId, candidate);
+        return candidate;
+      }
+    }
+
+    const { entries } = await getInfoEntries();
+    const matchedById = await findMatchingInfoPathByIdField(videoId, entries);
+    if (matchedById) {
+      setResolvedInfoPathCache(videoId, matchedById);
+      return matchedById;
+    }
+
+    setResolvedInfoPathCache(videoId, null);
+    return null;
+  }
+
   async function findMatchingInfoJson(videoId, searchDir) {
     if (!fs.existsSync(searchDir)) return null;
     const pendingDirs = [searchDir];
@@ -506,7 +627,7 @@ function registerInfoRoutes(app, deps) {
 
   async function resolveLiteInfoByVideoId(videoId) {
     const provisionalPath = getProvisionalInfoPath(videoId);
-    const infoPath = await resolveInfoJsonPath(videoId);
+    const infoPath = await resolveInfoJsonPathFromVideoId(videoId);
     if (infoPath) {
       const raw = await fs.promises.readFile(infoPath, "utf-8");
       const parsed = JSON.parse(raw);
@@ -557,7 +678,7 @@ function registerInfoRoutes(app, deps) {
 
       logger.info("info lookup start", { videoId });
 
-      const infoPath = await resolveInfoJsonPath(videoId);
+      const infoPath = await resolveInfoJsonPathFromVideoId(videoId);
 
       if (!infoPath) {
         if (fs.existsSync(provisionalPath)) {

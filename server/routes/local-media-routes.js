@@ -21,6 +21,7 @@ function registerLocalMediaRoutes(app, deps) {
   } = deps;
   const logger = deps.logger || createLogger("route-local-media");
   const LOCAL_VIDEOS_CACHE_TTL_MS = 5000;
+  const LOCAL_VIDEOS_INDEX_VERSION = 3;
   const VIDEO_EXT = [".mp4", ".mkv", ".webm", ".mov"];
   const THUMB_EXT = [".jpg", ".jpeg", ".png", ".webp"];
   const VIDEO_DIR_INDEX_PATH = path.join(baseDir, "cache", "video-dir-index.json");
@@ -497,6 +498,251 @@ function registerLocalMediaRoutes(app, deps) {
     return String(url || "").replace(/=s\d+[-a-z0-9]*/i, "");
   }
 
+  function hasExtendedLocalVideoMetadata(videos) {
+    if (!Array.isArray(videos)) return false;
+    if (videos.length === 0) return true;
+    return videos.every((video) =>
+      video &&
+      typeof video === "object" &&
+      Object.prototype.hasOwnProperty.call(video, "videoId") &&
+      Object.prototype.hasOwnProperty.call(video, "channelId") &&
+      Object.prototype.hasOwnProperty.call(video, "channelName") &&
+      Object.prototype.hasOwnProperty.call(video, "duration") &&
+      Object.prototype.hasOwnProperty.call(video, "liveStatus") &&
+      Object.prototype.hasOwnProperty.call(video, "isLive") &&
+      Object.prototype.hasOwnProperty.call(video, "wasLive") &&
+      Object.prototype.hasOwnProperty.call(video, "webpageUrl"),
+    );
+  }
+
+  function pickChannelAvatarUrl(channelObj) {
+    if (!Array.isArray(channelObj?.thumbnails)) return "";
+    const avatarThumb =
+      channelObj.thumbnails.find((thumb) => thumb?.id === "avatar_uncropped") ||
+      channelObj.thumbnails.find((thumb) =>
+        Number.isFinite(Number(thumb?.width)) &&
+        Number.isFinite(Number(thumb?.height)) &&
+        Math.abs(Number(thumb.width) - Number(thumb.height)) <= 16,
+      ) ||
+      channelObj.thumbnails[channelObj.thumbnails.length - 1];
+    return String(avatarThumb?.url || "").trim();
+  }
+
+  function pickChannelBannerUrl(channelObj) {
+    if (!Array.isArray(channelObj?.thumbnails)) return "";
+    const bannerThumb =
+      channelObj.thumbnails.find((thumb) => thumb?.id === "banner_uncropped") ||
+      channelObj.thumbnails.find((thumb) =>
+        Number(thumb?.width || 0) > Number(thumb?.height || 0) * 2,
+      ) ||
+      channelObj.thumbnails[0];
+    return String(bannerThumb?.url || "").trim();
+  }
+
+  function normalizeChannelSummary(channelObj) {
+    const source = channelObj && typeof channelObj === "object" ? channelObj : {};
+    const channelId = String(
+      source.channel_id || source.id || "",
+    ).trim();
+    const name = String(
+      source.channel || source.uploader || source.title || "",
+    )
+      .replace(/\s+-\s+videos$/i, "")
+      .trim();
+    if (!channelId || !name) return null;
+    return {
+      id: channelId,
+      channelId,
+      name,
+      handle: String(source.uploader_id || "").trim(),
+      url: String(source.channel_url || source.uploader_url || "").trim(),
+      avatar: pickChannelAvatarUrl(source),
+      banner: pickChannelBannerUrl(source),
+      subscriberCount: Number.isFinite(Number(source.channel_follower_count))
+        ? Number(source.channel_follower_count)
+        : null,
+    };
+  }
+
+  function extractLikelyYoutubeId(text) {
+    const source = String(text || "");
+    const match = source.match(
+      /(^|[^A-Za-z0-9_-])([A-Za-z0-9_-]{11})(?=$|[^A-Za-z0-9_-])/,
+    );
+    return match ? match[2] : "";
+  }
+
+  const infoJsonIdIndexCache = new Map();
+  const INFO_JSON_ID_INDEX_TTL_MS = 5 * 60 * 1000;
+
+  async function buildInfoJsonIdIndexForLibraryRoot(libraryRoot) {
+    const idToPath = new Map();
+    const dirs = [
+      path.join(libraryRoot, "コメント"),
+      path.join(libraryRoot, "仮コメント"),
+    ];
+
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      let entries = [];
+      try {
+        entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      } catch (_error) {
+        continue;
+      }
+
+      for (const entry of entries) {
+        if (!entry?.isFile?.()) continue;
+        if (!String(entry.name || "").endsWith(".info.json")) continue;
+
+        const fullPath = path.join(dir, entry.name);
+        let raw = "";
+        try {
+          raw = await fs.promises.readFile(fullPath, "utf-8");
+        } catch (_error) {
+          continue;
+        }
+        if (!raw) continue;
+
+        // JSON.parse せずに id だけ拾う（速い）
+        const match = raw.match(/"id"\s*:\s*"([^"]+)"/);
+        const id = String(match?.[1] || "").trim();
+        if (!id || idToPath.has(id)) continue;
+        idToPath.set(id, fullPath);
+      }
+    }
+
+    return idToPath;
+  }
+
+  async function resolveInfoJsonPathById(libraryRoot, videoId) {
+    const rootKey = String(libraryRoot || "").trim();
+    const idKey = String(videoId || "").trim();
+    if (!rootKey || !idKey) return "";
+
+    const now = Date.now();
+    const cached = infoJsonIdIndexCache.get(rootKey);
+    if (cached && cached.expiresAt > now && cached.idToPath instanceof Map) {
+      return cached.idToPath.get(idKey) || "";
+    }
+
+    const idToPath = await buildInfoJsonIdIndexForLibraryRoot(rootKey);
+    infoJsonIdIndexCache.set(rootKey, {
+      expiresAt: now + INFO_JSON_ID_INDEX_TTL_MS,
+      idToPath,
+    });
+    return idToPath.get(idKey) || "";
+  }
+
+  async function readInfoJsonSummary(videoPath) {
+    const resolvedVideoPath = path.resolve(String(videoPath || ""));
+    if (!resolvedVideoPath) {
+      return {
+        id: "",
+        title: "",
+        channelId: "",
+        channelName: "",
+        channelThumbnail: "",
+        duration: null,
+        liveStatus: "",
+        isLive: false,
+        wasLive: false,
+        webpageUrl: "",
+        uploadDate: "",
+        viewCount: null,
+      };
+    }
+
+    const baseName = normalizeVideoBaseName(resolvedVideoPath);
+    const libraryRoot = inferLibraryRootFromVideoPath(resolvedVideoPath);
+    const sameDirCandidate = path.join(path.dirname(resolvedVideoPath), `${baseName}.info.json`);
+    const candidatePaths = [
+      libraryRoot ? path.join(libraryRoot, "コメント", `${baseName}.info.json`) : "",
+      libraryRoot ? path.join(libraryRoot, "仮コメント", `${baseName}.info.json`) : "",
+      sameDirCandidate,
+    ].filter(Boolean);
+
+    for (const candidatePath of candidatePaths) {
+      try {
+        if (!fs.existsSync(candidatePath)) continue;
+        const raw = await fs.promises.readFile(candidatePath, "utf-8");
+        const parsed = JSON.parse(raw);
+        const videoId = String(parsed?.id || "").trim();
+        if (!videoId) continue;
+        return {
+          id: videoId,
+          title: String(parsed?.title || "").trim(),
+          channelId: String(parsed?.channel_id || "").trim(),
+          channelName: String(parsed?.channel || parsed?.uploader || "").trim(),
+          channelThumbnail: String(parsed?.channel_thumbnail || "").trim(),
+          duration: Number.isFinite(Number(parsed?.duration))
+            ? Math.max(0, Math.round(Number(parsed.duration)))
+            : null,
+          liveStatus: String(parsed?.live_status || "").trim(),
+          isLive: parsed?.is_live === true,
+          wasLive: parsed?.was_live === true,
+          webpageUrl: String(parsed?.webpage_url || "").trim(),
+          uploadDate: String(parsed?.upload_date || "").trim(),
+          viewCount: Number.isFinite(Number(parsed?.view_count))
+            ? Number(parsed.view_count)
+            : null,
+        };
+      } catch (_error) {
+        // ignore malformed sidecar json and continue fallback detection
+      }
+    }
+
+    // ファイル名が一致しない場合でも、id から info.json を引けるようにする
+    const videoIdFallback = extractLikelyYoutubeId(baseName);
+    if (libraryRoot && videoIdFallback) {
+      const matchedPath = await resolveInfoJsonPathById(libraryRoot, videoIdFallback);
+      if (matchedPath && fs.existsSync(matchedPath)) {
+        try {
+          const raw = await fs.promises.readFile(matchedPath, "utf-8");
+          const parsed = JSON.parse(raw);
+          const videoId = String(parsed?.id || "").trim();
+          if (videoId) {
+            return {
+              id: videoId,
+              title: String(parsed?.title || "").trim(),
+              channelId: String(parsed?.channel_id || "").trim(),
+              channelName: String(parsed?.channel || parsed?.uploader || "").trim(),
+              channelThumbnail: String(parsed?.channel_thumbnail || "").trim(),
+              duration: Number.isFinite(Number(parsed?.duration))
+                ? Math.max(0, Math.round(Number(parsed.duration)))
+                : null,
+              liveStatus: String(parsed?.live_status || "").trim(),
+              isLive: parsed?.is_live === true,
+              wasLive: parsed?.was_live === true,
+              webpageUrl: String(parsed?.webpage_url || "").trim(),
+              uploadDate: String(parsed?.upload_date || "").trim(),
+              viewCount: Number.isFinite(Number(parsed?.view_count))
+                ? Number(parsed.view_count)
+                : null,
+            };
+          }
+        } catch (_error) {
+          // ignore
+        }
+      }
+    }
+
+    return {
+      id: extractLikelyYoutubeId(baseName),
+      title: "",
+      channelId: "",
+      channelName: "",
+      channelThumbnail: "",
+      duration: null,
+      liveStatus: "",
+      isLive: false,
+      wasLive: false,
+      webpageUrl: "",
+      uploadDate: "",
+      viewCount: null,
+    };
+  }
+
   function getChatAssetFallbackPath(assetUrl, kind) {
     const normalizedUrl =
       kind === "badge"
@@ -721,7 +967,8 @@ function registerLocalMediaRoutes(app, deps) {
         !forceRefresh &&
         localVideosCache.data &&
         localVideosCache.expiresAt > now &&
-        localVideosCache.signature === "memory-cache"
+        localVideosCache.signature === "memory-cache" &&
+        hasExtendedLocalVideoMetadata(localVideosCache.data)
       ) {
         logger.info("local videos cache hit", {
           count: localVideosCache.data.length,
@@ -735,10 +982,12 @@ function registerLocalMediaRoutes(app, deps) {
         if (
           diskIndex &&
           Array.isArray(diskIndex.videos) &&
+          diskIndex.indexVersion === LOCAL_VIDEOS_INDEX_VERSION &&
           diskIndex.signature === signature &&
           Array.isArray(diskIndex.sourceDirs) &&
           diskIndex.sourceDirs.join("|") === normalizedSourceDirs.join("|") &&
-          diskIndex.fallbackEnabled === fallbackEnabled
+          diskIndex.fallbackEnabled === fallbackEnabled &&
+          hasExtendedLocalVideoMetadata(diskIndex.videos)
         ) {
           localVideosCache = {
             expiresAt: Date.now() + LOCAL_VIDEOS_CACHE_TTL_MS,
@@ -795,8 +1044,10 @@ function registerLocalMediaRoutes(app, deps) {
               findExistingThumbnailPath(fullPath, false);
             const stat = await fs.promises.stat(fullPath);
 
+            const infoSummary = await readInfoJsonSummary(fullPath);
+
             return {
-              title: base,
+              title: infoSummary.title || base,
               video: `/api/local-media?type=video&path=${encodeURIComponent(fullPath)}`,
               videoPath: fullPath,
               thumb: thumbPath
@@ -805,6 +1056,17 @@ function registerLocalMediaRoutes(app, deps) {
                   ? `/api/local-thumb-fallback?videoPath=${encodeURIComponent(fullPath)}&priority=low`
                   : null,
               filename: file,
+              videoId: infoSummary.id,
+              channelId: infoSummary.channelId,
+              channelName: infoSummary.channelName,
+              channelThumbnail: infoSummary.channelThumbnail,
+              duration: infoSummary.duration,
+              liveStatus: infoSummary.liveStatus,
+              isLive: infoSummary.isLive,
+              wasLive: infoSummary.wasLive,
+              webpageUrl: infoSummary.webpageUrl,
+              uploadDate: infoSummary.uploadDate,
+              viewCount: infoSummary.viewCount,
               mtime: stat.mtimeMs,
               sourceDir: videoDir,
             };
@@ -816,6 +1078,7 @@ function registerLocalMediaRoutes(app, deps) {
 
       videos.sort((a, b) => b.mtime - a.mtime);
       await writeLocalVideosIndex({
+        indexVersion: LOCAL_VIDEOS_INDEX_VERSION,
         sourceDirs: sourceDirs.map((dir) => path.resolve(dir)).sort(),
         fallbackEnabled,
         signature,
@@ -841,6 +1104,46 @@ function registerLocalMediaRoutes(app, deps) {
     } catch (e) {
       logger.error("ローカル動画のスキャンに失敗", { error: e.message });
       apiError(res, 500, "動画一覧の取得に失敗しました。");
+    }
+  });
+
+  app.get("/api/local-channels", async (_req, res) => {
+    try {
+      const channelDir = path.join(baseDir, "downloads", "チャンネル");
+      if (!fs.existsSync(channelDir)) {
+        return apiOk(res, []);
+      }
+
+      const entries = await fs.promises.readdir(channelDir, { withFileTypes: true });
+      const channels = [];
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        if (!entry.name.endsWith(".channel.json")) continue;
+        try {
+          const fullPath = path.join(channelDir, entry.name);
+          const raw = await fs.promises.readFile(fullPath, "utf-8");
+          const parsed = JSON.parse(raw);
+          const channel = normalizeChannelSummary(parsed);
+          if (channel) {
+            channels.push(channel);
+          }
+        } catch (error) {
+          logger.warn("channel json parse failed", {
+            file: entry.name,
+            error: error.message,
+          });
+        }
+      }
+
+      channels.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "ja"),
+      );
+      apiOk(res, channels);
+    } catch (error) {
+      logger.error("ローカルチャンネル一覧の取得に失敗", {
+        error: error.message,
+      });
+      apiError(res, 500, "チャンネル一覧の取得に失敗しました。");
     }
   });
 }

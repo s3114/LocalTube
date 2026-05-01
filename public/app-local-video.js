@@ -19,6 +19,28 @@
     showConfirm = async () => true,
     showSuccess = (_message) => {},
   }) {
+    function getPreferredVideoId(video) {
+      return String(video?.videoId || "").trim() || getVideoIdFromFilename(video?.filename);
+    }
+
+    function buildInlineHomeInfo(video) {
+      const videoId = getPreferredVideoId(video);
+      if (!videoId) return null;
+      return {
+        id: videoId,
+        title: String(video?.title || "").trim(),
+        channel: String(video?.channelName || "").trim(),
+        channel_thumbnail: String(video?.channelThumbnail || "").trim(),
+        duration: Number.isFinite(Number(video?.duration)) ? Number(video.duration) : null,
+        live_status: String(video?.liveStatus || "").trim(),
+        is_live: video?.isLive === true,
+        was_live: video?.wasLive === true,
+        webpage_url: String(video?.webpageUrl || "").trim(),
+        upload_date: String(video?.uploadDate || "").trim(),
+        view_count: Number.isFinite(Number(video?.viewCount)) ? Number(video.viewCount) : null,
+      };
+    }
+
     async function copyTextToClipboard(text) {
       const value = String(text || "");
       if (global.navigator?.clipboard?.writeText && global.isSecureContext) {
@@ -212,7 +234,8 @@
       const item = document.createElement("div");
       item.className = "local-video-item";
       item.dataset.filename = video.filename;
-      item.dataset.videoId = getVideoIdFromFilename(video.filename) || "";
+      item.dataset.videoId =
+        String(video.videoId || "").trim() || getVideoIdFromFilename(video.filename) || "";
 
       if (video.thumb) {
         const thumbImg = document.createElement("img");
@@ -241,11 +264,13 @@
 
       const channelEl = document.createElement("div");
       channelEl.className = "local-video-item-channel";
-      channelEl.textContent = "ローカル動画";
+      channelEl.textContent = String(video?.channelName || "").trim() || "ローカル動画";
 
       const metaEl = document.createElement("div");
       metaEl.className = "local-video-item-meta";
-      metaEl.textContent = "視聴回数不明・投稿日不明";
+      metaEl.textContent = Number.isFinite(Number(video?.duration))
+        ? `${Math.round(Number(video.duration))}秒`
+        : "視聴回数不明・投稿日不明";
 
       textEl.appendChild(titleEl);
       textEl.appendChild(channelEl);
@@ -749,9 +774,14 @@
 
       return videos.find((videoItem) => {
         if (!videoItem || !videoItem.filename) return false;
+        const actualVideoId = String(videoItem.videoId || "").trim();
         const idFromFilename = videoItem.filename.replace(/\.(mp4|mkv|webm|mov)$/i, "");
         const titleText = String(videoItem.title || "").trim();
-        return idFromFilename === normalizedVideoId || titleText === normalizedVideoId;
+        return (
+          actualVideoId === normalizedVideoId ||
+          idFromFilename === normalizedVideoId ||
+          titleText === normalizedVideoId
+        );
       });
     }
 
@@ -1330,7 +1360,7 @@
       }
 
       async function copyVideoShareUrl(video) {
-        const videoId = getVideoIdFromFilename(video?.filename);
+        const videoId = getPreferredVideoId(video);
         if (!videoId) return;
         let url = `http://localhost:3000/#player/${encodeURIComponent(videoId)}`;
         try {
@@ -1586,7 +1616,7 @@
       async function fetchLocalVideoInfoBatch(targetVideos) {
         const uncachedIds = [];
         targetVideos.forEach((video) => {
-          const videoId = getVideoIdFromFilename(video.filename);
+          const videoId = getPreferredVideoId(video);
           if (!videoId) return;
           if (localVideoInfoData.has(videoId) || requestedLocalVideoInfoIds.has(videoId)) {
             return;
@@ -1642,7 +1672,7 @@
       function scheduleLocalVideoInfoPrefetch(videos) {
         const idsToQueue = [];
         (Array.isArray(videos) ? videos : []).forEach((video) => {
-          const videoId = getVideoIdFromFilename(video.filename);
+          const videoId = getPreferredVideoId(video);
           if (!videoId) return;
           if (localVideoInfoData.has(videoId) || requestedLocalVideoInfoIds.has(videoId)) return;
           idsToQueue.push(videoId);
@@ -1816,7 +1846,7 @@
       }
 
       function playLocalVideo(video, activeItem = null, shouldAutoplay = true, playlistMeta = null) {
-        const videoId = getVideoIdFromFilename(video.filename);
+        const videoId = getPreferredVideoId(video);
         currentPlaylistPlayback = {
           listId: String(playlistMeta?.listId || "").trim(),
           index: String(playlistMeta?.index || "").trim(),
@@ -1895,9 +1925,17 @@
         allLocalVideos = Array.isArray(videos) ? videos : [];
         localVideoById.clear();
         allLocalVideos.forEach((video) => {
-          const videoId = getVideoIdFromFilename(video.filename);
+          const videoId =
+            String(video.videoId || "").trim() || getVideoIdFromFilename(video.filename);
           if (videoId) {
             localVideoById.set(videoId, video);
+            const inlineInfo = buildInlineHomeInfo(video);
+            if (inlineInfo) {
+              localVideoInfoData.set(videoId, {
+                ...(localVideoInfoData.get(videoId) || {}),
+                ...inlineInfo,
+              });
+            }
           }
         });
         renderLocalVideoList(
@@ -1912,6 +1950,11 @@
         renderPlaybackPlaylistSidebar();
         scheduleHomeInfoPrefetch();
         playPendingVideoIfAny(false);
+        window.dispatchEvent(
+          new CustomEvent("app:local-videos-updated", {
+            detail: { count: allLocalVideos.length },
+          }),
+        );
       }
 
       async function loadLocalVideos(forceRefresh = false) {

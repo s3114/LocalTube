@@ -355,10 +355,14 @@
     return false;
   }
 
+  function getHomeVideoId(video) {
+    return String(video?.videoId || "").trim() || getVideoIdFromFilename(video?.filename);
+  }
+
   function countMissingHomeInfo(videos, homeInfoData) {
     let missing = 0;
     for (const video of videos) {
-      const videoId = getVideoIdFromFilename(video?.filename);
+      const videoId = getHomeVideoId(video);
       if (!videoId) continue;
       if (!homeInfoData.has(videoId)) missing += 1;
     }
@@ -366,7 +370,26 @@
   }
 
   function getHomeVideoInfoFromMap(video, homeInfoData) {
-    return homeInfoData.get(getVideoIdFromFilename(video.filename)) || null;
+    return homeInfoData.get(getHomeVideoId(video)) || null;
+  }
+
+  function buildInlineHomeInfo(video) {
+    const videoId = getHomeVideoId(video);
+    if (!videoId) return null;
+    return {
+      id: videoId,
+      title: String(video?.title || "").trim(),
+      channel: String(video?.channelName || "").trim(),
+      channel_thumbnail: String(video?.channelThumbnail || "").trim(),
+      duration: Number.isFinite(Number(video?.duration)) ? Number(video.duration) : null,
+      live_status: String(video?.liveStatus || "").trim(),
+      is_live: video?.isLive === true,
+      was_live: video?.wasLive === true,
+      webpage_url: String(video?.webpageUrl || "").trim(),
+      upload_date: String(video?.uploadDate || "").trim(),
+      view_count: Number.isFinite(Number(video?.viewCount)) ? Number(video.viewCount) : null,
+      uploader: String(video?.channelName || "").trim(),
+    };
   }
 
   function matchesHomeKeywordTerms(video, info, terms) {
@@ -603,7 +626,7 @@
         const priority = i < initialBatchSize ? "high" : "low";
         const video = withFallbackThumbPriority(sourceVideo, priority);
         const { item, refs } = createCard(video);
-        const videoId = getVideoIdFromFilename(video.filename);
+        const videoId = getHomeVideoId(video);
         if (videoId) {
           cardRefsByVideoId.set(videoId, { video, refs });
         }
@@ -631,7 +654,7 @@
 
   async function fetchHomeInfoBatch(homeInfoData, requestedHomeInfoIds, videos) {
     const ids = videos
-      .map((video) => getVideoIdFromFilename(video.filename))
+      .map((video) => getHomeVideoId(video))
       .filter((id) => id && !homeInfoData.has(id));
     if (ids.length === 0) return;
 
@@ -710,7 +733,7 @@
 
   function createHomeCardInfoEnricher(homeInfoData) {
     return async function enrichHomeCardInfo(video, refs) {
-      const videoId = getVideoIdFromFilename(video.filename);
+      const videoId = getHomeVideoId(video);
       if (!videoId) return;
       const info = homeInfoData.get(videoId) || null;
       applyHomeCardInfoFromInfo(video, refs, info);
@@ -1266,7 +1289,7 @@
           const batch = targets.slice(i, i + batchSize);
           await fetchHomeInfoBatch(homeInfoData, requestedHomeInfoIds, batch);
           for (const video of batch) {
-            const videoId = getVideoIdFromFilename(video.filename);
+            const videoId = getHomeVideoId(video);
             const mapped = cardRefsByVideoId.get(videoId);
             const info = homeInfoData.get(videoId);
             if (mapped && info) {
@@ -1289,6 +1312,13 @@
       initialize: initializeHomeVideoBrowser,
       setVideos(videos) {
         allVideos = Array.isArray(videos) ? videos : [];
+        for (const video of allVideos) {
+          const inlineInfo = buildInlineHomeInfo(video);
+          if (!inlineInfo?.id) continue;
+          if (!homeInfoData.has(inlineInfo.id)) {
+            homeInfoData.set(inlineInfo.id, inlineInfo);
+          }
+        }
         updateHomeSearchPlaceholder();
       },
       render,
