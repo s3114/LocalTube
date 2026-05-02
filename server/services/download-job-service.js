@@ -1010,20 +1010,20 @@ function createDownloadJobService({
 
     if (!infoFile) {
       logger.warn("info.json が無いため登録不可", { jobPendingDir });
-      broadcast("status_update", {
-        id: job.id,
-        status: "completed",
-        progress: { percent: 100, eta: "スキップ完了（info.jsonなし）" },
-      });
+      job.progress = {
+        ...job.progress,
+        percentage: 100,
+        eta: "スキップ完了（info.jsonなし）",
+      };
       return;
     }
 
-    jobQueueService.enqueueJob(jobPendingDir);
-    broadcast("status_update", {
-      id: job.id,
-      status: "completed",
-      progress: { percent: 100, eta: "完了" },
-    });
+    await jobQueueService.enqueueJob(jobPendingDir);
+    job.progress = {
+      ...job.progress,
+      percentage: 100,
+      eta: "完了",
+    };
   }
 
   return {

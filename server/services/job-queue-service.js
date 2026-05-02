@@ -21,6 +21,7 @@ function createJobQueueService({
   fs.mkdirSync(pendingChatDir, { recursive: true });
 
   const processingQueue = [];
+  const pendingResolvers = new Map();
   let isProcessing = false;
 
   function defaultRunBatchScript(command) {
@@ -96,6 +97,7 @@ function createJobQueueService({
     if (isProcessing || processingQueue.length === 0) return;
     isProcessing = true;
     const jobPath = processingQueue.shift();
+    const pending = pendingResolvers.get(jobPath);
 
     logger.info("処理開始", { jobPath });
     try {
@@ -107,8 +109,10 @@ function createJobQueueService({
       );
       await moveExtraFiles(jobPath);
       logger.info("処理完了", { jobPath });
+      pending?.resolve?.();
     } catch (err) {
       logger.error("処理失敗", { jobPath, error: err.message });
+      pending?.reject?.(err);
       if (typeof broadcast === "function") {
         broadcast("status_update", {
           id: path.basename(jobPath),
@@ -117,18 +121,37 @@ function createJobQueueService({
         });
       }
     } finally {
+      pendingResolvers.delete(jobPath);
       isProcessing = false;
       if (processingQueue.length > 0) processQueue();
     }
   }
 
   function enqueueJob(jobPath) {
-    if (!jobPath) return;
+    if (!jobPath) return Promise.resolve();
+    const existing = pendingResolvers.get(jobPath);
+    if (existing?.promise) {
+      return existing.promise;
+    }
+
+    let resolvePromise;
+    let rejectPromise;
+    const promise = new Promise((resolve, reject) => {
+      resolvePromise = resolve;
+      rejectPromise = reject;
+    });
+    pendingResolvers.set(jobPath, {
+      promise,
+      resolve: resolvePromise,
+      reject: rejectPromise,
+    });
+
     if (!processingQueue.includes(jobPath)) {
       processingQueue.push(jobPath);
       logger.info("ジョブ登録", { jobPath });
     }
     setTimeout(processQueue, 300);
+    return promise;
   }
 
   if (enableWatch) {
