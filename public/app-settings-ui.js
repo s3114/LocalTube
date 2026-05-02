@@ -225,6 +225,9 @@ function clampNumberInRange(value, min, max, fallback) {
           formatValue: elements.fmt?.value || "",
           formatText:
             elements.fmt?.options?.[elements.fmt.selectedIndex]?.textContent || "",
+          videoFormatValue: elements.videoFormat?.value || "auto",
+          videoFormatText:
+            elements.videoFormat?.options?.[elements.videoFormat.selectedIndex]?.textContent || "自動",
           savePath: elements.savePath?.value || "",
           saveHistory: Boolean(elements.optHistory?.checked),
           downloadThumb: Boolean(elements.optThumb?.checked),
@@ -302,6 +305,9 @@ function clampNumberInRange(value, min, max, fallback) {
 
       function initializeGeneralSettingStorageBindings(elements) {
         elements.fmt.value = loadLocalSetting("fmt", elements.fmt.value);
+        if (elements.videoFormat) {
+          elements.videoFormat.value = loadLocalSetting("videoFormat", "auto");
+        }
         elements.savePath.value = loadLocalSetting("savePath", "");
         elements.optHistory.checked = loadLocalSetting("optHistory", true);
         elements.optThumb.checked = loadLocalSetting("optThumb", true);
@@ -345,6 +351,9 @@ function clampNumberInRange(value, min, max, fallback) {
 
         elements.fmt.addEventListener("change", (e) =>
           saveLocalSetting("fmt", e.target.value),
+        );
+        elements.videoFormat?.addEventListener("change", (e) =>
+          saveLocalSetting("videoFormat", e.target.value),
         );
         elements.savePath.addEventListener("input", (e) =>
           saveLocalSetting("savePath", e.target.value),

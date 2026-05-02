@@ -110,7 +110,7 @@
       /* ドロップダウン展開時のネイティブ配色をダーク寄りに固定 */
       select {
         color-scheme: dark;
-        background-color: #1b1b1b;
+        /* background-color: #1b1b1b; */
         color: var(--text);
       }
 
@@ -1294,6 +1294,26 @@
       /* 折りたたみ時はヘッダーだけ残す */
       .sidebar-local_movie.collapsed {
         padding-bottom: 6px;
+      }
+
+      .settings-collapsible-section {
+        margin-top: 10px;
+      }
+
+      .settings-collapsible-section .sidebar-header {
+        margin-bottom: 6px;
+      }
+
+      .settings-collapsible-section.collapsed .sidebar-content {
+        display: none;
+      }
+
+      .settings-collapsible-section.collapsed .sidebar-header {
+        margin-bottom: 0;
+      }
+
+      .settings-collapsible-section.collapsed .sidebar-toggle i {
+        transform: rotate(-90deg);
       }
 
       .chat-content {
@@ -4577,7 +4597,6 @@
                   </option>
                 </select>
               </div>
-
               <div class="field-row field-row-download-toggles">
                 <div class="field-label">DL</div>
                 <div class="download-toggle-group">
@@ -4730,16 +4749,6 @@
                   <span class="slider"></span>
                 </label>
               </div>
-              <!--<div class="toggle">
-                <div>
-                  IPv4 を強制
-                  <small>ダウンロード時に IPv4 を使用します。</small>
-                </div>
-                <label class="switch">
-                  <input type="checkbox" id="optForceIpv4" />
-                  <span class="slider"></span>
-                </label>
-              </div> -->
               <div class="toggle">
                 <div>
                   DRM 保護を回避
@@ -4752,6 +4761,37 @@
                   <input type="checkbox" id="optDrm" />
                   <span class="slider"></span>
                 </label>
+              </div>
+              <div id="advanced-download-settings-section"
+                class="settings-collapsible-section collapsed">
+                <div class="sidebar-header">
+                  <div class="sidebar-title">高度な設定</div>
+                  <button class="sidebar-toggle"
+                    data-target="advanced-download-settings-section">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+                <div class="sidebar-content">
+                  <div class="toggle">
+                    <div>
+                      IPv4 を強制
+                      <small>ダウンロード時に IPv4 を使用します。</small>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="optForceIpv4" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="toggle">
+                    <div>動画フォーマットを変更
+                      <small>必要に応じて変更してください。</small></div>
+                    <select id="videoFormat">
+                      <option value="auto">自動</option>
+                      <option value="av01">av01</option>
+                      <option value="vp9">vp9</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -5162,6 +5202,12 @@
                       </button>
                     </div>
                     <ul class="info-updates-list">
+                      <li class="info-updates-item" data-version="1.19.0">
+                        <span class="info-updates-date">2026/05/02</span>
+                        <span class="info-updates-version">v1.19.0</span>
+                        <span
+                          class="info-updates-content">高度な設定オプションの追加</span>
+                      </li>
                       <li class="info-updates-item" data-version="1.18.0">
                         <span class="info-updates-date">2026/05/01</span>
                         <span class="info-updates-version">v1.18.0</span>

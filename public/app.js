@@ -510,6 +510,7 @@ const appState = window.AppState || {
       function initializeSettingsAndSse() {
         const elements = {
           fmt: document.getElementById("fmt"),
+          videoFormat: document.getElementById("videoFormat"),
           savePath: document.getElementById("savePath"),
           optHistory: document.getElementById("optHistory"),
           optThumb: document.getElementById("optThumb"),
@@ -619,6 +620,7 @@ const appState = window.AppState || {
 
       function initializeFormatToggle() {
         const fmtSelect = document.getElementById("fmt");
+        const videoFormatSelect = document.getElementById("videoFormat");
         const staticToggle = document.getElementById("optStaticFormat");
         if (!fmtSelect || !staticToggle || !fmtSelect.options) return;
 
@@ -637,8 +639,29 @@ const appState = window.AppState || {
           { value: "160-0+140/160+140", text: "144p （256 x 144 ）" },
         ];
 
-        const applyOptions = (options) => {
-          const previousValue = fmtSelect.value;
+        const applyVideoCodecPreference = (value, codec) => {
+          const text = String(value || "");
+          if (codec === "av01") {
+            return text.replace(/\[ext=mp4\]/g, "[vcodec=av01]");
+          }
+          if (codec === "vp9") {
+            return text.replace(/\[ext=mp4\]/g, "[vcodec=vp9]");
+          }
+          return text;
+        };
+
+        const buildDynamicOptionsForCodec = (codec) =>
+          dynamicOptions.map((option) => ({
+            value: applyVideoCodecPreference(option.value, codec),
+            text: option.text,
+          }));
+
+        const readSavedFormatValue = () =>
+          typeof window.loadLocalSetting === "function"
+            ? window.loadLocalSetting("fmt", fmtSelect.value)
+            : fmtSelect.value;
+
+        const applyOptions = (options, preferredValue = fmtSelect.value) => {
           fmtSelect.innerHTML = "";
           options.forEach((option) => {
             const opt = document.createElement("option");
@@ -646,19 +669,57 @@ const appState = window.AppState || {
             opt.textContent = option.text;
             fmtSelect.appendChild(opt);
           });
-          if (options.some((opt) => opt.value === previousValue)) {
-            fmtSelect.value = previousValue;
+          if (options.some((opt) => opt.value === preferredValue)) {
+            fmtSelect.value = preferredValue;
           } else {
             fmtSelect.selectedIndex = 0;
           }
         };
 
-        const sync = () => {
-          applyOptions(staticToggle.checked ? staticOptions : dynamicOptions);
+        const sync = ({ useSavedValue = false } = {}) => {
+          const preferredValue = useSavedValue ? readSavedFormatValue() : fmtSelect.value;
+          const codec = videoFormatSelect?.value || "auto";
+          const options = staticToggle.checked
+            ? staticOptions
+            : buildDynamicOptionsForCodec(codec);
+          applyOptions(options, preferredValue);
         };
 
         staticToggle.addEventListener("change", sync);
-        sync();
+        videoFormatSelect?.addEventListener("change", sync);
+        sync({ useSavedValue: true });
+      }
+
+      function initializeAdvancedDownloadSettingsToggle() {
+        const storageKey = "advancedDownloadSettingsCollapsed";
+        const section = document.getElementById("advanced-download-settings-section");
+        if (!section) return;
+        const toggleBtn = section.querySelector(".sidebar-toggle");
+        const icon = toggleBtn?.querySelector("i");
+        const content = section.querySelector(".sidebar-content");
+        if (!toggleBtn || !icon || !content) return;
+
+        const applyCollapsedState = (collapsed) => {
+          content.classList.toggle("collapsed", collapsed);
+          section.classList.toggle("collapsed", collapsed);
+          icon.className = collapsed
+            ? "fa-solid fa-chevron-right"
+            : "fa-solid fa-chevron-down";
+        };
+
+        const initialCollapsed =
+          typeof window.loadLocalSetting === "function"
+            ? window.loadLocalSetting(storageKey, true)
+            : true;
+        applyCollapsedState(Boolean(initialCollapsed));
+
+        toggleBtn.addEventListener("click", () => {
+          const nextCollapsed = !section.classList.contains("collapsed");
+          applyCollapsedState(nextCollapsed);
+          if (typeof window.saveLocalSetting === "function") {
+            window.saveLocalSetting(storageKey, nextCollapsed);
+          }
+        });
       }
 
       // --- Actions ---
@@ -694,6 +755,7 @@ const appState = window.AppState || {
         registerServiceWorker();
         initializeSettingsAndSse();
         initializeFormatToggle();
+        initializeAdvancedDownloadSettingsToggle();
         headerRoutingController.initialize();
         playerPageController.initialize();
         playlistPageController.initialize();

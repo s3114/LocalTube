@@ -128,6 +128,7 @@ function bindPlayButton(videoPlayer, btnPlay) {
       function bindSidebarToggles(onSidebarToggled) {
         document.querySelectorAll(".sidebar-toggle").forEach((btn) => {
           btn.addEventListener("click", () => {
+            if (btn.closest(".settings-collapsible-section")) return;
             const targetId = btn.getAttribute("data-target");
             const section = document.getElementById(targetId);
             if (!section) return;

@@ -168,6 +168,8 @@ function createDownloadJobService({
       "--progress",
       "--no-color",
       "--newline",
+      "--merge-output-format",
+      "mp4"
     ];
     if (!liveReplayMode && !plainRetryMode) {
       // ライブ特別処理の対象は「現在ライブ中」のみ。

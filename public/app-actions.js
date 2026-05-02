@@ -203,9 +203,13 @@
 
   function buildDownloadSettingsSnapshot(doc) {
     const fmtEl = doc.getElementById("fmt");
+    const videoFormatEl = doc.getElementById("videoFormat");
     return {
       formatValue: fmtEl?.value || "",
       formatText: fmtEl?.options?.[fmtEl.selectedIndex]?.textContent || "",
+      videoFormatValue: videoFormatEl?.value || "auto",
+      videoFormatText:
+        videoFormatEl?.options?.[videoFormatEl.selectedIndex]?.textContent || "自動",
       savePath: doc.getElementById("savePath")?.value || "",
       saveHistory: Boolean(doc.getElementById("optHistory")?.checked),
       downloadThumb: Boolean(doc.getElementById("optThumb")?.checked),
