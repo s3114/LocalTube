@@ -89,7 +89,7 @@ function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
     });
   }
 
-  async function estimateUrl(url, { cookiePath, format, downloadVideo } = {}) {
+  async function estimateUrl(url, { cookiePath, selectedBrowser, format, downloadVideo } = {}) {
     const normalizedUrl = String(url || "").trim();
     if (!normalizedUrl) {
       return {
@@ -112,7 +112,9 @@ function createDownloadEstimateService({ spawn, path, baseDir, logger }) {
       format &&
       !normalizedUrl.includes("abema.tv");
     const formatArgs = canUseFormat ? ["-f", String(format)] : [];
-    const cookieArgs = cookiePath ? ["--cookies", cookiePath] : [];
+    const cookieArgs = cookiePath
+      ? ["--cookies", cookiePath]
+      : (selectedBrowser ? ["--cookies-from-browser", String(selectedBrowser)] : []);
 
     return (async () => {
       let stdout = "";

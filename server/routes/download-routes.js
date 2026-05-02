@@ -69,14 +69,17 @@ function registerDownloadRoutes(
     return results;
   }
 
-  async function buildResolvedEntries(inputUrls, cookieFile) {
+  async function buildResolvedEntries(inputUrls, cookieFile, settings) {
     const resolvedGroups = await mapWithConcurrency(
       inputUrls,
       DOWNLOAD_ESTIMATE_CONCURRENCY,
       async (url) => {
         const entries = [];
         try {
-          const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
+          const videoUrls = await getUrlsFromInput(url, {
+            cookiePath: cookieFile?.path,
+            selectedBrowser: settings?.selectedBrowser,
+          });
           for (const videoUrl of videoUrls) {
             entries.push({
               inputUrl: String(url || "").trim(),
@@ -92,7 +95,7 @@ function registerDownloadRoutes(
     return resolvedGroups.flat();
   }
 
-  async function buildEstimatedEntries(resolvedEntries, { cookieFile, format, downloadVideo }) {
+  async function buildEstimatedEntries(resolvedEntries, { cookieFile, settings, format, downloadVideo }) {
     const results = await mapWithConcurrency(
       resolvedEntries,
       DOWNLOAD_ESTIMATE_CONCURRENCY,
@@ -102,6 +105,7 @@ function registerDownloadRoutes(
             ok: true,
             entry: await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
               cookiePath: cookieFile?.path,
+              selectedBrowser: settings?.selectedBrowser,
               format,
               downloadVideo,
             }),
@@ -223,10 +227,12 @@ function registerDownloadRoutes(
       return apiError(res, 500, "サイズ見積もりサービスが利用できません。");
     }
 
+    const settings = await loadConfig();
     const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
-    const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile);
+    const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile, settings);
     const { entries: estimatedEntries, failures } = await buildEstimatedEntries(resolvedEntries, {
       cookieFile,
+      settings,
       format,
       downloadVideo,
     });
@@ -275,7 +281,10 @@ function registerDownloadRoutes(
       const resolvedVideoUrls = [];
       for (const url of inputUrls) {
         try {
-          const videoUrls = await getUrlsFromInput(url, cookieFile?.path);
+          const videoUrls = await getUrlsFromInput(url, {
+            cookiePath: cookieFile?.path,
+            selectedBrowser: settings?.selectedBrowser,
+          });
           resolvedVideoUrls.push(
             ...videoUrls.map((videoUrl) => String(videoUrl || "").trim()).filter(Boolean),
           );
@@ -312,7 +321,7 @@ function registerDownloadRoutes(
 
     const estimateMap = buildEstimateMap(estimateEntriesJson);
     const estimateFailureMap = buildEstimateFailureMap(estimateFailuresJson);
-    const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile);
+    const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile, settings);
     const newJobs = [];
     const failedEstimateJobs = [];
 

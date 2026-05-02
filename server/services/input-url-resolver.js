@@ -35,8 +35,14 @@ function createInputUrlResolver({ spawn, path, baseDir, logger, fetchWithTimeout
     }
   }
 
-  async function getUrlsFromInput(url, cookiePath) {
+  async function getUrlsFromInput(url, cookiePathOrOptions) {
     const resolvedUrl = await resolveAbemaShortUrl(url);
+    const cookieOptions =
+      typeof cookiePathOrOptions === "string"
+        ? { cookiePath: cookiePathOrOptions }
+        : (cookiePathOrOptions || {});
+    const cookiePath = String(cookieOptions.cookiePath || "").trim();
+    const selectedBrowser = String(cookieOptions.selectedBrowser || "").trim();
 
     return new Promise((resolve, reject) => {
       const ytDlpPath = resolveYtDlpPath(baseDir);
@@ -44,6 +50,8 @@ function createInputUrlResolver({ spawn, path, baseDir, logger, fetchWithTimeout
       const commonArgs = ["--skip-download", "--quiet", "--no-warnings"];
       if (cookiePath) {
         commonArgs.push("--cookies", cookiePath);
+      } else if (selectedBrowser) {
+        commonArgs.push("--cookies-from-browser", selectedBrowser);
       }
 
       if (resolvedUrl.includes("youtube.com/playlist?list=")) {
