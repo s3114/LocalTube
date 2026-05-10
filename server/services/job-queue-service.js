@@ -140,6 +140,7 @@ function createJobQueueService({
       resolvePromise = resolve;
       rejectPromise = reject;
     });
+    promise.catch(() => {});
     pendingResolvers.set(jobPath, {
       promise,
       resolve: resolvePromise,

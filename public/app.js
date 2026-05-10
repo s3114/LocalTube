@@ -694,6 +694,7 @@ const appState = window.AppState || {
         const storageKey = "advancedDownloadSettingsCollapsed";
         const section = document.getElementById("advanced-download-settings-section");
         if (!section) return;
+        if (typeof section.querySelector !== "function") return;
         const toggleBtn = section.querySelector(".sidebar-toggle");
         const icon = toggleBtn?.querySelector("i");
         const content = section.querySelector(".sidebar-content");

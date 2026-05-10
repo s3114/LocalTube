@@ -115,7 +115,7 @@ function clampNumberInRange(value, min, max, fallback) {
       }
 
       function applyDownloadEstimateSettingFromServer(elements, settings) {
-        const enabled = settings.enableDownloadEstimates !== false;
+        const enabled = settings.enableDownloadEstimates === true;
         if (elements.optDownloadEstimates) {
           elements.optDownloadEstimates.checked = enabled;
         }
@@ -346,7 +346,7 @@ function clampNumberInRange(value, min, max, fallback) {
           elements.optDownloadVideo.checked = loadLocalSetting("optDownloadVideo", true);
         }
         if (elements.optDownloadEstimates) {
-          elements.optDownloadEstimates.checked = loadLocalSetting("optDownloadEstimates", true);
+          elements.optDownloadEstimates.checked = loadLocalSetting("optDownloadEstimates", false);
         }
 
         elements.fmt.addEventListener("change", (e) =>

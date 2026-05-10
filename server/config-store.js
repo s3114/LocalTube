@@ -8,7 +8,7 @@ const CONFIG_DEFAULTS = {
   selectedBrowser: "",
   localVideoDirs: [],
   enableFallbackThumbnails: true,
-  enableDownloadEstimates: true,
+  enableDownloadEstimates: false,
   wallpaperBlur: 2,
   wallpaperBrightness: 50,
   ytDlpCustomCommand: "",

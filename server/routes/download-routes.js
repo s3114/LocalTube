@@ -227,7 +227,7 @@ function registerDownloadRoutes(
       return apiError(res, 500, "サイズ見積もりサービスが利用できません。");
     }
 
-    const settings = await loadConfig();
+    const settings = typeof loadConfig === "function" ? await loadConfig() : {};
     const inputUrls = urls.split(/[\n\s,]+/).filter((url) => url.trim() !== "");
     const resolvedEntries = await buildResolvedEntries(inputUrls, cookieFile, settings);
     const { entries: estimatedEntries, failures } = await buildEstimatedEntries(resolvedEntries, {
