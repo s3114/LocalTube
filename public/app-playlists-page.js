@@ -99,6 +99,15 @@
       return `動画 ${num.toLocaleString()} 本`;
     }
 
+    function formatDurationHhMmSs(value) {
+      const totalSeconds = Math.max(0, Math.round(Number(value)));
+      if (!Number.isFinite(totalSeconds)) return "";
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+    }
+
     async function loadLocalVideos() {
       const response = await fetch("/api/local-videos");
       const result = await parseApiResponse(response);
@@ -415,9 +424,8 @@
       if (video?.channelName) {
         metaParts.push(video.channelName);
       }
-      metaParts.push(formatVideoTypeLabel(video));
       if (Number.isFinite(Number(video?.duration)) && Number(video.duration) > 0) {
-        metaParts.push(`${Math.round(Number(video.duration))} 秒`);
+        metaParts.push(formatDurationHhMmSs(video.duration));
       }
       meta.textContent = metaParts.join(" ・ ") || video?.filename || "";
 
@@ -456,9 +464,8 @@
       if (video?.channelName) {
         metaParts.push(video.channelName);
       }
-      metaParts.push(formatVideoTypeLabel(video));
       if (Number.isFinite(Number(video?.duration)) && Number(video.duration) > 0) {
-        metaParts.push(`${Math.round(Number(video.duration))} 秒`);
+        metaParts.push(formatDurationHhMmSs(video.duration));
       }
       meta.textContent = metaParts.join(" ・ ");
 

@@ -405,9 +405,14 @@
         doc.getElementById("optDownloadComments")?.checked ?? true;
       const downloadChat = doc.getElementById("optDownloadChat")?.checked ?? true;
       const downloadVideo = doc.getElementById("optDownloadVideo")?.checked ?? true;
+      const fmtEl = doc.getElementById("fmt");
       const formData = new FormData();
       formData.append("urls", urlsInput.value);
-      formData.append("format", doc.getElementById("fmt").value);
+      formData.append("format", fmtEl?.value || "");
+      formData.append(
+        "formatText",
+        fmtEl?.options?.[fmtEl.selectedIndex]?.textContent || "",
+      );
       formData.append("saveHistory", doc.getElementById("optHistory").checked);
       formData.append("downloadThumb", doc.getElementById("optThumb").checked);
       formData.append(

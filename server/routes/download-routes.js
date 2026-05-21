@@ -24,6 +24,65 @@ function registerDownloadRoutes(
 ) {
   const routeLogger = logger || createLogger("route-download");
   const DOWNLOAD_ESTIMATE_CONCURRENCY = 30;
+  const NICOVIDEO_FORMAT_BY_TIER = new Map([
+    [
+      "4320p",
+      "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "2160p",
+      "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "1440p",
+      "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "1080p",
+      "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "720p",
+      "video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "480p",
+      "video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "360p",
+      "video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "240p",
+      "video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+    [
+      "144p",
+      "video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+    ],
+  ]);
+
+  function isNicovideoUrl(url) {
+    const text = String(url || "").trim().toLowerCase();
+    return (
+      text.includes("nicovideo.jp/") ||
+      text.includes("www.nicovideo.jp/") ||
+      text.includes("nico.ms/")
+    );
+  }
+
+  function extractFormatTier(formatText) {
+    const text = String(formatText || "").trim();
+    const match = text.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|240p|144p)/i);
+    return match ? match[1].toLowerCase() : "";
+  }
+
+  function resolveFormatForUrl(url, format, formatText) {
+    if (!isNicovideoUrl(url)) return format;
+    const tier = extractFormatTier(formatText);
+    return NICOVIDEO_FORMAT_BY_TIER.get(tier) || format;
+  }
 
   function parseEstimateEntries(rawValue) {
     const text = String(rawValue || "").trim();
@@ -95,7 +154,7 @@ function registerDownloadRoutes(
     return resolvedGroups.flat();
   }
 
-  async function buildEstimatedEntries(resolvedEntries, { cookieFile, settings, format, downloadVideo }) {
+  async function buildEstimatedEntries(resolvedEntries, { cookieFile, settings, format, formatText, downloadVideo }) {
     const results = await mapWithConcurrency(
       resolvedEntries,
       DOWNLOAD_ESTIMATE_CONCURRENCY,
@@ -106,7 +165,7 @@ function registerDownloadRoutes(
             entry: await downloadEstimateService.estimateUrl(entry.resolvedUrl, {
               cookiePath: cookieFile?.path,
               selectedBrowser: settings?.selectedBrowser,
-              format,
+              format: resolveFormatForUrl(entry.resolvedUrl, format, formatText),
               downloadVideo,
             }),
           };
@@ -216,6 +275,7 @@ function registerDownloadRoutes(
     const {
       urls,
       format,
+      formatText,
       downloadVideo,
     } = req.body;
     const cookieFile = req.file;
@@ -234,6 +294,7 @@ function registerDownloadRoutes(
       cookieFile,
       settings,
       format,
+      formatText,
       downloadVideo,
     });
 
@@ -248,6 +309,7 @@ function registerDownloadRoutes(
     const {
       urls,
       format,
+      formatText,
       saveHistory,
       downloadThumb,
       embedThumbnail,
@@ -344,7 +406,7 @@ function registerDownloadRoutes(
         id: jobId,
         url: entry.resolvedUrl,
         options: {
-          format,
+          format: resolveFormatForUrl(entry.resolvedUrl, format, formatText),
           saveHistory: saveHistory === "true",
           downloadThumb: downloadThumb === true || downloadThumb === "true",
           embedThumbnail: embedThumbnail !== "false",

@@ -23,6 +23,15 @@
       return String(video?.videoId || "").trim() || getVideoIdFromFilename(video?.filename);
     }
 
+    function formatDurationHhMmSs(value) {
+      const totalSeconds = Math.max(0, Math.round(Number(value)));
+      if (!Number.isFinite(totalSeconds)) return "";
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+    }
+
     function buildInlineHomeInfo(video) {
       const videoId = getPreferredVideoId(video);
       if (!videoId) return null;
@@ -224,9 +233,14 @@
       const resolvedDate = String(info?.upload_date || "").trim()
         ? formatUploadDateForDescription(info.upload_date)
         : "投稿日不明";
+      const resolvedDuration = Number.isFinite(Number(info?.duration))
+        ? formatDurationHhMmSs(info.duration)
+        : Number.isFinite(Number(video?.duration))
+          ? formatDurationHhMmSs(video.duration)
+          : "";
       titleEl.textContent = resolvedTitle;
       channelEl.textContent = resolvedChannel;
-      metaEl.textContent = `${resolvedViews}・${resolvedDate}`;
+      metaEl.textContent = [resolvedDuration, resolvedViews, resolvedDate].filter(Boolean).join(" ・ ");
       textEl.title = resolvedTitle;
     }
 
@@ -269,7 +283,7 @@
       const metaEl = document.createElement("div");
       metaEl.className = "local-video-item-meta";
       metaEl.textContent = Number.isFinite(Number(video?.duration))
-        ? `${Math.round(Number(video.duration))}秒`
+        ? formatDurationHhMmSs(video.duration)
         : "視聴回数不明・投稿日不明";
 
       textEl.appendChild(titleEl);

@@ -622,6 +622,7 @@ const appState = window.AppState || {
         const fmtSelect = document.getElementById("fmt");
         const videoFormatSelect = document.getElementById("videoFormat");
         const staticToggle = document.getElementById("optStaticFormat");
+        const urlsInput = document.getElementById("urls");
         if (!fmtSelect || !staticToggle || !fmtSelect.options) return;
 
         const dynamicOptions = Array.from(fmtSelect.options).map((option) => ({
@@ -638,6 +639,73 @@ const appState = window.AppState || {
           { value: "133-0+140/133+140/160-0+140/160+140", text: "240p （ 426 x 240 ）" },
           { value: "160-0+140/160+140", text: "144p （256 x 144 ）" },
         ];
+
+        const nicovideoOptions = [
+          {
+            value:
+              "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "4320p（7680 x 4320）",
+          },
+          {
+            value:
+              "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "2160p（3840 x 2160）",
+          },
+          {
+            value:
+              "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "1440p（2560 x 1440）",
+          },
+          {
+            value:
+              "video-h264-1080p+audio-aac-128kbps/video-h264-1080p+audio-aac-64kbps/video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "1080p（1920 x 1080）",
+          },
+          {
+            value:
+              "video-h264-720p+audio-aac-128kbps/video-h264-720p+audio-aac-64kbps/video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "720p （1280 x 720 ）",
+          },
+          {
+            value:
+              "video-h264-540p+audio-aac-128kbps/video-h264-540p+audio-aac-64kbps/video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "480p （720 x 480 ）",
+          },
+          {
+            value:
+              "video-h264-720-360p-low+audio-aac-128kbps/video-h264-360p-low+audio-aac-64kbps/video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "360p （640 x 360 ）",
+          },
+          {
+            value:
+              "video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "240p （ 426 x 240 ）",
+          },
+          {
+            value:
+              "video-h264-720-360p-lowest+audio-aac-128kbps/video-h264-360p-lowest+audio-aac-64kbps",
+            text: "144p （256 x 144 ）",
+          },
+        ];
+
+        const isNicovideoUrl = (value) => {
+          const text = String(value || "").trim().toLowerCase();
+          return (
+            text.includes("nicovideo.jp/") ||
+            text.includes("nico.ms/") ||
+            text.includes("www.nicovideo.jp/")
+          );
+        };
+
+        const shouldUseNicovideoFormats = () => {
+          const raw = String(urlsInput?.value || "");
+          const urls = raw
+            .split(/[\n\s,]+/)
+            .map((url) => url.trim())
+            .filter(Boolean);
+          if (!urls.length) return false;
+          return urls.every(isNicovideoUrl);
+        };
 
         const applyVideoCodecPreference = (value, codec) => {
           const text = String(value || "");
@@ -679,14 +747,21 @@ const appState = window.AppState || {
         const sync = ({ useSavedValue = false } = {}) => {
           const preferredValue = useSavedValue ? readSavedFormatValue() : fmtSelect.value;
           const codec = videoFormatSelect?.value || "auto";
-          const options = staticToggle.checked
-            ? staticOptions
-            : buildDynamicOptionsForCodec(codec);
+          let options;
+          if (shouldUseNicovideoFormats()) {
+            options = nicovideoOptions;
+          } else if (staticToggle.checked) {
+            options = staticOptions;
+          } else {
+            options = buildDynamicOptionsForCodec(codec);
+          }
           applyOptions(options, preferredValue);
         };
 
         staticToggle.addEventListener("change", sync);
         videoFormatSelect?.addEventListener("change", sync);
+        urlsInput?.addEventListener("input", sync);
+        urlsInput?.addEventListener("change", sync);
         sync({ useSavedValue: true });
       }
 
