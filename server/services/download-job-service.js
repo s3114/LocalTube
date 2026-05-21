@@ -18,6 +18,7 @@ function createDownloadJobService({
 }) {
   const logger = createLogger("download-job");
   const LIVE_CHAT_JSON_PATTERN = /\.live_chat(?:\.[^.]+)?\.json$/i;
+  const COMMENTS_JSON_PATTERN = /\.comments(?:\.[^.]+)?\.json$/i;
   const LIVE_FILTER_SKIP_FRAGMENT = "does not pass filter";
   const LIVE_ENDED_RETRY_MESSAGES = [
     "Video is no longer live",
@@ -585,8 +586,9 @@ function createDownloadJobService({
     const files = fs.readdirSync(finalMovieDir);
     const infoFile = files.find((f) => f.endsWith(".info.json"));
     const chatFile = files.find((f) => LIVE_CHAT_JSON_PATTERN.test(f));
+    const commentFiles = files.filter((f) => COMMENTS_JSON_PATTERN.test(f));
 
-    if (!infoFile && !chatFile) {
+    if (!infoFile && !chatFile && commentFiles.length === 0) {
       return { infoFile: null, jobPendingDir: null };
     }
 
@@ -623,6 +625,12 @@ function createDownloadJobService({
       logger.warn("live chat ファイルが見つかりません", {
         finalMovieDir,
       });
+    }
+
+    for (const commentFile of commentFiles) {
+      const src = path.join(finalMovieDir, commentFile);
+      const dest = path.join(stagingDir, commentFile);
+      if (moveOptionalFile(src, dest, "comments")) movedCount++;
     }
 
     if (movedCount === 0) {

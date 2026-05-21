@@ -38,6 +38,7 @@ test("job-queue-service processes a queued job once and sorts extra files", asyn
   const jobDir = path.join(pendingChatDir, "job_1");
   await fsp.mkdir(jobDir, { recursive: true });
   await fsp.writeFile(path.join(jobDir, "a.info.json"), "{}");
+  await fsp.writeFile(path.join(jobDir, "a.comments.json"), "{}");
   await fsp.writeFile(path.join(jobDir, "a.live_chat.json"), "{}");
   await fsp.writeFile(path.join(jobDir, "a.vtt"), "WEBVTT");
 
@@ -47,6 +48,7 @@ test("job-queue-service processes a queued job once and sorts extra files", asyn
 
   assert.equal(calls.length, 2);
   assert.equal(fs.existsSync(path.join(commentsDir, "a.info.json")), true);
+  assert.equal(fs.existsSync(path.join(liveChatDir, "a.comments.json")), true);
   assert.equal(fs.existsSync(path.join(liveChatDir, "a.live_chat.json")), true);
   assert.equal(fs.existsSync(path.join(subtitleDir, "a.vtt")), true);
   assert.equal(fs.existsSync(jobDir), false);
