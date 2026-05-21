@@ -26,6 +26,8 @@ function formatChannelSubscribers(subCount) {
 function normalizeLiveChatBaseName(videoBaseName) {
   return String(videoBaseName || "")
     .replace(/\.live_chat\.json$/i, "")
+    .replace(/\.live-chat\.json$/i, "")
+    .replace(/\.comments\.json$/i, "")
     .replace(/\.(mp4|mkv|webm|mov)$/i, "");
 }
 
@@ -57,8 +59,18 @@ function extractNonEmptyNdjsonLines(text) {
 }
 
 function parseNdjsonMessages(text) {
+  const sourceText = String(text || "").trim();
+  if (sourceText.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(sourceText);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn("JSONコメント配列のパースに失敗しました:", e);
+    }
+  }
+
   const messages = [];
-  for (const line of extractNonEmptyNdjsonLines(text)) {
+  for (const line of extractNonEmptyNdjsonLines(sourceText)) {
     try {
       messages.push(JSON.parse(line));
     } catch (e) {
@@ -87,6 +99,9 @@ function extractChatRenderer(msg) {
 }
 
 function getChatTimeSec(msg) {
+  const niconicoTimeMs = Number(msg?.vposMs);
+  if (Number.isFinite(niconicoTimeMs)) return Math.floor(niconicoTimeMs / 1000);
+
   const timeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
   return timeMs ? Math.floor(timeMs / 1000) : null;
 }
@@ -197,6 +212,10 @@ function createChatBadgeElementFromImages(badgeImages) {
 }
 
 function createChatLineElementFromMessage(msg) {
+  if (msg && typeof msg === "object" && "vposMs" in msg && "body" in msg) {
+    return createNiconicoChatLineElement(msg);
+  }
+
   const renderer = extractChatRenderer(msg);
   if (!renderer) return null;
 
@@ -233,6 +252,44 @@ function createChatLineElementFromMessage(msg) {
   line.appendChild(createChatAvatarElementForRenderer(renderer, author));
   line.appendChild(nameEl);
   line.appendChild(createChatBadgeElementFromImages(badgeImages));
+  line.appendChild(msgEl);
+  return line;
+}
+
+function createNiconicoChatLineElement(comment) {
+  const line = document.createElement("div");
+  line.className = "chat-line niconico-chat-line";
+  const timeSec = getChatTimeSec(comment);
+  if (timeSec !== null) {
+    line.dataset.time = timeSec;
+  }
+
+  const avatar = document.createElement("div");
+  avatar.className = "chat-avatar";
+  avatar.innerHTML = '<i class="fa-solid fa-circle-user"></i>';
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "chat-name";
+  nameEl.textContent = "niconico";
+  if (comment.isPremium === true) {
+    nameEl.classList.add("member");
+  }
+
+  const badgeEl = document.createElement("div");
+  badgeEl.className = "chat-badge";
+  const nicoruCount = Number(comment.nicoruCount);
+  if (Number.isFinite(nicoruCount) && nicoruCount > 0) {
+    badgeEl.textContent = `ニコる ${nicoruCount}`;
+    badgeEl.title = `ニコる ${nicoruCount}`;
+  }
+
+  const msgEl = document.createElement("span");
+  msgEl.className = "chat-message";
+  msgEl.textContent = String(comment.body || "");
+
+  line.appendChild(avatar);
+  line.appendChild(nameEl);
+  line.appendChild(badgeEl);
   line.appendChild(msgEl);
   return line;
 }

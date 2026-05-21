@@ -145,6 +145,100 @@ test("live-chat-routes returns a time window when query is provided", async () =
   await fsp.rm(tempDir, { recursive: true, force: true });
 });
 
+test("live-chat-routes resolves niconico .comments.json as live chat window", async () => {
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ytdl-nicochat-window-test-"));
+  const chatDir = path.join(tempDir, "downloads", "ライブチャット");
+  await fsp.mkdir(chatDir, { recursive: true });
+  const chatPath = path.join(chatDir, "sample.comments.json");
+  await fsp.writeFile(
+    chatPath,
+    JSON.stringify([
+      { id: "late", vposMs: 12000, body: "late" },
+      { id: "hit", vposMs: 6000, body: "hit" },
+      { id: "early", vposMs: 1000, body: "early" },
+    ]),
+    "utf-8",
+  );
+
+  const app = createCaptureApp();
+  let sentJson = null;
+  registerLiveChatRoutes(app, {
+    fs,
+    path,
+    baseDir: tempDir,
+    apiError: () => {},
+  });
+
+  const handler = app.routes.get("/api/live-chat/:videoFile");
+  await handler(
+    {
+      params: { videoFile: "sample" },
+      query: { startSec: "5", endSec: "10", limit: "50" },
+    },
+    {
+      json(payload) {
+        sentJson = payload;
+      },
+      setHeader() {},
+    },
+  );
+
+  assert.equal(Array.isArray(sentJson?.items), true);
+  assert.deepEqual(sentJson.items.map((item) => item.id), ["hit"]);
+  assert.equal(sentJson.hasMoreBefore, true);
+  assert.equal(sentJson.hasMoreAfter, true);
+
+  await fsp.rm(tempDir, { recursive: true, force: true });
+});
+
+test("live-chat-routes resolves niconico comments by info.json id", async () => {
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ytdl-nicochat-id-test-"));
+  const chatDir = path.join(tempDir, "downloads", "ライブチャット");
+  const infoDir = path.join(tempDir, "downloads", "コメント");
+  await fsp.mkdir(chatDir, { recursive: true });
+  await fsp.mkdir(infoDir, { recursive: true });
+  await fsp.writeFile(
+    path.join(chatDir, "sample-title.comments.json"),
+    JSON.stringify([{ id: "hit", vposMs: 1000, body: "hit" }]),
+    "utf-8",
+  );
+  await fsp.writeFile(
+    path.join(infoDir, "sample-title.info.json"),
+    JSON.stringify({
+      thumbnails: [{ id: "url" }],
+      id: "sm12345678",
+    }),
+    "utf-8",
+  );
+
+  const app = createCaptureApp();
+  let sentJson = null;
+  registerLiveChatRoutes(app, {
+    fs,
+    path,
+    baseDir: tempDir,
+    apiError: () => {},
+  });
+
+  const handler = app.routes.get("/api/live-chat/:videoFile");
+  await handler(
+    {
+      params: { videoFile: "sm12345678" },
+      query: { startSec: "0", endSec: "2", limit: "50" },
+    },
+    {
+      json(payload) {
+        sentJson = payload;
+      },
+      setHeader() {},
+    },
+  );
+
+  assert.deepEqual(sentJson?.items?.map((item) => item.id), ["hit"]);
+
+  await fsp.rm(tempDir, { recursive: true, force: true });
+});
+
 test("live-chat-emoji-map falls back to config dictionary when chat file is missing", async () => {
   const app = createCaptureApp();
   let apiErrorCalled = null;

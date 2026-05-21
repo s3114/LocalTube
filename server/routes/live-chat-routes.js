@@ -17,6 +17,7 @@ function registerLiveChatRoutes(app, deps) {
   const LIVE_CHAT_DIR_INDEX_PATH = path.join(baseDir, "cache", "live-chat-dir-index.json");
   const LIVE_CHAT_FILE_INDEX_PATH = path.join(baseDir, "cache", "live-chat-file-index.json");
   const LIVE_CHAT_INDEX_CACHE_TTL_MS = 5000;
+  const LIVE_CHAT_JSON_PATTERN = /\.(?:live_chat|live-chat|comments)\.json$/i;
   let liveChatIndexCache = {
     signature: "",
     expiresAt: 0,
@@ -74,13 +75,19 @@ function registerLiveChatRoutes(app, deps) {
     return [
       path.join(libraryRoot, "ライブチャット", `${base}.live_chat.json`),
       path.join(libraryRoot, "ライブチャット", `${base}.live-chat.json`),
+      path.join(libraryRoot, "ライブチャット", `${base}.comments.json`),
     ];
   }
 
   function normalizeChatBaseName(fileName) {
     return String(fileName || "")
       .replace(/\.live_chat\.json$/i, "")
-      .replace(/\.live-chat\.json$/i, "");
+      .replace(/\.live-chat\.json$/i, "")
+      .replace(/\.comments\.json$/i, "");
+  }
+
+  function isLiveChatJsonFileName(fileName) {
+    return LIVE_CHAT_JSON_PATTERN.test(String(fileName || ""));
   }
 
   function buildInfoCandidatesFromChatPath(chatFilePath) {
@@ -104,6 +111,18 @@ function registerLiveChatRoutes(app, deps) {
     return candidates;
   }
 
+  function extractInfoJsonVideoId(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return "";
+    try {
+      const parsed = JSON.parse(text);
+      return String(parsed?.id || "").trim();
+    } catch (_error) {
+      const match = text.match(/"id"\s*:\s*"([^"]+)"/);
+      return String(match?.[1] || "").trim();
+    }
+  }
+
   async function chatFileMatchesVideoId(chatFilePath, videoId) {
     const normalizedId = String(videoId || "").trim();
     if (!normalizedId) return false;
@@ -117,8 +136,7 @@ function registerLiveChatRoutes(app, deps) {
         continue;
       }
       if (!raw) continue;
-      const match = raw.match(/"id"\s*:\s*"([^"]+)"/);
-      if (String(match?.[1] || "").trim() === normalizedId) {
+      if (extractInfoJsonVideoId(raw) === normalizedId) {
         return true;
       }
     }
@@ -148,13 +166,13 @@ function registerLiveChatRoutes(app, deps) {
         } catch (_error) {
           continue;
         }
-        const match = raw.match(/"id"\s*:\s*"([^"]+)"/);
-        if (String(match?.[1] || "").trim() !== normalizedId) continue;
+        if (extractInfoJsonVideoId(raw) !== normalizedId) continue;
         const baseName = String(entry.name).replace(/\.info\.json$/i, "");
         const libraryRoot = path.dirname(root);
         const candidatePaths = [
           path.join(libraryRoot, "ライブチャット", `${baseName}.live_chat.json`),
           path.join(libraryRoot, "ライブチャット", `${baseName}.live-chat.json`),
+          path.join(libraryRoot, "ライブチャット", `${baseName}.comments.json`),
         ];
         for (const candidate of candidatePaths) {
           if (candidate && fs.existsSync(candidate)) {
@@ -242,10 +260,7 @@ function registerLiveChatRoutes(app, deps) {
           continue;
         }
         if (!entry.isFile()) continue;
-        if (
-          !entry.name.endsWith(".live_chat.json") &&
-          !entry.name.endsWith(".live-chat.json")
-        ) {
+        if (!isLiveChatJsonFileName(entry.name)) {
           continue;
         }
         dirs.add(path.resolve(currentDir));
@@ -322,10 +337,7 @@ function registerLiveChatRoutes(app, deps) {
 
       for (const entry of entries) {
         if (!entry.isFile()) continue;
-        if (
-          !entry.name.endsWith(".live_chat.json") &&
-          !entry.name.endsWith(".live-chat.json")
-        ) {
+        if (!isLiveChatJsonFileName(entry.name)) {
           continue;
         }
         map.set(entry.name, path.join(chatDir, entry.name));
@@ -407,6 +419,7 @@ function registerLiveChatRoutes(app, deps) {
       videoFile,
       `${videoFile}.live_chat.json`,
       `${videoFile}.live-chat.json`,
+      `${videoFile}.comments.json`,
     ];
     const { map, fromMemoryCache, fromDiskCache, dirIndexCacheHit } = await getLiveChatFileMap();
     for (const candidate of candidates) {
@@ -420,10 +433,7 @@ function registerLiveChatRoutes(app, deps) {
       for (const [fileName, fullPath] of map.entries()) {
         if (!fileName) continue;
         const lower = String(fileName).toLowerCase();
-        if (
-          (lower.endsWith(".live_chat.json") || lower.endsWith(".live-chat.json")) &&
-          lower.includes(normalized)
-        ) {
+        if (isLiveChatJsonFileName(lower) && lower.includes(normalized)) {
           return fullPath;
         }
       }
@@ -434,21 +444,21 @@ function registerLiveChatRoutes(app, deps) {
           return fullPath;
         }
       }
+    }
 
-      const derivedFromInfoPath = await findLiveChatByInfoJsonId(videoFile);
-      if (derivedFromInfoPath) {
-        return derivedFromInfoPath;
-      }
+    const derivedFromInfoPath = await findLiveChatByInfoJsonId(videoFile);
+    if (derivedFromInfoPath) {
+      return derivedFromInfoPath;
+    }
 
-      // ローカル動画が見つかるなら、そこから sidecar を推測する
-      if (typeof findLocalVideoPathById === "function") {
-        const videoPath = await findLocalVideoPathById(videoFile);
-        if (videoPath) {
-          for (const candidatePath of buildSidecarLiveChatCandidates(videoPath)) {
-            if (!candidatePath) continue;
-            if (!fs.existsSync(candidatePath)) continue;
-            return candidatePath;
-          }
+    // ローカル動画が見つかるなら、そこから sidecar を推測する
+    if (typeof findLocalVideoPathById === "function") {
+      const videoPath = await findLocalVideoPathById(videoFile);
+      if (videoPath) {
+        for (const candidatePath of buildSidecarLiveChatCandidates(videoPath)) {
+          if (!candidatePath) continue;
+          if (!fs.existsSync(candidatePath)) continue;
+          return candidatePath;
         }
       }
     }
@@ -464,13 +474,70 @@ function registerLiveChatRoutes(app, deps) {
   }
 
   function getChatTimeSecFromMessage(msg) {
+    const rawNiconicoTimeMs = msg?.vposMs;
+    const niconicoTimeMs = Number(rawNiconicoTimeMs);
+    if (Number.isFinite(niconicoTimeMs)) return Math.floor(niconicoTimeMs / 1000);
+
     const rawTimeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
     const timeMs = Number(rawTimeMs);
     if (!Number.isFinite(timeMs)) return null;
     return Math.floor(timeMs / 1000);
   }
 
+  async function readNiconicoCommentWindow(chatFile, { startSec, endSec, limit }) {
+    const raw = fs.promises?.readFile
+      ? await fs.promises.readFile(chatFile, "utf-8")
+      : await fsp.readFile(chatFile, "utf-8");
+    let parsed = [];
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_error) {
+      parsed = [];
+    }
+
+    const comments = Array.isArray(parsed) ? parsed : [];
+    const maxItems = Math.max(1, Math.min(1000, Number(limit) || 300));
+    const fromSec = Math.max(0, Number(startSec) || 0);
+    const toSec = Math.max(fromSec, Number(endSec) || fromSec + 60);
+    const timedComments = comments
+      .map((comment) => ({ comment, timeSec: getChatTimeSecFromMessage(comment) }))
+      .filter((item) => Number.isFinite(item.timeSec))
+      .sort((a, b) => a.timeSec - b.timeSec);
+
+    const items = [];
+    let hasMoreAfter = false;
+    let hasMoreBefore = false;
+
+    for (const item of timedComments) {
+      if (item.timeSec < fromSec) {
+        hasMoreBefore = true;
+        continue;
+      }
+      if (item.timeSec > toSec) {
+        hasMoreAfter = true;
+        break;
+      }
+      if (items.length >= maxItems) {
+        hasMoreAfter = true;
+        break;
+      }
+      items.push(item.comment);
+    }
+
+    return {
+      items,
+      startSec: fromSec,
+      endSec: toSec,
+      hasMoreBefore,
+      hasMoreAfter,
+    };
+  }
+
   async function readLiveChatWindow(chatFile, { startSec, endSec, limit }) {
+    if (/\.comments\.json$/i.test(String(chatFile || ""))) {
+      return readNiconicoCommentWindow(chatFile, { startSec, endSec, limit });
+    }
+
     const items = [];
     let hasMoreAfter = false;
     let hasMoreBefore = false;

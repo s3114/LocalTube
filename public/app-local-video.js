@@ -435,6 +435,9 @@
     }
 
     function getReplayTimeSecFromMessage(msg) {
+      const niconicoTimeMs = Number(msg?.vposMs);
+      if (Number.isFinite(niconicoTimeMs)) return Math.floor(niconicoTimeMs / 1000);
+
       const rawTimeMs = msg?.replayChatItemAction?.videoOffsetTimeMsec;
       const timeMs = Number(rawTimeMs);
       return Number.isFinite(timeMs) ? Math.floor(timeMs / 1000) : null;
