@@ -5,40 +5,29 @@ const path = require("node:path");
 const os = require("node:os");
 
 const {
-  platformToolCandidates,
   resolveExistingToolPath,
   resolveYtDlpPath,
   resolveFfmpegPath,
 } = require("../server/services/tool-path-service");
 
-test("tool-path-service prefers local yt-dlp.exe only on Windows", async () => {
+test("tool-path-service prefers local yt-dlp.exe when present", async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ytdl-tool-path-"));
-  const windowsToolPath = path.join(tempDir, "yt-dlp.exe");
-  await fs.writeFile(windowsToolPath, "stub", "utf8");
+  const toolPath = path.join(tempDir, "yt-dlp.exe");
+  await fs.writeFile(toolPath, "stub", "utf8");
 
-  if (process.platform === "win32") {
-    assert.equal(resolveYtDlpPath(tempDir), windowsToolPath);
-  } else {
-    assert.equal(resolveYtDlpPath(tempDir), "yt-dlp");
-  }
+  assert.equal(resolveYtDlpPath(tempDir), toolPath);
 
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 
-test("tool-path-service orders candidates by platform and excludes exe on POSIX", () => {
-  assert.deepEqual(platformToolCandidates("tool.exe", "tool", "win32"), ["tool.exe", "tool"]);
-  assert.deepEqual(platformToolCandidates("tool.exe", "tool", "darwin"), ["tool"]);
-  assert.deepEqual(platformToolCandidates("tool.exe", "tool", "linux"), ["tool"]);
-});
-
 test("tool-path-service falls back to PATH lookup command when local yt-dlp is absent", () => {
   const tempDir = path.join(os.tmpdir(), "ytdl-tool-path-missing");
-  assert.equal(resolveYtDlpPath(tempDir), process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
+  assert.equal(resolveYtDlpPath(tempDir), "yt-dlp.exe");
 });
 
 test("tool-path-service falls back to PATH lookup command when local ffmpeg is absent", () => {
   const tempDir = path.join(os.tmpdir(), "ytdl-ffmpeg-path-missing");
-  assert.equal(resolveFfmpegPath(tempDir), process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
+  assert.equal(resolveFfmpegPath(tempDir), "ffmpeg.exe");
 });
 
 test("tool-path-service returns null when PATH lookup is disabled and file is absent", () => {

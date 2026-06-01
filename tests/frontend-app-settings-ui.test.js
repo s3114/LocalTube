@@ -59,31 +59,3 @@ test("settings-ui local video status text builder returns expected labels", () =
   assert.equal(utils.buildLocalVideoDirsStatusText(["a"]), "1 件のフォルダーを登録しました");
   assert.equal(utils.buildLocalVideoDirsStatusText([]), "追加フォルダーをクリアしました");
 });
-
-test("settings-ui autostart view disables unsupported platforms", () => {
-  loadSettingsUi();
-  const utils = global.__settingsUiTestUtils;
-
-  assert.deepEqual(utils.buildAutostartStatusView({
-    enabled: false,
-    mode: "unsupported",
-    supported: false,
-    message: "Windows専用です。",
-  }), {
-    mode: "disabled",
-    disabled: true,
-    text: "Windows専用です。",
-    color: "var(--subtext)",
-  });
-
-  assert.deepEqual(utils.buildAutostartStatusView({
-    enabled: true,
-    mode: "logon",
-    supported: true,
-  }), {
-    mode: "logon",
-    disabled: false,
-    text: "現在: ログオン時",
-    color: "var(--green)",
-  });
-});

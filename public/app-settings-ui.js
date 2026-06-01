@@ -475,31 +475,6 @@ function clampNumberInRange(value, min, max, fallback) {
         });
       }
 
-
-      function buildAutostartStatusView(scheduleData) {
-        const data = scheduleData || {};
-        const supported = data.supported !== false && data.mode !== "unsupported";
-        if (!supported) {
-          return {
-            mode: "disabled",
-            disabled: true,
-            text: data.message || "このOSでは利用できません（Windows専用）",
-            color: "var(--subtext)",
-          };
-        }
-
-        const enabled = Boolean(data.enabled);
-        const mode = enabled ? String(data.mode || "startup") : "disabled";
-        return {
-          mode,
-          disabled: false,
-          text: enabled
-            ? `現在: ${mode === "logon" ? "ログオン時" : "システム起動時"}`
-            : "現在: 無効",
-          color: enabled ? "var(--green)" : "var(--main-txt)",
-        };
-      }
-
       function initializeAutostartTaskButtons(elements) {
         const autostartModeSelect = document.getElementById("opt-autostart-mode");
         const autostartStatus = document.getElementById("autostart-status");
@@ -515,14 +490,17 @@ function clampNumberInRange(value, min, max, fallback) {
             if (!result.ok) {
               throw new Error(result.error || "状態の取得に失敗しました。");
             }
-            const view = buildAutostartStatusView(result.data);
-            autostartModeSelect.value = view.mode;
-            autostartModeSelect.disabled = view.disabled;
-            autostartStatus.textContent = view.text;
-            autostartStatus.style.color = view.color;
+            const enabled = Boolean(result.data?.enabled);
+            const mode = enabled
+              ? String(result.data?.mode || "startup")
+              : "disabled";
+            autostartModeSelect.value = mode;
+            autostartStatus.textContent = enabled
+              ? `現在: ${mode === "logon" ? "ログオン時" : "システム起動時"}`
+              : "現在: 無効";
+            autostartStatus.style.color = enabled ? "var(--green)" : "var(--main-txt)";
           } catch (error) {
             console.error("自動起動タスク状態取得エラー:", error);
-            autostartModeSelect.disabled = false;
             autostartStatus.textContent = "状態の取得に失敗しました。";
             autostartStatus.style.color = "var(--accent)";
           }
@@ -564,7 +542,7 @@ function clampNumberInRange(value, min, max, fallback) {
         autostartModeSelect.addEventListener("change", async () => {
           const previousMode = autostartModeSelect.dataset.previousMode || "disabled";
           const nextMode = autostartModeSelect.value || "disabled";
-          if (autostartModeSelect.disabled || nextMode === previousMode) return;
+          if (nextMode === previousMode) return;
 
           const confirmed = await showSettingsConfirmModal(
             elements,
@@ -2172,7 +2150,6 @@ global.initializeSettingsUiController = initializeSettingsUiController;
 global.__settingsUiTestUtils = {
     setSettingStatus,
     buildLocalVideoDirsStatusText,
-    buildAutostartStatusView,
     applyLocalVideoDirsFromServer,
     applyFallbackThumbnailSettingFromServer,
     applyDownloadEstimateSettingFromServer,
