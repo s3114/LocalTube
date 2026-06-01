@@ -7,7 +7,7 @@ YouTube動画をPCに保存し、ローカルで管理・再生するための�
 - コメントやライブチャット、サムネイルの保存、再生
 
 
-## セットアップ
+## Windowsでの起動について
 
 動画での詳しいセットアップ方法はこちら
 [https://www.youtube.com/watch?v=CHa9mrQl_lM
@@ -21,16 +21,19 @@ YouTube動画をPCに保存し、ローカルで管理・再生するための�
 
 ## macOSでの起動について
 
-1. Node.js 20 以上をインストール
+1. [こちら](https://github.com/s3114/LocalTube/archive/refs/heads/main.zip) からプロジェクトをダウンロード
+2. Node.js 20 以上をインストール
    - Homebrewを使う場合: `brew install node`
-2. 動画をダウンロードする場合は必要なmacOS用外部ツールをインストール
+3. 動画をダウンロードする場合は必要なmacOS用外部ツールをインストール
    - まとめて入れる場合: `mac依存ツールインストール.command` をダブルクリック
    - 手動で入れる場合: `brew install yt-dlp ffmpeg atomicparsley deno`
-3. 初回のみ依存パッケージをインストール
+4. 初回のみ依存パッケージをインストール
    - `npm install`
-4. `起動.command` をダブルクリック、またはターミナルで `npm start` / `node start-localtube.js` を実行
-5. ブラウザで `http://localhost:3000` を開く
+5. `起動.command` をダブルクリック、またはターミナルで `npm start` / `node start-localtube.js` を実行
+6. ブラウザで `http://localhost:3000` を開く
 
+- 現在の既知の問題
+  - アプリの自動アップデートには対応していません。
 
 私自身がmacを所持しておらず、経験もないため、完全にAI任せのファイルとなっています。
 実行できるかどうかの確認もできていないため、macを所持している方が居たら修正をお願いします。
