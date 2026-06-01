@@ -19,9 +19,7 @@ YouTube動画をPCに保存し、ローカルで管理・再生するための�
 4. ブラウザで `http://localhost:3000` を開く
 
 
-## macOSでの起動
-
-`macに対応させたい方のための.md` の内容をもとに、macOSでも最低限の起動と動画ダウンロードに対応しています。
+## macOSでの起動について
 
 1. Node.js 20 以上をインストール
    - Homebrewを使う場合: `brew install node`
@@ -33,15 +31,17 @@ YouTube動画をPCに保存し、ローカルで管理・再生するための�
 4. `起動.command` をダブルクリック、またはターミナルで `npm start` / `node start-localtube.js` を実行
 5. ブラウザで `http://localhost:3000` を開く
 
-`start-localtube.js` はWindows/macOS共通の起動ファイルです。Windowsの `起動.bat` / `起動最小構成.bat` とmacOSの `起動.command` は、最終的にこの共通ファイルからサーバーを起動します。
-macOSではWindows用の `.exe` / `.dll` は実行しません。Homebrew等でインストールされる `yt-dlp`、`ffmpeg`、`AtomicParsley`、`deno` コマンドを使用します。Finderから起動した場合でも `/opt/homebrew/bin` / `/usr/local/bin` をPATHへ補完します。
-自動起動設定はWindowsでは `create_autostart_task.ps1` / `delete_autostart_task.ps1` を使ってタスクスケジューラを操作します。macOSではWindows専用の自動起動設定（タスクスケジューラ）は利用できないため、設定ページ上では無効表示になります。
+
+私自身がmacを所持しておらず、経験もないため、完全にAI任せのファイルとなっています。
+実行できるかどうかの確認もできていないため、macを所持している方が居たら修正をお願いします。
+
 
 ## ライセンス
 
 このプロジェクトは MIT License のもとで公開されています。
 
 詳細は LICENSE ファイルを参照してください。
+
 
 ## コントリビューション
 
