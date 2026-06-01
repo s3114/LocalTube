@@ -23,19 +23,28 @@ function resolveExistingToolPath(baseDir, candidates, { allowPathLookup = false 
   return list.find((candidate) => String(candidate || "").trim()) || null;
 }
 
+function platformToolCandidates(windowsName, posixName, platform = process.platform) {
+  return platform === "win32" ? [windowsName, posixName] : [posixName];
+}
+
 function resolveYtDlpPath(baseDir) {
-  return resolveExistingToolPath(baseDir, ["yt-dlp.exe", "yt-dlp"], {
-    allowPathLookup: true,
-  });
+  return resolveExistingToolPath(
+    baseDir,
+    platformToolCandidates("yt-dlp.exe", "yt-dlp"),
+    { allowPathLookup: true },
+  );
 }
 
 function resolveFfmpegPath(baseDir) {
-  return resolveExistingToolPath(baseDir, ["ffmpeg.exe", "ffmpeg"], {
-    allowPathLookup: true,
-  });
+  return resolveExistingToolPath(
+    baseDir,
+    platformToolCandidates("ffmpeg.exe", "ffmpeg"),
+    { allowPathLookup: true },
+  );
 }
 
 module.exports = {
+  platformToolCandidates,
   resolveExistingToolPath,
   resolveYtDlpPath,
   resolveFfmpegPath,

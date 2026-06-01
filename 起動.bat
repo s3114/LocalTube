@@ -344,7 +344,7 @@ echo ==================================================
 echo.
 
 :START_SERVER
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -WindowStyle Hidden -FilePath 'node' -ArgumentList '\"%~dp0server.js\"' -WorkingDirectory '%~dp0'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -WindowStyle Hidden -FilePath 'node' -ArgumentList '\"%~dp0start-localtube.js\"' -WorkingDirectory '%~dp0'"
 echo Server started at http://localhost:%SERVER_PORT%
 echo Window will close after 15 seconds...
 timeout /t 15 /nobreak >nul
