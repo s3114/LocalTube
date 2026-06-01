@@ -1,19 +1,6 @@
 const fs = require("fs");
 const { createLogger } = require("../services/logger-service");
 
-const WINDOWS_AUTOSTART_ONLY_MESSAGE =
-  "自動起動設定はWindowsのタスクスケジューラ専用機能です。";
-
-function buildUnsupportedScheduleStatus(platform = process.platform) {
-  return {
-    enabled: false,
-    mode: "unsupported",
-    supported: false,
-    platform,
-    message: WINDOWS_AUTOSTART_ONLY_MESSAGE,
-  };
-}
-
 function buildScheduleResultFromStdout(stdout) {
   const resultContent = stdout.trim();
 
@@ -62,13 +49,8 @@ function removeResultFileQuietly(resultFilePath) {
   }
 }
 
-function isWindowsPlatform(platform = process.platform) {
-  return platform === "win32";
-}
-
 function registerScheduleRoutes(app, deps) {
   const { path, os, spawn, baseDir, apiOk, apiError } = deps;
-  const platform = deps.platform || process.platform;
   const logger = deps.logger || createLogger("route-schedule");
 
   function runPowerShellScript(scriptPath, args) {
@@ -130,10 +112,6 @@ function registerScheduleRoutes(app, deps) {
   }
 
   app.get("/api/schedule/status", async (_req, res) => {
-    if (!isWindowsPlatform(platform)) {
-      return apiOk(res, buildUnsupportedScheduleStatus(platform));
-    }
-
     const taskName = "YoutubeDL-AutoStart";
     const { error, code, stdout, stderr } = await runSchtasks([
       "/query",
@@ -152,26 +130,13 @@ function registerScheduleRoutes(app, deps) {
       return apiOk(res, {
         enabled: true,
         mode: detectScheduleModeFromXml(stdout),
-        supported: true,
-        platform,
       });
     }
 
-    return apiOk(res, {
-      enabled: false,
-      mode: "disabled",
-      supported: true,
-      platform,
-    });
+    return apiOk(res, { enabled: false, mode: "disabled" });
   });
 
   app.post("/api/schedule/create", async (req, res) => {
-    if (!isWindowsPlatform(platform)) {
-      return apiError(res, 501, WINDOWS_AUTOSTART_ONLY_MESSAGE, {
-        data: buildUnsupportedScheduleStatus(platform),
-      });
-    }
-
     const taskName = "YoutubeDL-AutoStart";
     const batPath = path.resolve(baseDir, "起動.bat");
     const psScriptPath = path.resolve(baseDir, "create_autostart_task.ps1");
@@ -229,12 +194,6 @@ function registerScheduleRoutes(app, deps) {
   });
 
   app.post("/api/schedule/delete", async (_req, res) => {
-    if (!isWindowsPlatform(platform)) {
-      return apiError(res, 501, WINDOWS_AUTOSTART_ONLY_MESSAGE, {
-        data: buildUnsupportedScheduleStatus(platform),
-      });
-    }
-
     const taskName = "YoutubeDL-AutoStart";
     const psScriptPath = path.resolve(baseDir, "delete_autostart_task.ps1");
     const resultFilePath = path.join(
@@ -280,8 +239,5 @@ function registerScheduleRoutes(app, deps) {
 module.exports = {
   registerScheduleRoutes,
   buildScheduleResultFromStdout,
-  buildUnsupportedScheduleStatus,
   detectScheduleModeFromXml,
-  isWindowsPlatform,
-  WINDOWS_AUTOSTART_ONLY_MESSAGE,
 };

@@ -5,7 +5,6 @@ const { spawnSync } = require("child_process");
 const { getLogEntries } = require("../services/log-stream-service");
 const { getLocalTubeErrorHints } = require("../../shared/error-hints");
 const {
-  platformToolCandidates,
   resolveFfmpegPath,
   resolveYtDlpPath,
 } = require("../services/tool-path-service");
@@ -476,30 +475,16 @@ function resolveExistingToolPath(baseDir, candidates, allowPathLookup = false) {
     if (fs.existsSync(fullPath)) return fullPath;
   }
   if (!allowPathLookup) return null;
-  return candidates.find((candidate) => String(candidate || "").trim()) || null;
+  return candidates[candidates.length - 1] || null;
 }
 
 function readToolVersions(baseDir) {
-  const ytDlpPath = resolveExistingToolPath(
-    baseDir,
-    platformToolCandidates("yt-dlp.exe", "yt-dlp"),
-    true,
-  );
-  const ffmpegPath = resolveExistingToolPath(
-    baseDir,
-    platformToolCandidates("ffmpeg.exe", "ffmpeg"),
-    true,
-  );
-  const denoPath = resolveExistingToolPath(
-    baseDir,
-    platformToolCandidates("deno.exe", "deno"),
-    true,
-  );
+  const ytDlpPath = resolveExistingToolPath(baseDir, ["yt-dlp.exe"]);
+  const ffmpegPath = resolveExistingToolPath(baseDir, ["ffmpeg.exe"]);
+  const denoPath = resolveExistingToolPath(baseDir, ["deno.exe", "deno"], true);
   const atomicParsleyPath = resolveExistingToolPath(
     baseDir,
-    process.platform === "win32"
-      ? ["AtomicParsley.exe", "atomicparsley.exe", "AtomicParsley"]
-      : ["AtomicParsley", "atomicparsley"],
+    ["AtomicParsley.exe", "atomicparsley.exe", "AtomicParsley"],
     true,
   );
 
