@@ -329,7 +329,9 @@ registerReportRoutes(app, {
 function scheduleServerRestart({ preferStartupBat }) {
   const scriptPath = path.resolve(__dirname, "server.js");
   const startupBatPath = path.resolve(__dirname, "起動.bat");
-  const useStartupBat = Boolean(preferStartupBat && fs.existsSync(startupBatPath));
+  const useStartupBat = Boolean(
+    process.platform === "win32" && preferStartupBat && fs.existsSync(startupBatPath),
+  );
   const helperCode = `
 const { spawn } = require("child_process");
 const nodePath = ${JSON.stringify(process.execPath)};
